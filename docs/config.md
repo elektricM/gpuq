@@ -199,6 +199,37 @@ override them).
 gpud announces this signal in every `granted` event; `gpud run --yield-signal` overrides it
 for one job.
 
+## [immich]
+
+The Immich ML adapter. The section is off unless it is present. gpud watches Immich's ML job
+queues and runs the GPU ML container only while it holds a lease. See `integrations.md`
+for the setup and `examples/immich.toml`.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `url` | required | Immich server, e.g. `http://127.0.0.1:2283`. gpud adds `/api`. |
+| `key_file` | required | File holding an Immich API key. Read on every call. |
+| `compose_dir` | required | Directory of the compose file; gpud runs docker compose there. |
+| `service` | required | Compose service of the GPU ML container. |
+| `container` | required | Its container name, for `docker inspect` (health). |
+| `compose_profile` | `"gpu"` | `docker compose --profile <this> up -d <service>`. |
+| `docker` | `["docker"]` | argv prefix for docker, e.g. `["sudo", "docker"]`. |
+| `class` | `"immich"` | Priority class of the lease; it must exist in `[classes]`, so add `immich = 3` or set another class. |
+| `vram` | `"6G"` | VRAM the lease declares. |
+| `card` | primary card | A `[[gpu.card]]` name. |
+| `poll_s` | `30` | Time between backlog checks. |
+| `min_backlog` | `200` | Backlog that makes gpud pause the queues and ask for the card. |
+| `cpu_ok_backlog` | `50` | After a release, a backlog this small is resumed for the CPU container; a larger one stays paused. |
+| `queues` | `["smartSearch", "faceDetection", "ocr"]` | The ML queues to watch, pause and resume. |
+| `gpu_concurrency` | `{ smartSearch = 8, faceDetection = 4, ocr = 2 }` | Queue concurrency while on the GPU. The old values come back on release. Names must be in `queues`. |
+| `health_timeout_s` | `600` | How long the container may take to become healthy. |
+| `settle_s` | `35` | Wait after "healthy" so Immich notices the container before the queues resume. |
+| `drain_poll_s` | `5` | Time between checks for active jobs on release (60 checks at most). |
+| `state_file` | `$XDG_STATE_HOME/gpud/immich.json`, else `~/.local/state/gpud/immich.json` | Remembers that gpud paused the queues. |
+
+The backlog is `waiting + active + delayed + paused` summed over `queues`. `gpud check-config`
+prints one `immich:` line for the section.
+
 ## [[service]]
 
 A managed GPU service. Repeat the table for each one. See `integrations.md` for how they behave.

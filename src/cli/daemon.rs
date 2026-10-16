@@ -29,11 +29,14 @@ use crate::config::{CardSpec, Config, ConfigError, GpuVendor, LlmBackend};
 use crate::gate::{Gate, GateOptions};
 use crate::probe::detect::{make_probe, ProbeOptions, Vendor};
 use crate::workload::hook::CommandHook;
+use crate::workload::immich::{self, ImmichView};
 use crate::workload::managed;
 use crate::workload::service::ServiceControl;
 
 /// How long the tasks get to finish after a shutdown signal.
 const SHUTDOWN_GRACE: Duration = Duration::from_secs(10);
+/// Same, with the Immich adapter configured: its release path gets 30 s.
+const SHUTDOWN_GRACE_IMMICH: Duration = Duration::from_secs(35);
 
 /// Every problem in a config error, one per line.
 fn problems(e: &ConfigError) -> Vec<String> {
@@ -239,6 +242,7 @@ fn build_backend(cfg: &Config) -> Result<Built, String> {
 struct BackendStatus {
     backend: Arc<dyn Backend>,
     swap: Option<Arc<LlamaSwap>>,
+    immich: Option<Arc<ImmichView>>,
 }
 
 #[async_trait]
@@ -259,10 +263,14 @@ impl StatusExtra for BackendStatus {
                     .collect()
             }),
         };
-        match models {
+        let mut extra = match models {
             Ok(models) => json!({"backend": {"kind": kind, "models": models}}),
             Err(e) => json!({"backend": {"kind": kind, "error": e.to_string()}}),
+        };
+        if let (Some(view), Some(obj)) = (&self.immich, extra.as_object_mut()) {
+            obj.insert("immich".into(), view.json());
         }
+        extra
     }
 }
 
@@ -363,9 +371,22 @@ async fn serve(cfg: Config, path: Option<&Path>) -> Result<(), String> {
         let gate = Gate::new(options, backend.clone(), handle.clone());
         tasks.spawn(gate.serve(listener, stopped(stop_rx.clone())));
     }
-    let extra = Arc::new(BackendStatus { backend, swap });
+    let immich_view = cfg.immich.as_ref().map(|_| ImmichView::new());
+    let extra = Arc::new(BackendStatus {
+        backend,
+        swap,
+        immich: immich_view.clone(),
+    });
     let api = Api::new(handle.clone(), extra).with_yield_signal(cfg.run.yield_signal.clone());
     tasks.spawn(api.serve(api_listener, stopped(stop_rx.clone())));
+    if let (Some(im), Some(view)) = (cfg.immich.clone(), immich_view) {
+        let (arbiter, rx) = (handle.clone(), stop_rx.clone());
+        tasks.spawn(async move {
+            if let Err(e) = immich::run(im, arbiter, rx, view).await {
+                tracing::error!("immich adapter stopped: {e:#}");
+            }
+        });
+    }
     let services = cfg.service.clone();
     let managed_rx = stop_rx.clone();
     tasks.spawn(async move {
@@ -378,11 +399,17 @@ async fn serve(cfg: Config, path: Option<&Path>) -> Result<(), String> {
     wait_for_signal().await;
     tracing::info!("shutting down");
     let _ = stop_tx.send(true);
+    // The Immich adapter may need to stop its container (up to 30 s) before the card is free.
+    let grace = if cfg.immich.is_some() {
+        SHUTDOWN_GRACE_IMMICH
+    } else {
+        SHUTDOWN_GRACE
+    };
     let drain = async { while tasks.join_next().await.is_some() {} };
-    if tokio::time::timeout(SHUTDOWN_GRACE, drain).await.is_err() {
+    if tokio::time::timeout(grace, drain).await.is_err() {
         tracing::warn!(
             "tasks still running after {}s; exiting anyway",
-            SHUTDOWN_GRACE.as_secs()
+            grace.as_secs()
         );
     }
     Ok(())

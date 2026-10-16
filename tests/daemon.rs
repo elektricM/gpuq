@@ -396,6 +396,66 @@ async fn backend_none_has_no_gate_but_grants_leases() {
     assert_eq!(daemon.terminate().await, 0);
 }
 
+#[tokio::test]
+async fn immich_section_adds_its_object_to_status_and_the_cli_prints_a_line() {
+    let fake = FakeLlamaSwap::start().await;
+    let setup = Setup::new();
+    // No key file: the adapter stays idle and says why. Docker does not exist and is not needed.
+    let immich = format!(
+        r#"
+[classes]
+immich = 3
+
+[immich]
+url = "http://127.0.0.1:9"
+key_file = "{key}"
+compose_dir = "{dir}"
+service = "ml-gpu"
+container = "ml_gpu"
+docker = ["{dir}/no-such-docker"]
+state_file = "{dir}/immich.json"
+"#,
+        key = setup.path("no-key").display(),
+        dir = setup.dir.path().display(),
+    );
+    let cfg = setup.config(&fake.url(), &immich);
+    let check = run_cli(&["check-config", "-c", cfg.to_str().unwrap()]).await;
+    assert!(
+        check.out.contains("immich: http://127.0.0.1:9"),
+        "{}",
+        check.out
+    );
+    let daemon = Daemon::start(&setup, &cfg).await;
+
+    let mut st = daemon.status_json().await;
+    for _ in 0..50 {
+        if st["immich"]["error"].is_string() {
+            break;
+        }
+        sleep(Duration::from_millis(50)).await;
+        st = daemon.status_json().await;
+    }
+    assert_eq!(
+        st["immich"],
+        json!({"state": "idle", "backlog": null, "paused_by_gpud": false,
+               "error": "no usable API key"}),
+        "{st}"
+    );
+    // The backend key is still there next to it.
+    assert_eq!(st["backend"]["kind"], "llama-swap", "{st}");
+
+    let d = finish(daemon.cli(&["status"]).spawn().unwrap()).await;
+    assert_eq!(d.rc, 0, "{}", d.err);
+    let lines: Vec<&str> = d.out.lines().filter(|l| l.starts_with("immich")).collect();
+    assert_eq!(lines.len(), 1, "{}", d.out);
+    assert!(
+        lines[0].contains("idle") && lines[0].contains("no usable API key"),
+        "{}",
+        d.out
+    );
+    assert_eq!(daemon.terminate().await, 0);
+}
+
 // ---------------------------------------------------------------------- several cards
 
 impl Setup {

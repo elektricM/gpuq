@@ -126,3 +126,10 @@ yield_signal = "SIGUSR1"   # what `gpud run` sends a yieldable job; --yield-sign
 # backend = "http://127.0.0.1:8189"
 # gpu_paths = ["/prompt"]   # empty = every request needs the card
 # busy_url = "http://127.0.0.1:8189/queue"   # while this reports work, keep the lease
+#
+# [immich]                  # Immich ML driven by the queue backlog; see examples/immich.toml
+# url = "http://127.0.0.1:2283"
+# key_file = "/etc/gpud/immich.key"
+# compose_dir = "/srv/immich"
+# service = "immich-machine-learning-gpu"
+# container = "immich_machine_learning_gpu"

@@ -138,10 +138,8 @@ fn unknown_key_is_rejected() {
 
 #[test]
 fn python_style_sections_point_at_service() {
-    for section in ["comfyui", "immich"] {
-        let msg = err_text(&format!("[{section}]\nenabled = true\n"));
-        assert!(msg.contains("[[service]]"), "{msg}");
-    }
+    let msg = err_text("[comfyui]\nenabled = true\n");
+    assert!(msg.contains("[[service]]"), "{msg}");
 }
 
 #[test]

@@ -3,12 +3,13 @@
 "I run X. How do I plug it in?" Find X below, copy the matching file from `examples/`, change
 the names and ports, run `gpud check-config -c FILE`.
 
-## Four kinds of workload
+## Kinds of workload
 
 | Kind | Use it for | You write | gpud does |
 |---|---|---|---|
 | LLM backend behind the gate | llama-swap, Ollama, llama-server, vLLM, SGLang | `[gate]`, `[llm]` | Proxies the API, holds requests while a job has the card, unloads and reloads models. |
 | Managed service | ComfyUI, Immich ML, a TTS/ASR server, any CUDA/ROCm daemon | `[[service]]` | Starts and stops it (systemd, docker, podman, command), optionally gates its HTTP port. |
+| Immich adapter | Immich ML with a CPU fallback | `[immich]` | Reads Immich's queues, pauses them, takes a lease and runs the GPU ML container only then. |
 | `gpud run` command | Training, whisper, ffmpeg, any script | Nothing in the config | Queues, takes a lease, runs the command, releases on exit. |
 | Native lease client | Your own program | HTTP calls (`lease-api.md`) | Same lease, as an NDJSON stream. |
 
@@ -153,8 +154,62 @@ Use a user unit for gpud when ComfyUI is a `systemctl --user` unit (below).
 
 ### Immich machine learning
 
-`examples/immich-ml.toml`. Immich server sends inference calls to `/predict` on the ML
-container. gpud sits in front of it:
+There are two ways. Pick the adapter if you can run a CPU ML container as well; use the gated
+service if you cannot.
+
+#### With the queue-aware adapter (`[immich]`)
+
+`examples/immich.toml`. gpud reads Immich's ML job queues and runs the GPU ML container only
+while it holds a lease. Nothing proxies through gpud: Immich talks to its ML containers
+directly.
+
+1. **Two ML URLs.** In Immich, Administration, Settings, Machine Learning, list two URLs: the
+   GPU container first, a CPU-only container second. Immich tries them in order and uses the
+   CPU one while the GPU one is down. The GPU container exists only while gpud holds a lease,
+   because a container that answers without VRAM would fail requests instead of letting Immich
+   fall back.
+2. **A compose profile.** Define the GPU ML service in your Immich compose file under
+   `profiles: ["gpu"]` with `restart: "no"`. gpud runs
+   `docker compose --profile gpu up -d <service>` and `... stop <service>` in `compose_dir`.
+   Set `compose_profile` if you named the profile differently.
+3. **An API key.** Create one in Immich (Account settings, API keys) with these permissions:
+   `queue.read` and `queue.update` (list, pause and resume queues) and `systemConfig.read` and
+   `systemConfig.update` (queue concurrency). Put the key alone in `key_file`. gpud reads the
+   file on every call, so you can rotate the key without restarting. If the file is missing or
+   unreadable, or Immich answers 401, gpud logs one warning, shows the reason in `gpud status`
+   and stays idle until the file changes.
+4. **gpud user.** It runs docker, so it needs the docker group (or set `docker`).
+
+What gpud does, once per `poll_s`:
+
+- The backlog is `waiting + active + delayed + paused` over `queues`. At `min_backlog` or more,
+  gpud pauses the queues (so the CPU container does not chew through a reindex) and queues for
+  a yieldable lease of class `class` named `immich-ml`.
+- When the lease is granted it starts the container, waits for `docker inspect` to report it
+  healthy, waits `settle_s` so Immich has noticed it, raises the queue concurrency to
+  `gpu_concurrency` and resumes the queues.
+- When the arbiter asks the lease to yield, or the backlog has been empty for two polls, gpud
+  pauses the queues, waits for active jobs (60 checks, `drain_poll_s` apart), stops the
+  container, restores the concurrency and releases the lease.
+- Then, a backlog of `cpu_ok_backlog` or less is resumed for the CPU container. A bigger one
+  stays paused until the next lease. A yield during the health wait or the settle sleep ends
+  the start at once.
+
+**State file.** gpud records `{"paused_by_gpud": true}` in `state_file` while it has the queues
+paused. If gpud restarts, it keeps going from there: with an empty backlog it resumes the
+queues and clears the flag, otherwise it queues for the card again.
+
+**Crashes and shutdown.** At startup, a GPU container that is running while gpud holds no lease
+is stopped. On `SIGTERM` while serving, gpud runs the release path (at most 30 s) so the
+container does not stay on the GPU. Errors in a poll are logged and retried on the next one.
+
+`gpud status` shows an `immich` line (state `idle`, `waiting`, `starting`, `serving` or
+`draining`, the backlog, and any error); `/status` has the same under `immich`.
+
+#### As a gated service (`[[service]]`)
+
+`examples/immich-ml.toml`, for setups without a CPU fallback. Immich server sends inference
+calls to `/predict` on the ML container. gpud sits in front of it:
 
 - Point Immich at gpud's port (Admin, Settings, Machine Learning). The container's published
   port moves to the `backend` address.
@@ -163,6 +218,7 @@ container. gpud sits in front of it:
   Immich is doing inference, and the VRAM is free the rest of the time.
 - Immich admin settings accept several ML URLs. List gpud's first and a CPU-only ML container
   second: Immich falls back to the CPU one when the GPU one is unavailable or still starting.
+  This setup does not pause the queues, so a reindex goes on whichever container answers.
 
 ### Other CUDA or ROCm services
 

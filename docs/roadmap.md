@@ -50,11 +50,3 @@ services without dropping live leases. Changing listen ports will keep needing a
 Intel is not supported because there is no single simple place to read VRAM from for both
 iGPUs and Arc cards. Until then, use `gpu.vendor = "command"` with a script that prints
 `used_mib total_mib`.
-
-## Immich queue-aware adapter
-
-The Python prototype paused Immich's job queues based on their backlog, so indexing ran when
-the card was free and not while it was in use. Today Immich ML is a gated managed service
-(`examples/immich-ml.toml`): the card is taken per `/predict` request and released when the
-requests stop. An adapter that talks to Immich's API could do better: pause and resume queues
-by backlog instead of waiting for requests, and avoid starting the container for a single photo.

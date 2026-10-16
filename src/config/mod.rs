@@ -7,6 +7,7 @@
 //! Durations are written as seconds (integer or float) and exposed as [`Duration`].
 
 mod card;
+mod immich;
 mod service;
 mod vram;
 
@@ -21,6 +22,7 @@ use crate::arbiter::{ClassTuning, Classes, Settings, Tuning};
 use crate::Mib;
 
 pub use card::{default_env_vars, CardSpec, GpuCard};
+pub use immich::Immich;
 pub use service::{Flavor, Service, ServiceGate, ServiceKind, ServiceSpec};
 pub use vram::{parse_vram, VramParseError};
 
@@ -81,6 +83,8 @@ pub struct Config {
     pub run: Run,
     /// Managed GPU services, one `[[service]]` table each.
     pub service: Vec<Service>,
+    /// The Immich ML adapter; present means enabled.
+    pub immich: Option<Immich>,
 }
 
 impl Default for Config {
@@ -94,6 +98,7 @@ impl Default for Config {
             classes: default_classes(),
             run: Run::default(),
             service: Vec::new(),
+            immich: None,
         }
     }
 }
@@ -441,7 +446,7 @@ impl Config {
             message,
         };
         let table: toml::Table = text.parse().map_err(|e| parse_err(format!("{e}")))?;
-        for old in ["comfyui", "immich"] {
+        for old in ["comfyui"] {
             if table.contains_key(old) {
                 return Err(parse_err(format!(
                     "[{old}] is no longer a built-in section; declare it as a [[service]] entry \
@@ -493,6 +498,11 @@ impl Config {
         }
 
         p.extend(self.card_problems());
+        if let Some(im) = &self.immich {
+            let classes: Vec<&str> = classes.keys().map(String::as_str).collect();
+            let cards: Vec<String> = self.cards().into_iter().map(|c| c.name).collect();
+            p.extend(im.problems(&classes, &cards));
+        }
         if self.gate.port == 0 {
             p.push("gate.port must be non-zero".into());
         }
@@ -657,6 +667,9 @@ impl Config {
             for svc in &self.service {
                 let _ = writeln!(s, "  {}", svc.summary());
             }
+        }
+        if let Some(im) = &self.immich {
+            let _ = writeln!(s, "{}", im.summary());
         }
         s
     }

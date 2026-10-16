@@ -4,6 +4,7 @@
 //! Everything that uses the GPU besides the LLM backend: commands, hooks, managed services.
 
 pub mod hook;
+pub mod immich;
 pub mod managed;
 pub mod service;
 

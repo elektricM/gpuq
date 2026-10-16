@@ -91,6 +91,9 @@ fn render(st: &Value) -> String {
         }
         None => {}
     }
+    if let Some(im) = st.get("immich").filter(|v| v.is_object()) {
+        put("immich", immich_line(im));
+    }
     for l in arr(st, "leases") {
         let y = if l.get("yield_requested").and_then(Value::as_bool) == Some(true) {
             " YIELD REQUESTED"
@@ -198,6 +201,21 @@ fn arr<'a>(v: &'a Value, key: &str) -> &'a [Value] {
         .map_or(&[], Vec::as_slice)
 }
 
+/// `state   backlog N   queues paused by gpud   error` for the `immich` object.
+fn immich_line(im: &Value) -> String {
+    let mut line = s(im, "state").to_owned();
+    if let Some(b) = im.get("backlog").and_then(Value::as_u64) {
+        line.push_str(&format!("   backlog {b}"));
+    }
+    if im.get("paused_by_gpud").and_then(Value::as_bool) == Some(true) {
+        line.push_str("   queues paused by gpud");
+    }
+    if let Some(e) = im.get("error").and_then(Value::as_str) {
+        line.push_str(&format!("   error: {e}"));
+    }
+    line
+}
+
 /// `model (state)` for one entry of the backend's model list.
 fn model_line(m: &Value) -> String {
     match m {
@@ -274,6 +292,21 @@ mod tests {
         assert!(t.contains("job on gpu1 vram=all"), "{t}");
         assert!(t.contains("w on any vram=512MiB"), "{t}");
         assert!(!t.contains("device "), "{t}");
+    }
+
+    #[test]
+    fn renders_one_immich_line() {
+        let st = json!({"state": "llm", "immich": {"state": "serving", "backlog": 120,
+            "paused_by_gpud": false, "error": null}});
+        assert!(render(&st).contains("immich     serving   backlog 120\n"));
+        let st = json!({"state": "llm", "immich": {"state": "idle", "backlog": null,
+            "paused_by_gpud": true, "error": "no usable API key"}});
+        let t = render(&st);
+        assert!(
+            t.contains("idle   queues paused by gpud   error: no usable API key"),
+            "{t}"
+        );
+        assert!(!render(&json!({"state": "llm"})).contains("immich"));
     }
 
     #[test]
