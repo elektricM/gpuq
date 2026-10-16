@@ -25,9 +25,18 @@ struct Out {
     err: String,
 }
 
+/// A port for a listener that is bound later. It is taken below the kernel's ephemeral range
+/// (32768 and up), so an outgoing connection cannot grab it before the listener binds it.
 fn free_port() -> u16 {
-    let l = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-    l.local_addr().unwrap().port()
+    use std::sync::atomic::{AtomicU16, Ordering};
+    static NEXT: AtomicU16 = AtomicU16::new(0);
+    let base = 20_000 + (std::process::id() % 12) as u16 * 1_000;
+    loop {
+        let port = base + NEXT.fetch_add(1, Ordering::Relaxed) % 1_000;
+        if std::net::TcpListener::bind(("127.0.0.1", port)).is_ok() {
+            return port;
+        }
+    }
 }
 
 fn gpud(args: &[&str]) -> Command {
