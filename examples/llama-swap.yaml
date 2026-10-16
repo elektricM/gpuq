@@ -1,0 +1,27 @@
+# A llama-swap config that works well with gpud (see llama-swap.toml).
+# Change the model paths, -ngl and context sizes to fit your card.
+
+models:
+  # The resident model (llm.resident = "chat"). --slot-save-path lets gpud save slot 0 to
+  # disk before it unloads the model and restore it afterwards, so a running conversation
+  # keeps its KV cache across a GPU job. The directory must be writable by llama-swap.
+  "chat":
+    cmd: |
+      llama-server --port ${PORT} -m /models/chat.gguf -ngl 99 --ctx-size 32768
+      --slot-save-path /var/cache/llama-swap/slots
+    ttl: 0
+
+  # Another GPU model. llama-swap swaps it in for "chat" on demand; gpud gates it the
+  # same way. gpud resolves the alias too, so gpt-4o-mini requests are treated as
+  # requests for "coder" (including its class in llm.model_classes).
+  "coder":
+    cmd: |
+      llama-server --port ${PORT} -m /models/coder.gguf -ngl 99
+    aliases: ["gpt-4o-mini"]
+
+  # A CPU-only model. gpud sees the marker in cmd (llm.cpu_markers) and never holds its
+  # requests, whatever the GPU is doing. Use CUDA_VISIBLE_DEVICES=-1 on NVIDIA.
+  "embed":
+    cmd: |
+      env HIP_VISIBLE_DEVICES=-1 ROCR_VISIBLE_DEVICES=-1
+      llama-server --port ${PORT} -m /models/embed.gguf --embeddings -ngl 0

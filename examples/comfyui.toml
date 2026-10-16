@@ -1,0 +1,45 @@
+# ComfyUI as a managed service, run by a systemd USER unit.
+# Install as ~/.config/gpud/config.toml and run gpud as a user service too
+# (packaging/systemd/gpud.user.service): only a user instance can control
+# `systemctl --user` units.
+#
+# What else to change:
+#   * Move ComfyUI to 8189 with a drop-in, so gpud can take 8188:
+#       # ~/.config/systemd/user/comfyui.service.d/50-gpud.conf
+#       [Service]
+#       ExecStart=
+#       ExecStart=%h/ComfyUI/.venv/bin/python main.py --listen 127.0.0.1 --port 8189
+#     (adjust the interpreter and directory; only --listen and --port matter), then
+#     `systemctl --user daemon-reload`.
+#   * Unit name and vram below.
+#   * Do not enable comfyui.service at boot: gpud starts it on the first prompt.
+#
+# With flavor = "comfyui", POST /prompt is answered at once and held until gpud has the
+# card. Other requests pass while ComfyUI runs and get a 503 while it is stopped, so
+# opening the UI never wakes the GPU.
+
+[llm]
+backend = "none"                     # no LLM server here, so no LLM gate: ComfyUI is the only tenant
+# With an LLM too, drop this line and add [gate] and the rest of [llm] (see llama-swap.toml).
+
+[[service]]
+name = "comfyui"
+flavor = "comfyui"
+class = "interactive"
+vram = "16G"
+yieldable = true                     # a higher class can take the card back
+stop_on_release = true
+idle_release_s = 120                 # no queued or running prompt for this long: release the card
+
+[service.control]
+kind = "systemd"
+unit = "comfyui.service"
+user = true
+health_url = "http://127.0.0.1:8189/system_stats"
+start_timeout_s = 180
+
+[service.gate]
+listen = "127.0.0.1:8188"            # what you open in the browser
+backend = "http://127.0.0.1:8189"    # ComfyUI after the drop-in
+gpu_paths = ["/prompt"]
+busy_url = "http://127.0.0.1:8189/queue"

@@ -1,0 +1,23 @@
+# gpud in front of SGLang. Same shape as vllm.toml: unload = stop, load = start.
+# Install as /etc/gpud/config.toml.
+#
+# What else to change:
+#   * Start SGLang on 127.0.0.1:8001 (`--host 127.0.0.1 --port 8001`); gpud takes 8000.
+#   * Change the unit name (or switch to docker / command, see vllm.toml).
+
+[gate]
+host = "127.0.0.1"
+port = 8000
+backend = "http://127.0.0.1:8001"
+
+[llm]
+backend = "sglang"
+idle_s = 300
+gap_s = 10
+
+[llm.service]
+kind = "systemd"
+unit = "sglang.service"
+user = false
+health_url = "http://127.0.0.1:8001/health"
+start_timeout_s = 600

@@ -1,0 +1,44 @@
+# A generic CUDA or ROCm daemon (a TTS or ASR HTTP server, an image API...) as a managed
+# service. Install as /etc/gpud/config.toml.
+#
+# What else to change:
+#   * Unit name, ports, vram, class. Start the daemon on 127.0.0.1:5001; gpud serves 5000.
+#   * gpu_paths: URL prefixes that need the card. Query strings are ignored. An empty
+#     list means every request does.
+#   * Without busy_url, a request counts as work until its response ends. If the daemon
+#     queues work internally, set busy_url to a URL that returns a non-empty JSON list or
+#     object while it is busy.
+#   * A daemon that must stay loaded: drop [service.gate] and the idle settings. gpud then
+#     takes the lease at startup and holds it, and the daemon stops only to let a higher
+#     class in (see docs/integrations.md).
+
+[llm]
+backend = "none"                     # no LLM gate on this machine
+
+[[service]]
+name = "tts"
+class = "interactive"
+vram = "6G"
+yieldable = true
+stop_on_release = true
+idle_release_s = 120
+
+[service.control]
+kind = "systemd"
+unit = "tts.service"
+health_url = "http://127.0.0.1:5001/health"
+start_timeout_s = 90
+
+[service.gate]
+listen = "127.0.0.1:5000"
+backend = "http://127.0.0.1:5001"
+gpu_paths = ["/v1/audio", "/synthesize"]
+# busy_url = "http://127.0.0.1:5001/queue"
+
+# Command variant for control (replace [service.control]):
+# [service.control]
+# kind = "command"
+# start = ["/usr/local/bin/tts-start"]
+# stop = ["/usr/local/bin/tts-stop"]
+# status = ["/usr/local/bin/tts-status"]
+# health_url = "http://127.0.0.1:5001/health"

@@ -1,0 +1,35 @@
+# gpud in front of llama-swap, with one resident model.
+# Install as /etc/gpud/config.toml. Pair it with llama-swap.yaml in this directory.
+#
+# What else to change:
+#   * llama-swap must move off port 8080 to gate.backend. With the stock systemd unit:
+#       # /etc/systemd/system/llama-swap.service.d/zz-gpud-port.conf
+#       [Service]
+#       ExecStart=
+#       ExecStart=/usr/local/bin/llama-swap -config /etc/llama-swap/config.yaml -watch-config -listen 127.0.0.1:8081
+#     then `systemctl daemon-reload && systemctl restart llama-swap`.
+#   * Clients keep using port 8080. Nothing to change on their side.
+#   * Model names below must match the keys in llama-swap.yaml.
+#   * Add [gpu] settings if auto-detection picks the wrong card (see docs/config.md).
+
+[gate]
+host = "127.0.0.1"
+port = 8080                          # where your clients already point
+backend = "http://127.0.0.1:8081"    # where llama-swap listens after the drop-in
+
+[llm]
+backend = "llama-swap"
+llama_swap_config = "/etc/llama-swap/config.yaml"   # gpud reads aliases and CPU-only models from it
+resident = "chat"                    # loaded again whenever the card goes idle
+slot_save_models = ["chat"]          # started with --slot-save-path: gpud saves and restores slot 0
+# cpu_models = ["embed"]             # only needed when gpud cannot read the YAML above
+idle_s = 300                         # background and batch jobs wait for this much LLM silence
+gap_s = 10                           # other classes wait for this much
+
+# Requests for "coder" are scheduled as a different class than the default "llm".
+[llm.model_classes]
+"coder" = "interactive"
+
+[classes]
+# Defaults: realtime 0, llm 1, interactive 2, background 3, batch 4.
+# Add your own here; lower number = more important.

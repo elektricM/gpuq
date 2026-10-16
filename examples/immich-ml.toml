@@ -1,0 +1,51 @@
+# Immich machine learning as a managed service in a docker container.
+# Install as /etc/gpud/config.toml.
+#
+# What else to change:
+#   * Container: use the CUDA, ROCm or OpenVINO image variant and keep the GPU devices in
+#     the compose file. Create the container once (`docker compose create`); gpud only
+#     starts and stops it. Use restart: "no".
+#   * Publish the container on 127.0.0.1:3004 and let gpud take 3003. In Immich admin
+#     settings, Machine Learning, set the URL to http://<gpud-host>:3003.
+#   * Immich admin settings accept several ML URLs. List gpud first and a CPU-only ML
+#     container second: Immich falls back to the CPU one while the GPU one is unavailable.
+#   * Run gpud as a user in the docker group (see docs/integrations.md).
+#   * "0.0.0.0" below exposes the port on the network; use a LAN address if you can.
+#
+# Only /predict (the inference call) needs the card. Other paths such as /ping pass while
+# the container is up and get a 503 while it is stopped, so health checks never wake the GPU.
+
+[llm]
+backend = "none"                     # no LLM gate on this machine
+
+[[service]]
+name = "immich-ml"
+class = "background"
+vram = "4G"
+yieldable = true
+stop_on_release = true               # the container goes down when the work is done
+idle_release_s = 60
+
+[service.control]
+kind = "docker"
+container = "immich_machine_learning"
+health_url = "http://127.0.0.1:3004/ping"
+start_timeout_s = 120
+
+[service.gate]
+listen = "0.0.0.0:3003"              # what Immich server points at
+backend = "http://127.0.0.1:3004"    # the container's published port
+gpu_paths = ["/predict"]
+
+# Compose service to create the container once (docker compose create), adjusted from the
+# one in the Immich docs. ROCm shown; NVIDIA uses the -cuda image and a deploy reservation.
+#
+#   services:
+#     immich-machine-learning-gpu:
+#       container_name: immich_machine_learning
+#       image: ghcr.io/immich-app/immich-machine-learning:release-rocm
+#       restart: "no"
+#       ports: ["127.0.0.1:3004:3003"]
+#       volumes: [model-cache:/cache]
+#       devices: ["/dev/dri:/dev/dri", "/dev/kfd:/dev/kfd"]
+#       group_add: [video]

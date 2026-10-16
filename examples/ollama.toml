@@ -1,0 +1,24 @@
+# gpud in front of Ollama.
+# Install as /etc/gpud/config.toml.
+#
+# What else to change:
+#   * Ollama normally listens on 11434, which is also where clients point. Either move
+#     Ollama and let gpud take 11434 (shown here), or leave Ollama alone and point
+#     clients at gpud's port.
+#   * To move Ollama, add a drop-in for ollama.service and restart it:
+#       # /etc/systemd/system/ollama.service.d/zz-gpud-port.conf
+#       [Service]
+#       Environment="OLLAMA_HOST=127.0.0.1:11435"
+#   * No slot save/restore with Ollama. gpud sends keep_alive -1, so models stay loaded
+#     until gpud unloads them for a GPU job.
+
+[gate]
+host = "127.0.0.1"
+port = 11434                         # what clients already use
+backend = "http://127.0.0.1:11435"   # where Ollama listens after the drop-in
+
+[llm]
+backend = "ollama"
+resident = "llama3.1:8b"             # reloaded when the card goes idle; empty = load on demand
+idle_s = 300
+gap_s = 10
