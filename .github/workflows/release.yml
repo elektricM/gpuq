@@ -1,0 +1,91 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+env:
+  CARGO_TERM_COLOR: always
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-musl
+            rpm_arch: x86_64
+          - target: aarch64-unknown-linux-musl
+            rpm_arch: aarch64
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      - name: Install cross (aarch64)
+        if: matrix.target == 'aarch64-unknown-linux-musl'
+        run: cargo install cross --locked --version 0.2.5
+
+      - name: Install musl-tools (x86_64)
+        if: matrix.target == 'x86_64-unknown-linux-musl'
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+
+      - name: Build
+        run: |
+          if [ "${{ matrix.target }}" = aarch64-unknown-linux-musl ]; then
+            cross build --release --locked --target ${{ matrix.target }}
+          else
+            cargo build --release --locked --target ${{ matrix.target }}
+          fi
+
+      - name: Check the binary is static
+        run: file target/${{ matrix.target }}/release/gpud
+
+      - name: Install packaging tools
+        run: cargo install cargo-deb cargo-generate-rpm --locked
+
+      - name: Package
+        run: |
+          set -eux
+          version="${GITHUB_REF_NAME#v}"
+          target="${{ matrix.target }}"
+          name="gpud-${version}-${target}"
+          mkdir -p dist "stage/${name}"
+          cp "target/${target}/release/gpud" README.md LICENSE "stage/${name}/"
+          cp -r examples "stage/${name}/examples"
+          mkdir -p "stage/${name}/packaging"
+          cp -r packaging/systemd "stage/${name}/packaging/systemd"
+          tar -C stage -czf "dist/${name}.tar.gz" "${name}"
+          cargo deb --no-build --no-strip --target "${target}" --output dist/
+          cargo generate-rpm --target "${target}" -o dist/
+          ls -l dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.target }}
+          path: dist/*
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: dist-*
+          merge-multiple: true
+      - name: Checksums
+        working-directory: dist
+        run: sha256sum * > SHA256SUMS && cat SHA256SUMS
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true

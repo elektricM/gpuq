@@ -1,0 +1,3 @@
+u gpud - "gpud GPU manager" /var/lib/gpud
+m gpud video
+m gpud render
