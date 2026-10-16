@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 The gpud authors
+// Copyright (C) 2026 Martin Dolez
 
 //! A fake llama-swap (with llama-server slots) on a real socket, plus a probe for its VRAM.
 //! Ports tests/fakes.py. Include with `#[path = "support/fake_llamaswap.rs"] mod fake_llamaswap;`.

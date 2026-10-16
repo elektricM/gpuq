@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 The gpud authors
+// Copyright (C) 2026 Martin Dolez
 
 //! The gate: pass-through, classification, CPU-only models, streaming and disconnects.
 //! Real sockets and real (short) time, like tests/test_gate.py.

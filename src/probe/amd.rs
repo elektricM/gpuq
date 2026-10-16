@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 The gpud authors
+// Copyright (C) 2026 Martin Dolez
 
 //! amdgpu's `mem_info_*` counters under `/sys/bus/pci/devices/<pci>`.
 //!

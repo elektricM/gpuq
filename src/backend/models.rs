@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 The gpud authors
+// Copyright (C) 2026 Martin Dolez
 
 //! Model table parsed from llama-swap's YAML: which models use the GPU, aliases, slot saving.
 //!

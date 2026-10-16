@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 The gpud authors
+// Copyright (C) 2026 Martin Dolez
 
 //! Servers that cannot unload a model at runtime (vLLM, SGLang): unloading stops the service,
 //! loading starts it again.

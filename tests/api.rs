@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 The gpud authors
+// Copyright (C) 2026 Martin Dolez
 
 //! Control API over a real socket, in front of the arbiter and the in-memory fakes.
 //! Ported from tests/test_api.py. Real time (sockets), with a short ping interval.

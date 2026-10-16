@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 The gpud authors
+// Copyright (C) 2026 Martin Dolez
 
 //! Hook runner. Ported from tests/test_hooks.py. Unix only (uses sh, true, sleep).
 #![cfg(unix)]

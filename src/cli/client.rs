@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 The gpud authors
+// Copyright (C) 2026 Martin Dolez
 
 //! Minimal HTTP/1 client for the control API: JSON GETs and the NDJSON lease stream.
 use bytes::Bytes;

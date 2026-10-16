@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 The gpud authors
+// Copyright (C) 2026 Martin Dolez
 
 //! Arbiter scheduling against a fake backend and a fake VRAM counter.
 //! Ported from tests/test_arbiter.py; time is paused, so the suite is deterministic.

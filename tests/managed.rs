@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 The gpud authors
+// Copyright (C) 2026 Martin Dolez
 
 //! Generic managed services: lease on demand, start and stop through command scripts, idle
 //! release, yield. Real sockets and short real time; the arbiter runs on in-memory fakes.

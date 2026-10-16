@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 The gpud authors
+// Copyright (C) 2026 Martin Dolez
 
 //! Helpers for the service and backend tests: a tiny fake HTTP server and fake service
 //! binaries (shell scripts that record their arguments and flip a state file).

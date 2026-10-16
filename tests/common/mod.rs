@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 The gpud authors
+// Copyright (C) 2026 Martin Dolez
 
 //! Shared test doubles: an in-memory fake llama-swap plus amdgpu VRAM counter, and a rig that
 //! starts the arbiter in front of them. No sockets, no processes; all waiting is tokio time.

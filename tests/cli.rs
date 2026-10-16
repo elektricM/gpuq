@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 The gpud authors
+// Copyright (C) 2026 Martin Dolez
 
 //! The `gpud` command line, run as a real subprocess against an in-process API server.
 //! Ported from tests/test_cli.py.
