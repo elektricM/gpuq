@@ -25,9 +25,9 @@ impl CommandHook {
 
 #[async_trait]
 impl OffloadHook for CommandHook {
-    /// The hook sees the card it should free as `GPUD_CARD`.
+    /// The hook sees the card it should free as `GPUQ_CARD`.
     async fn run(&self, card: &str) -> bool {
-        run_hook_env(&self.argv, self.timeout, &[("GPUD_CARD", card)]).await == Some(0)
+        run_hook_env(&self.argv, self.timeout, &[("GPUQ_CARD", card)]).await == Some(0)
     }
 }
 

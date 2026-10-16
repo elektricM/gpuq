@@ -10,7 +10,7 @@ mod support;
 use std::time::{Duration, Instant};
 
 use common::Rig;
-use gpud::config::{Flavor, ServiceKind, ServiceSpec};
+use gpuq::config::{Flavor, ServiceKind, ServiceSpec};
 use serde_json::{json, Value};
 use support::{eventually, service, FakeComfy, Managed};
 
@@ -22,7 +22,7 @@ async fn setup(render_ms: u64, idle_ms: u64) -> (Managed, FakeComfy) {
 async fn setup_with(
     render_ms: u64,
     idle_ms: u64,
-    tweak: impl FnOnce(&mut gpud::config::Service),
+    tweak: impl FnOnce(&mut gpuq::config::Service),
 ) -> (Managed, FakeComfy) {
     let comfy = FakeComfy::start(Duration::from_millis(render_ms)).await;
     let mut svc = service("comfyui", &comfy.url(), "20000M");
@@ -192,7 +192,7 @@ async fn held_prompts_are_visible_and_cancellable() {
     assert_eq!(job["create_time"], 5);
     let queue = json_of(&m, "/queue").await;
     assert_eq!(queue["queue_pending"][0][1], pid.as_str());
-    let waiting = |st: &gpud::arbiter::Status| st.queue.iter().any(|w| w.name == "comfyui");
+    let waiting = |st: &gpuq::arbiter::Status| st.queue.iter().any(|w| w.name == "comfyui");
     m.rig.wait_for(|st, _| waiting(st)).await;
     let r = m
         .http

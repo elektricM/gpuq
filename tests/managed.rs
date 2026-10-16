@@ -21,7 +21,7 @@ async fn rig() -> Rig {
 }
 
 /// A gated service named "tts" controlled by the fake's scripts.
-async fn start(fake: &FakeService, tweak: impl FnOnce(&mut gpud::config::Service)) -> Managed {
+async fn start(fake: &FakeService, tweak: impl FnOnce(&mut gpuq::config::Service)) -> Managed {
     let mut svc = service("tts", &fake.url(""), VRAM);
     svc.control = Some(fake.spec(false));
     svc.gate.as_mut().unwrap().gpu_paths = vec!["/work".into()];

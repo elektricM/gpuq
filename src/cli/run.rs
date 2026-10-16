@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Martin Dolez
 
-//! `gpud run` and `gpud hold`: keep a lease open for as long as the work lasts.
+//! `gpuq run` and `gpuq hold`: keep a lease open for as long as the work lasts.
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::str::FromStr;
@@ -22,27 +22,27 @@ const READOPT_EVERY: Duration = Duration::from_secs(2);
 
 #[derive(Args)]
 pub struct RunArgs {
-    /// Priority class from gpud's [classes] table.
+    /// Priority class from gpuq's [classes] table.
     #[arg(long, default_value = "batch")]
     class: String,
     /// VRAM to reserve, e.g. 8G, 3000M or all.
     #[arg(long, default_value = "all")]
     vram: String,
-    /// Lease name shown in `gpud status` (default: the command's basename).
+    /// Lease name shown in `gpuq status` (default: the command's basename).
     #[arg(long)]
     name: Option<String>,
     /// Signal the job when something more important needs the card.
     #[arg(long)]
     yieldable: bool,
-    /// Signal sent on a yield request, e.g. SIGUSR1 or TERM. Default: gpud's
+    /// Signal sent on a yield request, e.g. SIGUSR1 or TERM. Default: gpuq's
     /// `[run] yield_signal`, else SIGUSR1.
     #[arg(long, value_name = "SIGNAL")]
     yield_signal: Option<String>,
-    /// Card to run on: a name from `gpud status`, or `any` for the first card with room.
+    /// Card to run on: a name from `gpuq status`, or `any` for the first card with room.
     /// Default: the primary card.
     #[arg(long, value_name = "NAME|any")]
     card: Option<String>,
-    /// If gpud is not running, run the command anyway.
+    /// If gpuq is not running, run the command anyway.
     #[arg(long)]
     fallback: bool,
     /// The command, after `--`.
@@ -58,7 +58,7 @@ pub struct HoldArgs {
     vram: String,
     #[arg(long, default_value = "manual")]
     name: String,
-    /// Card to hold: a name from `gpud status`, or `any`. Default: the primary card.
+    /// Card to hold: a name from `gpuq status`, or `any`. Default: the primary card.
     #[arg(long, value_name = "NAME|any")]
     card: Option<String>,
 }
@@ -103,7 +103,7 @@ impl Fail {
     fn exit(self, addr: &str) -> ExitCode {
         match self {
             Fail::Down => {
-                say(&format!("gpud is not running ({addr})"));
+                say(&format!("gpuq is not running ({addr})"));
                 ExitCode::from(EX_UNAVAILABLE)
             }
             Fail::Msg(m) => {
@@ -120,7 +120,7 @@ struct Session {
     addr: String,
     body: Value,
     id: String,
-    /// The yield signal gpud announced with the grant.
+    /// The yield signal gpuq announced with the grant.
     yield_signal: Option<String>,
     /// The card the lease is on, and the environment that points a program at it.
     card: Option<String>,
@@ -158,11 +158,11 @@ impl Session {
                     }
                     Ok(Some(_)) => {}
                     Ok(None) => return Err(Fail::Msg(
-                        "gpud closed the connection before granting the lease".into())),
+                        "gpuq closed the connection before granting the lease".into())),
                     Err(e) => return Err(Fail::Msg(e.to_string())),
                 },
                 _ = &mut notice, if !told => {
-                    say("queued for the GPU (see `gpud status`)");
+                    say("queued for the GPU (see `gpuq status`)");
                     told = true;
                 }
                 sig = sigs.recv() => return Err(Fail::Signal(sig)),
@@ -170,7 +170,7 @@ impl Session {
         }
     }
 
-    /// Resolves when gpud asks the lease to yield. Meanwhile it reads pings and, if the
+    /// Resolves when gpuq asks the lease to yield. Meanwhile it reads pings and, if the
     /// connection is lost, re-adopts the lease with `resume_id` every 2 s. Cancel safe.
     async fn wait_yield(&mut self) {
         loop {
@@ -180,7 +180,7 @@ impl Session {
                     Ok(Some(_)) => continue,
                     Ok(None) | Err(_) => {
                         self.stream = None;
-                        say("lost gpud; re-adopting the lease");
+                        say("lost gpuq; re-adopting the lease");
                     }
                 }
             }
@@ -254,8 +254,8 @@ fn parse_signal(s: &str) -> Result<Signal, String> {
 }
 
 /// A path that does not exist yet, where programs can poll for a yield request.
-/// Kill the job if `gpud run` itself dies without cleaning up (kill -9, OOM killer): its lease
-/// ends with our connection, so a job left running would use the card behind gpud's back.
+/// Kill the job if `gpuq run` itself dies without cleaning up (kill -9, OOM killer): its lease
+/// ends with our connection, so a job left running would use the card behind gpuq's back.
 /// The runtime is single-threaded, so the thread that forks lives as long as the process.
 #[cfg(target_os = "linux")]
 fn die_with_parent(cmd: &mut Command) {
@@ -281,12 +281,12 @@ fn yield_file_path(lease_id: &str) -> PathBuf {
         .map(PathBuf::from)
         .filter(|d| d.is_dir())
         .unwrap_or_else(std::env::temp_dir);
-    dir.join(format!("gpud-yield-{}-{lease_id}", std::process::id()))
+    dir.join(format!("gpuq-yield-{}-{lease_id}", std::process::id()))
 }
 
 pub async fn run(addr: &str, a: RunArgs) -> ExitCode {
     let Some(program) = a.cmd.first() else {
-        say("nothing to run (use: gpud run [options] -- cmd ...)");
+        say("nothing to run (use: gpuq run [options] -- cmd ...)");
         return ExitCode::from(2);
     };
     // Check an explicit --yield-signal before queueing; the default comes with the grant.
@@ -318,7 +318,7 @@ pub async fn run(addr: &str, a: RunArgs) -> ExitCode {
         Ok(s) => Some(s),
         Err(Fail::Down) if a.fallback => {
             say(&format!(
-                "gpud is not running ({addr}); running without a lease"
+                "gpuq is not running ({addr}); running without a lease"
             ));
             None
         }
@@ -339,10 +339,10 @@ pub async fn run(addr: &str, a: RunArgs) -> ExitCode {
     let mut cmd = Command::new(program);
     cmd.args(&a.cmd[1..]);
     if let (Some(s), Some(f)) = (&session, &yield_file) {
-        cmd.env("GPUD_LEASE_ID", &s.id).env("GPUD_YIELD_FILE", f);
+        cmd.env("GPUQ_LEASE_ID", &s.id).env("GPUQ_YIELD_FILE", f);
         cmd.envs(s.env.iter().map(|(k, v)| (k, v)));
         if let Some(card) = &s.card {
-            cmd.env("GPUD_CARD", card);
+            cmd.env("GPUQ_CARD", card);
         }
     }
     die_with_parent(&mut cmd);

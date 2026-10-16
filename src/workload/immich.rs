@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Martin Dolez
 
-//! Immich ML on the GPU, only while gpud grants a lease.
+//! Immich ML on the GPU, only while gpuq grants a lease.
 //!
 //! Immich is configured with two ML URLs, the GPU container first and a CPU one second. The
 //! GPU container exists only while this task holds a lease: a reachable container without
@@ -36,14 +36,14 @@ use tokio::time::{sleep, timeout, Instant};
 use crate::arbiter::{CardSel, Handle, Lease, LeaseRequest};
 use crate::config::{parse_vram, Immich};
 
-/// Lease name, as shown in `gpud status`.
+/// Lease name, as shown in `gpuq status`.
 pub const LEASE_NAME: &str = "immich-ml";
 
 /// Per-request limit for the Immich API.
 const API_TIMEOUT: Duration = Duration::from_secs(30);
 /// Checks for active jobs before the container is stopped anyway.
 const DRAIN_CHECKS: usize = 60;
-/// Time the release path gets when gpud is shutting down.
+/// Time the release path gets when gpuq is shutting down.
 const SHUTDOWN_RELEASE: Duration = Duration::from_secs(30);
 /// Longest wait for one docker call.
 const DOCKER_TIMEOUT: Duration = Duration::from_secs(300);
@@ -112,13 +112,13 @@ impl ImmichView {
         }
     }
 
-    /// `{"state", "backlog", "paused_by_gpud", "error"}`.
+    /// `{"state", "backlog", "paused_by_gpuq", "error"}`.
     pub fn json(&self) -> Value {
         let s = self.get();
         json!({
             "state": s.state.as_str(),
             "backlog": s.backlog,
-            "paused_by_gpud": s.paused,
+            "paused_by_gpuq": s.paused,
             "error": s.error,
         })
     }
@@ -283,7 +283,7 @@ impl Adapter {
         self.view.update(|s| s.state = state);
     }
 
-    /// Sleep `d`, or less if gpud shuts down or `lease` is asked to yield.
+    /// Sleep `d`, or less if gpuq shuts down or `lease` is asked to yield.
     async fn nap(&self, d: Duration, lease: Option<&Lease>) -> Wake {
         let mut sd = self.shutdown.clone();
         tokio::select! {
@@ -300,7 +300,7 @@ impl Adapter {
 
     // ------------------------------------------------------------------ key and API
 
-    /// The API key. Read on every call: the file gets rotated and gpud must follow.
+    /// The API key. Read on every call: the file gets rotated and gpuq must follow.
     fn key(&self) -> Option<String> {
         let read = std::fs::read_to_string(&self.c.key_file)
             .map_err(|e| e.to_string())
@@ -411,7 +411,7 @@ impl Adapter {
         Ok(out)
     }
 
-    /// Pause or resume every ML queue and remember that gpud did it. A failure on one queue does
+    /// Pause or resume every ML queue and remember that gpuq did it. A failure on one queue does
     /// not stop the others; the first error is returned.
     async fn set_paused(&self, paused: bool) -> Result<(), ApiError> {
         let mut first = None;
@@ -431,7 +431,7 @@ impl Adapter {
                 }
             }
         }
-        // Pausing even one queue means gpud has something to undo; resuming is only done
+        // Pausing even one queue means gpuq has something to undo; resuming is only done
         // once every queue is.
         if (paused && done > 0) || (!paused && first.is_none()) {
             self.save_state(paused);
@@ -759,7 +759,7 @@ fn load_state(path: &Path) -> bool {
     std::fs::read_to_string(path)
         .ok()
         .and_then(|t| serde_json::from_str::<Value>(&t).ok())
-        .and_then(|v| v["paused_by_gpud"].as_bool())
+        .and_then(|v| v["paused_by_gpuq"].as_bool())
         .unwrap_or(false)
 }
 
@@ -768,6 +768,6 @@ fn write_state(path: &Path, paused: bool) -> std::io::Result<()> {
         std::fs::create_dir_all(dir)?;
     }
     let tmp = path.with_extension("json.tmp");
-    std::fs::write(&tmp, json!({"paused_by_gpud": paused}).to_string())?;
+    std::fs::write(&tmp, json!({"paused_by_gpuq": paused}).to_string())?;
     std::fs::rename(&tmp, path)
 }

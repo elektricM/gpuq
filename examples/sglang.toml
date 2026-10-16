@@ -1,8 +1,8 @@
-# gpud in front of SGLang. Same shape as vllm.toml: unload = stop, load = start.
-# Install as /etc/gpud/config.toml.
+# gpuq in front of SGLang. Same shape as vllm.toml: unload = stop, load = start.
+# Install as /etc/gpuq/config.toml.
 #
 # What else to change:
-#   * Start SGLang on 127.0.0.1:8001 (`--host 127.0.0.1 --port 8001`); gpud takes 8000.
+#   * Start SGLang on 127.0.0.1:8001 (`--host 127.0.0.1 --port 8001`); gpuq takes 8000.
 #   * Change the unit name (or switch to docker / command, see vllm.toml).
 
 [gate]

@@ -207,7 +207,7 @@ pub enum Flavor {
 #[derive(Clone, Debug, PartialEq, Eq, Default, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct ServiceGate {
-    /// `host:port` gpud listens on.
+    /// `host:port` gpuq listens on.
     pub listen: String,
     /// Where requests are forwarded.
     pub backend: String,

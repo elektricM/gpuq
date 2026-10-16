@@ -12,8 +12,8 @@ mod support;
 use std::time::{Duration, Instant};
 
 use common::{granted, Rig};
-use gpud::arbiter::Vram;
-use gpud::config::Config;
+use gpuq::arbiter::Vram;
+use gpuq::config::Config;
 use serde_json::json;
 use support::{eventually, eventually_async, FakeDocker, Harness, GPU_CONCURRENCY};
 use tokio::time::sleep;
@@ -27,7 +27,7 @@ async fn harness() -> Harness {
 /// A realtime job that does not fit next to the Immich lease, so the arbiter asks it to yield.
 fn urgent(
     h: &Harness,
-) -> tokio::task::JoinHandle<Result<gpud::arbiter::Lease, gpud::arbiter::ArbiterError>> {
+) -> tokio::task::JoinHandle<Result<gpuq::arbiter::Lease, gpuq::arbiter::ArbiterError>> {
     h.rig
         .spawn_acquire("realtime", Vram::Mib(URGENT_MIB), false, "urgent")
 }
@@ -130,7 +130,7 @@ async fn a_grant_starts_the_container_waits_settles_then_raises_concurrency_and_
         "concurrency raised {:?} after the container turned healthy",
         raised_at.duration_since(healthy_at)
     );
-    // The full config went back, with the GPU values and the sections gpud does not touch.
+    // The full config went back, with the GPU values and the sections gpuq does not touch.
     let put = &h.immich.config_puts()[0];
     for (q, n) in GPU_CONCURRENCY {
         assert_eq!(put["job"][q]["concurrency"], n);
@@ -335,7 +335,7 @@ async fn a_missing_or_empty_key_file_keeps_the_adapter_idle() {
 async fn a_pause_left_by_a_previous_run_is_undone_when_the_backlog_is_gone() {
     let mut h = harness().await;
     std::fs::create_dir_all(h.state_file.parent().unwrap()).unwrap();
-    std::fs::write(&h.state_file, r#"{"paused_by_gpud": true}"#).unwrap();
+    std::fs::write(&h.state_file, r#"{"paused_by_gpuq": true}"#).unwrap();
     h.immich.set_paused(true);
     h.immich.set_backlog(0);
     assert!(h.immich.all_paused());
@@ -344,14 +344,14 @@ async fn a_pause_left_by_a_previous_run_is_undone_when_the_backlog_is_gone() {
     eventually("state cleared", || h.state_paused() == Some(false)).await;
     assert!(h.lease_names().await.is_empty());
     assert!(h.docker.compose_calls().is_empty());
-    assert_eq!(h.view.json()["paused_by_gpud"], false);
+    assert_eq!(h.view.json()["paused_by_gpuq"], false);
 }
 
 #[tokio::test]
 async fn a_pause_left_by_a_previous_run_with_a_small_backlog_still_asks_for_the_card() {
     let mut h = harness().await;
     std::fs::create_dir_all(h.state_file.parent().unwrap()).unwrap();
-    std::fs::write(&h.state_file, r#"{"paused_by_gpud": true}"#).unwrap();
+    std::fs::write(&h.state_file, r#"{"paused_by_gpuq": true}"#).unwrap();
     h.immich.set_paused(true);
     h.immich.set_backlog(10);
     h.start(&[]);
@@ -464,7 +464,7 @@ async fn the_status_object_has_four_fields_and_follows_the_states() {
     let v = h.view.json();
     assert_eq!(
         v,
-        json!({"state": "idle", "backlog": null, "paused_by_gpud": false, "error": null})
+        json!({"state": "idle", "backlog": null, "paused_by_gpuq": false, "error": null})
     );
     h.immich.set_backlog(300);
     h.start(&[]);
@@ -472,7 +472,7 @@ async fn the_status_object_has_four_fields_and_follows_the_states() {
     let v = h.view.json();
     assert_eq!(v["state"], "serving");
     assert_eq!(v["backlog"], 300);
-    assert_eq!(v["paused_by_gpud"], false);
+    assert_eq!(v["paused_by_gpuq"], false);
     assert!(v["error"].is_null());
     assert_eq!(v.as_object().unwrap().len(), 4);
 
@@ -495,7 +495,7 @@ fn parse(extra: &str) -> Result<Config, String> {
 const MINIMAL: &str = r#"
 [immich]
 url = "http://127.0.0.1:2283"
-key_file = "/etc/gpud/immich.key"
+key_file = "/etc/gpuq/immich.key"
 compose_dir = "/srv/immich"
 service = "ml-gpu"
 container = "ml_gpu"
@@ -601,19 +601,19 @@ fn the_state_file_defaults_follow_xdg_then_home() {
     std::env::set_var("XDG_STATE_HOME", "/xdg/state");
     assert_eq!(
         c.state_path().unwrap().to_str(),
-        Some("/xdg/state/gpud/immich.json")
+        Some("/xdg/state/gpuq/immich.json")
     );
     std::env::remove_var("XDG_STATE_HOME");
     std::env::set_var("HOME", "/srv/someone");
     assert_eq!(
         c.state_path().unwrap().to_str(),
-        Some("/srv/someone/.local/state/gpud/immich.json")
+        Some("/srv/someone/.local/state/gpuq/immich.json")
     );
     let mut c = c;
-    c.state_file = Some("/var/lib/gpud/immich.json".into());
+    c.state_file = Some("/var/lib/gpuq/immich.json".into());
     assert_eq!(
         c.state_path().unwrap().to_str(),
-        Some("/var/lib/gpud/immich.json")
+        Some("/var/lib/gpuq/immich.json")
     );
 }
 

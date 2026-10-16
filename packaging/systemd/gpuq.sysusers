@@ -1,0 +1,3 @@
+u gpuq - "gpuq GPU scheduler" /var/lib/gpuq
+m gpuq video
+m gpuq render

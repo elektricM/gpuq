@@ -6,8 +6,8 @@
 
 use std::time::{Duration, Instant};
 
-use gpud::arbiter::OffloadHook;
-use gpud::workload::hook::{run_hook, CommandHook};
+use gpuq::arbiter::OffloadHook;
+use gpuq::workload::hook::{run_hook, CommandHook};
 
 fn argv(a: &[&str]) -> Vec<String> {
     a.iter().map(|s| s.to_string()).collect()

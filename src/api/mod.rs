@@ -93,7 +93,7 @@ impl Api {
         self
     }
 
-    /// Signal name sent with every grant (`[run] yield_signal`), so `gpud run` uses it
+    /// Signal name sent with every grant (`[run] yield_signal`), so `gpuq run` uses it
     /// unless told otherwise.
     pub fn with_yield_signal(mut self, signal: impl Into<String>) -> Self {
         self.yield_signal = Some(signal.into());

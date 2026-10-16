@@ -6,11 +6,11 @@
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use gpud::arbiter::Vram;
-use gpud::config::{parse_vram, Config, ConfigError, GpuVendor, LlmBackend, ServiceKind};
+use gpuq::arbiter::Vram;
+use gpuq::config::{parse_vram, Config, ConfigError, GpuVendor, LlmBackend, ServiceKind};
 
 fn example_path() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("examples/gpud.toml")
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("examples/gpuq.toml")
 }
 
 fn parse(text: &str) -> Result<Config, ConfigError> {
@@ -73,7 +73,7 @@ fn llm_config_alias_is_accepted() {
 
 #[test]
 fn missing_explicit_path_is_an_error() {
-    match Config::load(Some(Path::new("/nonexistent/gpud.toml"))) {
+    match Config::load(Some(Path::new("/nonexistent/gpuq.toml"))) {
         Err(ConfigError::Read { source, .. }) => {
             assert_eq!(source.kind(), std::io::ErrorKind::NotFound)
         }

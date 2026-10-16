@@ -1,15 +1,15 @@
 # Immich machine learning as a managed service in a docker container.
-# Install as /etc/gpud/config.toml.
+# Install as /etc/gpuq/config.toml.
 #
 # What else to change:
 #   * Container: use the CUDA, ROCm or OpenVINO image variant and keep the GPU devices in
-#     the compose file. Create the container once (`docker compose create`); gpud only
+#     the compose file. Create the container once (`docker compose create`); gpuq only
 #     starts and stops it. Use restart: "no".
-#   * Publish the container on 127.0.0.1:3004 and let gpud take 3003. In Immich admin
-#     settings, Machine Learning, set the URL to http://<gpud-host>:3003.
-#   * Immich admin settings accept several ML URLs. List gpud first and a CPU-only ML
+#   * Publish the container on 127.0.0.1:3004 and let gpuq take 3003. In Immich admin
+#     settings, Machine Learning, set the URL to http://<gpuq-host>:3003.
+#   * Immich admin settings accept several ML URLs. List gpuq first and a CPU-only ML
 #     container second: Immich falls back to the CPU one while the GPU one is unavailable.
-#   * Run gpud as a user in the docker group (see docs/integrations.md).
+#   * Run gpuq as a user in the docker group (see docs/integrations.md).
 #   * "0.0.0.0" below exposes the port on the network; use a LAN address if you can.
 #
 # Only /predict (the inference call) needs the card. Other paths such as /ping pass while

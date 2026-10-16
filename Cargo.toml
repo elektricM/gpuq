@@ -1,14 +1,14 @@
 [package]
-name = "gpud"
+name = "gpuq"
 version = "0.1.1"
 edition = "2021"
 rust-version = "1.80"
-description = "GPU manager and queue: one card, many AI and GPU workloads"
+description = "GPU scheduler for Linux: priority classes, leases and VRAM accounting for jobs and services"
 license = "GPL-3.0-or-later"
-repository = "https://github.com/elektricM/gpud"
+repository = "https://github.com/elektricM/gpuq"
 readme = "README.md"
 authors = ["Martin Dolez"]
-homepage = "https://github.com/elektricM/gpud"
+homepage = "https://github.com/elektricM/gpuq"
 keywords = ["gpu", "llm", "scheduler", "vram", "queue"]
 categories = ["command-line-utilities"]
 
@@ -50,30 +50,30 @@ copyright = "2026 Martin Dolez"
 section = "utils"
 priority = "optional"
 extended-description = """\
-gpud decides who owns the GPU: an LLM server behind an HTTP gate, or leased jobs, \
+gpuq decides who owns the GPU: an LLM server behind an HTTP gate, or leased jobs, \
 with priority classes, idle timers and leases tied to their connection."""
 maintainer-scripts = "packaging/deb/"
-conf-files = ["/etc/gpud/config.toml"]
+conf-files = ["/etc/gpuq/config.toml"]
 assets = [
-    ["target/release/gpud", "usr/bin/gpud", "755"],
-    ["packaging/systemd/gpud.service", "usr/lib/systemd/system/gpud.service", "644"],
-    ["packaging/systemd/gpud.user.service", "usr/lib/systemd/user/gpud.service", "644"],
-    ["packaging/systemd/gpud.sysusers", "usr/lib/sysusers.d/gpud.conf", "644"],
-    ["examples/gpud.toml", "etc/gpud/config.toml", "644"],
-    ["examples/*.toml", "usr/share/doc/gpud/examples/", "644"],
-    ["README.md", "usr/share/doc/gpud/README.md", "644"],
-    ["LICENSE", "usr/share/doc/gpud/LICENSE", "644"],
+    ["target/release/gpuq", "usr/bin/gpuq", "755"],
+    ["packaging/systemd/gpuq.service", "usr/lib/systemd/system/gpuq.service", "644"],
+    ["packaging/systemd/gpuq.user.service", "usr/lib/systemd/user/gpuq.service", "644"],
+    ["packaging/systemd/gpuq.sysusers", "usr/lib/sysusers.d/gpuq.conf", "644"],
+    ["examples/gpuq.toml", "etc/gpuq/config.toml", "644"],
+    ["examples/*.toml", "usr/share/doc/gpuq/examples/", "644"],
+    ["README.md", "usr/share/doc/gpuq/README.md", "644"],
+    ["LICENSE", "usr/share/doc/gpuq/LICENSE", "644"],
 ]
 
 [package.metadata.generate-rpm]
 assets = [
-    { source = "target/release/gpud", dest = "/usr/bin/gpud", mode = "755" },
-    { source = "packaging/systemd/gpud.service", dest = "/usr/lib/systemd/system/gpud.service", mode = "644" },
-    { source = "packaging/systemd/gpud.user.service", dest = "/usr/lib/systemd/user/gpud.service", mode = "644" },
-    { source = "packaging/systemd/gpud.sysusers", dest = "/usr/lib/sysusers.d/gpud.conf", mode = "644" },
-    { source = "examples/gpud.toml", dest = "/etc/gpud/config.toml", mode = "644", config = "noreplace" },
-    { source = "examples/*.toml", dest = "/usr/share/doc/gpud/examples/", mode = "644", doc = true },
-    { source = "README.md", dest = "/usr/share/doc/gpud/README.md", mode = "644", doc = true },
-    { source = "LICENSE", dest = "/usr/share/doc/gpud/LICENSE", mode = "644", doc = true },
+    { source = "target/release/gpuq", dest = "/usr/bin/gpuq", mode = "755" },
+    { source = "packaging/systemd/gpuq.service", dest = "/usr/lib/systemd/system/gpuq.service", mode = "644" },
+    { source = "packaging/systemd/gpuq.user.service", dest = "/usr/lib/systemd/user/gpuq.service", mode = "644" },
+    { source = "packaging/systemd/gpuq.sysusers", dest = "/usr/lib/sysusers.d/gpuq.conf", mode = "644" },
+    { source = "examples/gpuq.toml", dest = "/etc/gpuq/config.toml", mode = "644", config = "noreplace" },
+    { source = "examples/*.toml", dest = "/usr/share/doc/gpuq/examples/", mode = "644", doc = true },
+    { source = "README.md", dest = "/usr/share/doc/gpuq/README.md", mode = "644", doc = true },
+    { source = "LICENSE", dest = "/usr/share/doc/gpuq/LICENSE", mode = "644", doc = true },
 ]
-post_install_script = "command -v systemd-sysusers >/dev/null 2>&1 && systemd-sysusers gpud.conf || true"
+post_install_script = "command -v systemd-sysusers >/dev/null 2>&1 && systemd-sysusers gpuq.conf || true"

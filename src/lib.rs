@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Martin Dolez
 
-//! gpud: one GPU, many workloads. See README.md.
+//! gpuq: one GPU, many workloads. See README.md.
 
 pub mod api;
 pub mod arbiter;

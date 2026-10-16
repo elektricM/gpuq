@@ -9,7 +9,7 @@ mod common;
 use std::time::Duration;
 
 use common::*;
-use gpud::arbiter::{Phase, Vram, WaiterKind};
+use gpuq::arbiter::{Phase, Vram, WaiterKind};
 use tokio::time::{sleep, timeout, Instant};
 
 #[tokio::test(start_paused = true)]

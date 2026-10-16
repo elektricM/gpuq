@@ -338,7 +338,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "gpud"
+name = "gpuq"
 version = "0.1.1"
 dependencies = [
  "anyhow",

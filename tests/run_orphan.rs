@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Martin Dolez
 
-//! `gpud run` killed with SIGKILL takes its job down with it (Linux only: PR_SET_PDEATHSIG).
+//! `gpuq run` killed with SIGKILL takes its job down with it (Linux only: PR_SET_PDEATHSIG).
 #![cfg(target_os = "linux")]
 
 mod support_api;
@@ -28,14 +28,14 @@ fn alive(pid: i32) -> bool {
 }
 
 #[tokio::test]
-async fn job_dies_when_gpud_run_is_killed() {
+async fn job_dies_when_gpuq_run_is_killed() {
     let api = TestApi::start(Duration::from_millis(200)).await;
     let dir = tempfile::tempdir().unwrap();
     let pidfile = dir.path().join("pid");
     let script = format!("echo $$ > {}; exec sleep 60", pidfile.display());
-    let mut run = Command::new(env!("CARGO_BIN_EXE_gpud"))
+    let mut run = Command::new(env!("CARGO_BIN_EXE_gpuq"))
         .args(["run", "--vram", "1G", "--", "sh", "-c", &script])
-        .env("GPUD_API", api.addr.to_string())
+        .env("GPUQ_API", api.addr.to_string())
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
@@ -71,6 +71,6 @@ async fn job_dies_when_gpud_run_is_killed() {
     if !gone {
         let _ = kill(Pid::from_raw(job), Signal::SIGKILL);
     }
-    assert!(gone, "the job outlived gpud run");
+    assert!(gone, "the job outlived gpuq run");
     assert!(status_within(&api.rig, Duration::from_secs(5), |s| s.leases.is_empty()).await);
 }

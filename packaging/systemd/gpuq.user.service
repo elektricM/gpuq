@@ -1,0 +1,15 @@
+[Unit]
+Description=gpuq GPU scheduler (user instance)
+Documentation=https://github.com/elektricM/gpuq
+After=network.target
+
+[Service]
+Type=notify
+# Reads ~/.config/gpuq/config.toml. Easiest mode when gpuq must start and stop
+# `systemctl --user` services such as ComfyUI.
+ExecStart=/usr/bin/gpuq daemon
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Martin Dolez
 
-//! `gpud status`.
+//! `gpuq status`.
 use std::process::ExitCode;
 
 use serde_json::Value;
@@ -13,7 +13,7 @@ pub async fn status(addr: &str, json: bool) -> ExitCode {
     let st = match client::get_json(addr, "/status").await {
         Ok(st) => st,
         Err(ClientError::Down(_)) => {
-            say(&format!("gpud is not running ({addr})"));
+            say(&format!("gpuq is not running ({addr})"));
             return ExitCode::from(EX_UNAVAILABLE);
         }
         Err(e) => {
@@ -201,14 +201,14 @@ fn arr<'a>(v: &'a Value, key: &str) -> &'a [Value] {
         .map_or(&[], Vec::as_slice)
 }
 
-/// `state   backlog N   queues paused by gpud   error` for the `immich` object.
+/// `state   backlog N   queues paused by gpuq   error` for the `immich` object.
 fn immich_line(im: &Value) -> String {
     let mut line = s(im, "state").to_owned();
     if let Some(b) = im.get("backlog").and_then(Value::as_u64) {
         line.push_str(&format!("   backlog {b}"));
     }
-    if im.get("paused_by_gpud").and_then(Value::as_bool) == Some(true) {
-        line.push_str("   queues paused by gpud");
+    if im.get("paused_by_gpuq").and_then(Value::as_bool) == Some(true) {
+        line.push_str("   queues paused by gpuq");
     }
     if let Some(e) = im.get("error").and_then(Value::as_str) {
         line.push_str(&format!("   error: {e}"));
@@ -297,13 +297,13 @@ mod tests {
     #[test]
     fn renders_one_immich_line() {
         let st = json!({"state": "llm", "immich": {"state": "serving", "backlog": 120,
-            "paused_by_gpud": false, "error": null}});
+            "paused_by_gpuq": false, "error": null}});
         assert!(render(&st).contains("immich     serving   backlog 120\n"));
         let st = json!({"state": "llm", "immich": {"state": "idle", "backlog": null,
-            "paused_by_gpud": true, "error": "no usable API key"}});
+            "paused_by_gpuq": true, "error": "no usable API key"}});
         let t = render(&st);
         assert!(
-            t.contains("idle   queues paused by gpud   error: no usable API key"),
+            t.contains("idle   queues paused by gpuq   error: no usable API key"),
             "{t}"
         );
         assert!(!render(&json!({"state": "llm"})).contains("immich"));

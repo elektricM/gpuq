@@ -1,15 +1,15 @@
 # Maintainer: Martin
-pkgname=gpud
+pkgname=gpuq
 pkgver=0.1.1
 pkgrel=1
 pkgdesc='GPU manager and queue: one card, many AI and GPU workloads'
 arch=(x86_64 aarch64)
-url='https://github.com/elektricM/gpud'
+url='https://github.com/elektricM/gpuq'
 license=('GPL-3.0-or-later')
 makedepends=(cargo)
-backup=('etc/gpud/config.toml')
+backup=('etc/gpuq/config.toml')
 options=('!lto')  # makepkg's LTO flags break ring's assembly at link time
-source=("$pkgname-$pkgver.tar.gz::https://github.com/elektricM/gpud/archive/refs/tags/v$pkgver.tar.gz")
+source=("$pkgname-$pkgver.tar.gz::https://github.com/elektricM/gpuq/archive/refs/tags/v$pkgver.tar.gz")
 sha256sums=('98de4e15e1385165060931e3e4106a936a6fcd16fd92de3590d6a10258b7e41e')
 
 prepare() {
@@ -34,12 +34,12 @@ check() {
 
 package() {
   cd "$pkgname-$pkgver"
-  install -Dm755 target/release/gpud "$pkgdir/usr/bin/gpud"
-  install -Dm644 packaging/systemd/gpud.service "$pkgdir/usr/lib/systemd/system/gpud.service"
-  install -Dm644 packaging/systemd/gpud.user.service "$pkgdir/usr/lib/systemd/user/gpud.service"
-  install -Dm644 packaging/systemd/gpud.sysusers "$pkgdir/usr/lib/sysusers.d/gpud.conf"
-  install -Dm644 examples/gpud.toml "$pkgdir/etc/gpud/config.toml"
-  install -Dm644 examples/gpud.toml "$pkgdir/usr/share/doc/$pkgname/examples/gpud.toml"
+  install -Dm755 target/release/gpuq "$pkgdir/usr/bin/gpuq"
+  install -Dm644 packaging/systemd/gpuq.service "$pkgdir/usr/lib/systemd/system/gpuq.service"
+  install -Dm644 packaging/systemd/gpuq.user.service "$pkgdir/usr/lib/systemd/user/gpuq.service"
+  install -Dm644 packaging/systemd/gpuq.sysusers "$pkgdir/usr/lib/sysusers.d/gpuq.conf"
+  install -Dm644 examples/gpuq.toml "$pkgdir/etc/gpuq/config.toml"
+  install -Dm644 examples/gpuq.toml "$pkgdir/usr/share/doc/$pkgname/examples/gpuq.toml"
   install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
   install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
 }

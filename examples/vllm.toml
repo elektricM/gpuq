@@ -1,12 +1,12 @@
-# gpud in front of vLLM. vLLM cannot unload a model while running, so "unload" means
+# gpuq in front of vLLM. vLLM cannot unload a model while running, so "unload" means
 # stopping it and "load" means starting it again (and waiting for /health).
-# Install as /etc/gpud/config.toml.
+# Install as /etc/gpuq/config.toml.
 #
 # What else to change:
 #   * Move vLLM off the port clients use: `--host 127.0.0.1 --port 8001` in its unit or
-#     container, and gpud takes 8000.
+#     container, and gpuq takes 8000.
 #   * Pick ONE [llm.service] block. Docker is active; systemd and command are below.
-#   * gpud needs permission to run the control command: see docs/integrations.md
+#   * gpuq needs permission to run the control command: see docs/integrations.md
 #     (docker group, or a polkit rule for systemd units).
 #   * vLLM reserves most of the card (--gpu-memory-utilization), so GPU jobs take turns
 #     with it: they wait for idle_s of silence, then vLLM is stopped for them.

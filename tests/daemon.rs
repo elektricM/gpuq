@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Martin Dolez
 
-//! The real `gpud` binary: check-config, then the daemon on loopback ports against a fake
+//! The real `gpuq` binary: check-config, then the daemon on loopback ports against a fake
 //! llama-swap. Unix only (shell-script probe, signals, unix datagram sockets).
 #![cfg(unix)]
 
@@ -39,12 +39,12 @@ fn free_port() -> u16 {
     }
 }
 
-fn gpud(args: &[&str]) -> Command {
-    let mut cmd = Command::new(env!("CARGO_BIN_EXE_gpud"));
+fn gpuq(args: &[&str]) -> Command {
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_gpuq"));
     cmd.args(args)
         .env_remove("NOTIFY_SOCKET")
-        .env_remove("GPUD_API")
-        .env_remove("GPUD_LOG")
+        .env_remove("GPUQ_API")
+        .env_remove("GPUQ_LOG")
         .env_remove("RUST_LOG")
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
@@ -56,7 +56,7 @@ fn gpud(args: &[&str]) -> Command {
 async fn finish(child: Child) -> Out {
     let o = timeout(Duration::from_secs(20), child.wait_with_output())
         .await
-        .expect("gpud did not finish in 20 s")
+        .expect("gpuq did not finish in 20 s")
         .unwrap();
     Out {
         rc: o.status.code().unwrap_or(-1),
@@ -66,7 +66,7 @@ async fn finish(child: Child) -> Out {
 }
 
 async fn run_cli(args: &[&str]) -> Out {
-    finish(gpud(args).spawn().unwrap()).await
+    finish(gpuq(args).spawn().unwrap()).await
 }
 
 /// Config files in a temp dir, pointing at the fake.
@@ -129,7 +129,7 @@ resume_grace_s = 0.1
             probe = self.probe_script().display(),
             models = models.display(),
         );
-        let p = self.path("gpud.toml");
+        let p = self.path("gpuq.toml");
         std::fs::write(&p, text).unwrap();
         p
     }
@@ -151,7 +151,7 @@ impl Daemon {
     }
 
     async fn start_with(setup: &Setup, config: &Path, env: &[(&str, &Path)]) -> Daemon {
-        let mut cmd = gpud(&["daemon", "-c", config.to_str().unwrap()]);
+        let mut cmd = gpuq(&["daemon", "-c", config.to_str().unwrap()]);
         for (k, v) in env {
             cmd.env(k, v);
         }
@@ -189,8 +189,8 @@ impl Daemon {
     }
 
     fn cli(&self, args: &[&str]) -> Command {
-        let mut cmd = gpud(args);
-        cmd.env("GPUD_API", &self.api);
+        let mut cmd = gpuq(args);
+        cmd.env("GPUQ_API", &self.api);
         cmd
     }
 
@@ -243,16 +243,16 @@ async fn check_config_lists_every_problem_and_exits_1() {
     assert_eq!(d.rc, 1);
     let lines: Vec<&str> = d.err.lines().collect();
     assert!(lines.len() >= 3, "{}", d.err);
-    assert!(lines.iter().all(|l| l.starts_with("gpud: ")), "{}", d.err);
+    assert!(lines.iter().all(|l| l.starts_with("gpuq: ")), "{}", d.err);
     assert!(d.err.contains("gate.backend"));
     assert!(d.err.contains("yield_signal"));
 }
 
 #[tokio::test]
 async fn check_config_missing_file_exits_1() {
-    let d = run_cli(&["check-config", "-c", "/nonexistent/gpud.toml"]).await;
+    let d = run_cli(&["check-config", "-c", "/nonexistent/gpuq.toml"]).await;
     assert_eq!(d.rc, 1);
-    assert!(d.err.starts_with("gpud: "), "{}", d.err);
+    assert!(d.err.starts_with("gpuq: "), "{}", d.err);
 }
 
 #[tokio::test]
@@ -301,7 +301,7 @@ async fn daemon_serves_the_gate_the_api_and_the_cli() {
     assert_eq!(st["backend"]["kind"], "llama-swap", "{st}");
     assert_eq!(st["backend"]["models"][0]["model"], "big", "{st}");
 
-    // `gpud status` shows it too.
+    // `gpuq status` shows it too.
     let d = finish(daemon.cli(&["status"]).spawn().unwrap()).await;
     assert_eq!(d.rc, 0, "{}", d.err);
     assert!(d.out.contains("llm"), "{}", d.out);
@@ -446,7 +446,7 @@ state_file = "{dir}/immich.json"
     }
     assert_eq!(
         st["immich"],
-        json!({"state": "idle", "backlog": null, "paused_by_gpud": false,
+        json!({"state": "idle", "backlog": null, "paused_by_gpuq": false,
                "error": "no usable API key"}),
         "{st}"
     );
@@ -516,7 +516,7 @@ reload_when_idle = false
             p1 = p1.display(),
             models = models.display(),
         );
-        let p = self.path("gpud.toml");
+        let p = self.path("gpuq.toml");
         std::fs::write(&p, text).unwrap();
         p
     }

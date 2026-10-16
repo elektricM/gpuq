@@ -132,7 +132,7 @@ pub struct Tuning {
     pub reload_slack_mib: Mib,
     /// ...or after waiting this long.
     pub reload_wait: Duration,
-    /// After a gpud restart with an empty card, time for clients to re-adopt their leases.
+    /// After a gpuq restart with an empty card, time for clients to re-adopt their leases.
     pub resume_grace: Duration,
     /// Hold LLM requests this long behind yieldable batch leases (zero = off).
     pub batch_hold: Duration,
@@ -262,7 +262,7 @@ pub struct LeaseRequest {
     pub yieldable: bool,
     pub name: String,
     pub pid: Option<u32>,
-    /// Re-adopt a lease granted before a gpud restart instead of queueing.
+    /// Re-adopt a lease granted before a gpuq restart instead of queueing.
     pub resume_id: Option<String>,
     pub card: CardSel,
 }

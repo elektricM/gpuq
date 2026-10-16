@@ -1,18 +1,18 @@
-# gpud configuration. Copy to /etc/gpud/config.toml (or ~/.config/gpud/config.toml).
+# gpuq configuration. Copy to /etc/gpuq/config.toml (or ~/.config/gpuq/config.toml).
 #
 # Every key is shown with its default. Keep only the ones you change; missing keys fall
 # back to the built-in value. Tables are merged into the defaults, lists and scalars are
 # replaced. Unknown keys are an error. Durations are seconds.
 
 [gate]
-# gpud listens where your clients already point (llama-swap's usual port) and forwards to
+# gpuq listens where your clients already point (llama-swap's usual port) and forwards to
 # the LLM server, which you move to `backend`. Use "*" to listen on all interfaces.
 host = "127.0.0.1"
 port = 8080
 backend = "http://127.0.0.1:8081"
 
 [api]
-# Control API used by the `gpud` CLI and by lease clients. Keep it on loopback: anyone who
+# Control API used by the `gpuq` CLI and by lease clients. Keep it on loopback: anyone who
 # can reach it can take the card.
 host = "127.0.0.1"
 port = 9390
@@ -65,7 +65,7 @@ reload_when_idle = true
 reload_delay_s = 20        # pause after the last job before reloading the resident model
 reload_slack_mib = 1024    # reload once VRAM is within this of the post-unload level...
 reload_wait_s = 120        # ...or after waiting this long
-resume_grace_s = 30        # after a gpud restart, time for `gpud run` clients to re-adopt leases
+resume_grace_s = 30        # after a gpuq restart, time for `gpuq run` clients to re-adopt leases
 
 batch_hold_s = 0           # hold LLM requests this long behind yieldable batch jobs (0 = off)
 batch_hold_count = 0       # ...but hand over as soon as this many are queued (0 = timer only)
@@ -101,7 +101,7 @@ background = 3
 batch = 4
 
 [run]
-yield_signal = "SIGUSR1"   # what `gpud run` sends a yieldable job; --yield-signal overrides it
+yield_signal = "SIGUSR1"   # what `gpuq run` sends a yieldable job; --yield-signal overrides it
 
 # Managed GPU services: ComfyUI, an ML container, a TTS server... One table each.
 # [[service]]
@@ -129,7 +129,7 @@ yield_signal = "SIGUSR1"   # what `gpud run` sends a yieldable job; --yield-sign
 #
 # [immich]                  # Immich ML driven by the queue backlog; see examples/immich.toml
 # url = "http://127.0.0.1:2283"
-# key_file = "/etc/gpud/immich.key"
+# key_file = "/etc/gpuq/immich.key"
 # compose_dir = "/srv/immich"
 # service = "immich-machine-learning-gpu"
 # container = "immich_machine_learning_gpu"

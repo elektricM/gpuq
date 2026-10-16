@@ -1,20 +1,20 @@
 # ComfyUI as a managed service, run by a systemd USER unit.
-# Install as ~/.config/gpud/config.toml and run gpud as a user service too
-# (packaging/systemd/gpud.user.service): only a user instance can control
+# Install as ~/.config/gpuq/config.toml and run gpuq as a user service too
+# (packaging/systemd/gpuq.user.service): only a user instance can control
 # `systemctl --user` units.
 #
 # What else to change:
-#   * Move ComfyUI to 8189 with a drop-in, so gpud can take 8188:
-#       # ~/.config/systemd/user/comfyui.service.d/50-gpud.conf
+#   * Move ComfyUI to 8189 with a drop-in, so gpuq can take 8188:
+#       # ~/.config/systemd/user/comfyui.service.d/50-gpuq.conf
 #       [Service]
 #       ExecStart=
 #       ExecStart=%h/ComfyUI/.venv/bin/python main.py --listen 127.0.0.1 --port 8189
 #     (adjust the interpreter and directory; only --listen and --port matter), then
 #     `systemctl --user daemon-reload`.
 #   * Unit name and vram below.
-#   * Do not enable comfyui.service at boot: gpud starts it on the first prompt.
+#   * Do not enable comfyui.service at boot: gpuq starts it on the first prompt.
 #
-# With flavor = "comfyui", POST /prompt is answered at once and held until gpud has the
+# With flavor = "comfyui", POST /prompt is answered at once and held until gpuq has the
 # card. Other requests pass while ComfyUI runs and get a 503 while it is stopped, so
 # opening the UI never wakes the GPU.
 

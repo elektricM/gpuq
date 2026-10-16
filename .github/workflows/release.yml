@@ -47,7 +47,7 @@ jobs:
           fi
 
       - name: Check the binary is static
-        run: file target/${{ matrix.target }}/release/gpud
+        run: file target/${{ matrix.target }}/release/gpuq
 
       - name: Install packaging tools
         run: cargo install cargo-deb cargo-generate-rpm --locked
@@ -57,9 +57,9 @@ jobs:
           set -eux
           version="${GITHUB_REF_NAME#v}"
           target="${{ matrix.target }}"
-          name="gpud-${version}-${target}"
+          name="gpuq-${version}-${target}"
           mkdir -p dist "stage/${name}"
-          cp "target/${target}/release/gpud" README.md LICENSE "stage/${name}/"
+          cp "target/${target}/release/gpuq" README.md LICENSE "stage/${name}/"
           cp -r examples "stage/${name}/examples"
           mkdir -p "stage/${name}/packaging"
           cp -r packaging/systemd "stage/${name}/packaging/systemd"

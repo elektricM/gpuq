@@ -9,7 +9,7 @@ mod support;
 
 use std::time::Duration;
 
-use gpud::workload::service::{Engine, ServiceControl, ServiceError};
+use gpuq::workload::service::{Engine, ServiceControl, ServiceError};
 use support::*;
 
 const FAST: Duration = Duration::from_millis(20);

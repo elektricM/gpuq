@@ -97,13 +97,13 @@ impl Gate {
             Err(BodyError::TooLarge) => {
                 return full(
                     StatusCode::PAYLOAD_TOO_LARGE,
-                    "gpud: request body too large\n".into(),
+                    "gpuq: request body too large\n".into(),
                 )
             }
             Err(BodyError::Read(e)) => {
                 return full(
                     StatusCode::BAD_REQUEST,
-                    format!("gpud: cannot read body: {e}\n"),
+                    format!("gpuq: cannot read body: {e}\n"),
                 )
             }
         };
@@ -113,7 +113,7 @@ impl Gate {
             match self.inner.arbiter.enter_llm(model, &class).await {
                 Ok(g) => guard = Some(Box::new(g)),
                 Err(e) => {
-                    return full(StatusCode::SERVICE_UNAVAILABLE, format!("gpud: {e}\n"));
+                    return full(StatusCode::SERVICE_UNAVAILABLE, format!("gpuq: {e}\n"));
                 }
             }
         }

@@ -9,9 +9,9 @@ should be automatic: detect the foreground GPU user, ask everything to yield, ha
 back afterwards.
 
 Today it is manual. The `interactive` class outranks `background` and `batch`, and
-`gpud hold --class interactive --vram all` takes the whole card until you press Ctrl-C.
+`gpuq hold --class interactive --vram all` takes the whole card until you press Ctrl-C.
 Yieldable jobs get asked to give it up; the LLM is unloaded. Wrap a game launcher in
-`gpud run --class interactive --vram all -- game` to get the same without remembering.
+`gpuq run --class interactive --vram all -- game` to get the same without remembering.
 
 ## Multi-GPU leftovers
 
@@ -20,7 +20,7 @@ Several cards work: one queue, a probe and an env per card, leases that name a c
 
 - Several LLM servers, one per card, each behind its own gate. Today the LLM lives on one card
   (`llm.card`).
-- Automatic `visible_devices`. You write the device number or UUID per card; gpud could work
+- Automatic `visible_devices`. You write the device number or UUID per card; gpuq could work
   out the mapping from PCI addresses.
 - Multi-card `auto`. `vendor = "auto"` only works with a single card, so each card names its
   vendor.
@@ -33,7 +33,7 @@ card, release a lease or ask a job to yield, so day-to-day use does not need the
 ship inside the binary (no separate frontend build) and stay on loopback by default, like the
 API itself. `GET /status` already returns most of what it needs.
 
-Today: `gpud status`, or `GET /status` on the control API.
+Today: `gpuq status`, or `GET /status` on the control API.
 
 ## Metrics
 

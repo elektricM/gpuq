@@ -1,28 +1,28 @@
 #!/bin/sh
-# `gpud run` examples. Each command waits for the card, runs under a lease, and releases
+# `gpuq run` examples. Each command waits for the card, runs under a lease, and releases
 # it on exit. The lease lives as long as the connection, so a crash cannot leak it.
 #
 # This file is a menu, not a script to run top to bottom. Copy the line you want.
 
 # Anything that uses the GPU. Waits until the LLM has been quiet for llm.idle_s.
-gpud run --class batch --vram 8G -- python embed_all.py
+gpuq run --class batch --vram 8G -- python embed_all.py
 
-# Whole card, with a name that shows up in `gpud status`.
-gpud run --class batch --vram all --name render -- ffmpeg -hwaccel cuda -i in.mp4 out.mp4
+# Whole card, with a name that shows up in `gpuq status`.
+gpuq run --class batch --vram all --name render -- ffmpeg -hwaccel cuda -i in.mp4 out.mp4
 
 # Higher class: waits only for the request in flight, not for LLM silence.
-gpud run --class interactive --vram 12G -- python generate_images.py
+gpuq run --class interactive --vram 12G -- python generate_images.py
 
-# A yieldable job. When something more important waits, gpud creates $GPUD_YIELD_FILE and
+# A yieldable job. When something more important waits, gpuq creates $GPUQ_YIELD_FILE and
 # sends SIGUSR1 (change with --yield-signal or [run] yield_signal). The job should save its
 # state and exit; it is never killed. See train.py below and the loop that resumes it.
-gpud run --class batch --vram 20G --yieldable --name train -- python train.py
+gpuq run --class batch --vram 20G --yieldable --name train -- python train.py
 
-# Run without a lease if gpud is not running (default: exit 69).
-gpud run --fallback --class batch --vram 8G -- python embed_all.py
+# Run without a lease if gpuq is not running (default: exit 69).
+gpuq run --fallback --class batch --vram 8G -- python embed_all.py
 
 # Hold the card by hand, for gaming or debugging, until Ctrl-C.
-gpud hold --class interactive --vram all --name manual
+gpuq hold --class interactive --vram all --name manual
 
 exit 0
 
@@ -30,7 +30,7 @@ exit 0
 #
 #     import os, signal, sys
 #
-#     yield_file = os.environ.get("GPUD_YIELD_FILE")   # set by `gpud run`; created on yield
+#     yield_file = os.environ.get("GPUQ_YIELD_FILE")   # set by `gpuq run`; created on yield
 #     asked = False
 #
 #     def on_yield(signum, frame):
@@ -53,7 +53,7 @@ exit 0
 # ---- resume until done ---------------------------------------------------------------------
 #
 #     while true; do
-#         gpud run --class batch --vram 20G --yieldable --name train -- python train.py
+#         gpuq run --class batch --vram 20G --yieldable --name train -- python train.py
 #         rc=$?
 #         [ "$rc" -eq 75 ] || exit "$rc"
 #         sleep 5

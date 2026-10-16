@@ -9,8 +9,8 @@ mod support;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use gpud::backend::ollama::Ollama;
-use gpud::backend::Backend;
+use gpuq::backend::ollama::Ollama;
+use gpuq::backend::Backend;
 use serde_json::json;
 use support::*;
 
@@ -175,9 +175,9 @@ async fn ollama_load_is_false_on_http_error_and_unreachable() {
 #[cfg(unix)]
 mod service_backed {
     use super::*;
-    use gpud::backend::llama_server::LlamaServer;
-    use gpud::backend::stopstart::StopStart;
-    use gpud::workload::service::{Engine, ServiceControl};
+    use gpuq::backend::llama_server::LlamaServer;
+    use gpuq::backend::stopstart::StopStart;
+    use gpuq::workload::service::{Engine, ServiceControl};
 
     /// Health is 200 while `state` in `dir` equals `up_value`.
     async fn health_server(dir: &std::path::Path, up_value: &'static str) -> FakeServer {

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Martin Dolez
 
-//! ComfyUI specifics: prompts are held by gpud and submitted once the lease is held.
+//! ComfyUI specifics: prompts are held by gpuq and submitted once the lease is held.
 
 use std::collections::{BTreeSet, HashMap, VecDeque};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -49,7 +49,7 @@ fn now_ms() -> u64 {
         .map_or(0, |d| d.as_millis() as u64)
 }
 
-/// A prompt gpud holds or has sent.
+/// A prompt gpuq holds or has sent.
 #[derive(Clone, Debug)]
 pub(super) struct Item {
     pub id: String,

@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Martin Dolez
 
-//! Managed GPU services (ComfyUI, an ML server, a TTS server...): gpud holds a lease for them
+//! Managed GPU services (ComfyUI, an ML server, a TTS server...): gpuq holds a lease for them
 //! while they work, starts and stops them, and can gate their HTTP port.
 //!
 //! Each service is one state machine (`machine.rs`) in its own task. With a `[service.gate]`
-//! gpud listens on `gate.listen` and proxies to `gate.backend`:
+//! gpuq listens on `gate.listen` and proxies to `gate.backend`:
 //!
 //! - A request whose path starts with one of `gpu_paths` (any path if the list is empty) needs
 //!   the card. Without a lease it is held until the lease is granted and the service is up;
@@ -222,7 +222,7 @@ impl GateCtx {
     fn stopped(&self) -> Response<ProxyBody> {
         full(
             StatusCode::SERVICE_UNAVAILABLE,
-            format!("gpud: {} is stopped; it starts on demand\n", self.name),
+            format!("gpuq: {} is stopped; it starts on demand\n", self.name),
         )
     }
 
@@ -254,13 +254,13 @@ impl GateCtx {
             Err(BodyError::TooLarge) => {
                 return full(
                     StatusCode::PAYLOAD_TOO_LARGE,
-                    "gpud: request body too large\n".into(),
+                    "gpuq: request body too large\n".into(),
                 )
             }
             Err(BodyError::Read(e)) => {
                 return full(
                     StatusCode::BAD_REQUEST,
-                    format!("gpud: cannot read body: {e}\n"),
+                    format!("gpuq: cannot read body: {e}\n"),
                 )
             }
         };
@@ -497,6 +497,6 @@ fn failed_job(id: &str, why: &str) -> Value {
         "priority": 0,
         "outputs_count": 0,
         "previewable_outputs_count": 0,
-        "execution_error": {"exception_message": why, "exception_type": "gpud submit error"},
+        "execution_error": {"exception_message": why, "exception_type": "gpuq submit error"},
     })
 }

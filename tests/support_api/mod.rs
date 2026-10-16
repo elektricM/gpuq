@@ -13,8 +13,8 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use gpud::api::{Api, StatusExtra};
-use gpud::arbiter::{self, Card};
+use gpuq::api::{Api, StatusExtra};
+use gpuq::arbiter::{self, Card};
 use serde_json::{json, Value};
 use tokio::net::TcpListener;
 use tokio::sync::oneshot;
@@ -138,7 +138,7 @@ impl TestApi {
         }
     }
 
-    /// Serve again on the same port, like a gpud restart.
+    /// Serve again on the same port, like a gpuq restart.
     pub async fn restart(&mut self) {
         self.stop().await;
         let listener = TcpListener::bind(self.addr).await.unwrap();
@@ -258,7 +258,7 @@ impl Events {
 pub async fn status_within(
     rig: &Rig,
     within: Duration,
-    pred: impl Fn(&gpud::arbiter::Status) -> bool,
+    pred: impl Fn(&gpuq::arbiter::Status) -> bool,
 ) -> bool {
     let end = tokio::time::Instant::now() + within;
     loop {

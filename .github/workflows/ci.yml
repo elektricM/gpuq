@@ -51,7 +51,7 @@ jobs:
         run: cargo build --release --target x86_64-unknown-linux-musl
       - name: Check the binary is static
         run: |
-          bin=target/x86_64-unknown-linux-musl/release/gpud
+          bin=target/x86_64-unknown-linux-musl/release/gpuq
           file "$bin"
           if ldd "$bin" 2>&1 | grep -q 'not a dynamic executable'; then
             echo "static"
@@ -63,5 +63,5 @@ jobs:
           fi
       - uses: actions/upload-artifact@v4
         with:
-          name: gpud-x86_64-unknown-linux-musl
-          path: target/x86_64-unknown-linux-musl/release/gpud
+          name: gpuq-x86_64-unknown-linux-musl
+          path: target/x86_64-unknown-linux-musl/release/gpuq

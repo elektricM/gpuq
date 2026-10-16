@@ -687,7 +687,7 @@ impl Actor {
                 self.event(format!("start: llm state, loaded {loaded:?}"));
             }
             Ok(_) => {
-                // Nothing loaded: maybe gpud restarted under a running job. Give `gpu run`
+                // Nothing loaded: maybe gpuq restarted under a running job. Give `gpu run`
                 // clients time to re-adopt their leases before reloading the LLM on top.
                 let grace = self.t.resume_grace;
                 self.cards[l].grace_until = Instant::now() + grace;

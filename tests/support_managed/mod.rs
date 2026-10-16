@@ -15,8 +15,8 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use bytes::Bytes;
-use gpud::config::{Flavor, Service, ServiceGate, ServiceKind, ServiceSpec};
-use gpud::workload::managed;
+use gpuq::config::{Flavor, Service, ServiceGate, ServiceKind, ServiceSpec};
+use gpuq::workload::managed;
 use http_body_util::{BodyExt, Full};
 use hyper::{Request, Response};
 use hyper_util::rt::TokioIo;

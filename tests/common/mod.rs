@@ -11,12 +11,12 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::Duration;
 
 use async_trait::async_trait;
-use gpud::arbiter::{
+use gpuq::arbiter::{
     self, ArbiterError, CardSel, ClassTuning, Classes, Handle, Lease, LeaseRequest, OffloadHook,
     Settings, Status, Tuning, Vram,
 };
-use gpud::backend::{Backend, BackendError, Capabilities};
-use gpud::probe::{ProbeError, VramProbe, VramReading};
+use gpuq::backend::{Backend, BackendError, Capabilities};
+use gpuq::probe::{ProbeError, VramProbe, VramReading};
 use tokio::task::JoinHandle;
 use tokio::time::{sleep, timeout, Instant};
 

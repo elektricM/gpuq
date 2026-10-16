@@ -1,19 +1,19 @@
 [Unit]
-Description=gpud, GPU manager and queue
-Documentation=https://github.com/elektricM/gpud
+Description=gpuq GPU scheduler
+Documentation=https://github.com/elektricM/gpuq
 After=network.target
-# If gpud fronts llama-swap, start it after the backend is up:
+# If gpuq fronts llama-swap, start it after the backend is up:
 #Wants=llama-swap.service
 #After=llama-swap.service
 
 [Service]
 Type=notify
-ExecStart=/usr/bin/gpud daemon -c /etc/gpud/config.toml
-User=gpud
-Group=gpud
+ExecStart=/usr/bin/gpuq daemon -c /etc/gpuq/config.toml
+User=gpuq
+Group=gpuq
 # video and render give read access to the GPU sysfs files and device nodes.
 SupplementaryGroups=video render
-StateDirectory=gpud
+StateDirectory=gpuq
 Restart=on-failure
 RestartSec=2
 
@@ -28,14 +28,14 @@ RestrictSUIDSGID=true
 LockPersonality=true
 #ReadWritePaths=/some/extra/path
 
-# What to relax when gpud has to act on other things:
+# What to relax when gpuq has to act on other things:
 # - Starting or stopping other system units: an unprivileged
-#   user needs a polkit rule allowing org.freedesktop.systemd1.manage-units for the gpud
+#   user needs a polkit rule allowing org.freedesktop.systemd1.manage-units for the gpuq
 #   user, or run this service as root (drop User=/Group=, and NoNewPrivileges=true).
 # - Starting or stopping docker containers: add the docker group, which is root-equivalent:
 #   SupplementaryGroups=video render docker
 #   Docker access is root-equivalent; weigh that before enabling it.
-# - For per-user services such as ComfyUI, use the user unit (gpud.user.service) instead.
+# - For per-user services such as ComfyUI, use the user unit (gpuq.user.service) instead.
 
 [Install]
 WantedBy=multi-user.target

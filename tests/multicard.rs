@@ -7,12 +7,12 @@
 
 mod support_multi;
 
-use gpud::arbiter::{ArbiterError, CardSel, Phase, Vram, WaiterKind};
+use gpuq::arbiter::{ArbiterError, CardSel, Phase, Vram, WaiterKind};
 use support_multi::*;
 use tokio::time::{sleep, timeout, Instant};
 
 /// Fill card `i` with a non-yieldable lease and matching used VRAM.
-async fn fill(rig: &MultiRig, i: usize, mib: u64) -> gpud::arbiter::Lease {
+async fn fill(rig: &MultiRig, i: usize, mib: u64) -> gpuq::arbiter::Lease {
     let lease = rig
         .lease_on(named(i), "interactive", mib, false, "filler")
         .await;
@@ -20,7 +20,7 @@ async fn fill(rig: &MultiRig, i: usize, mib: u64) -> gpud::arbiter::Lease {
     lease
 }
 
-fn env_of(lease: &gpud::arbiter::Lease) -> Vec<(String, String)> {
+fn env_of(lease: &gpuq::arbiter::Lease) -> Vec<(String, String)> {
     lease.env().to_vec()
 }
 

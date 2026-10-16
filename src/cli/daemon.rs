@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Martin Dolez
 
-//! `gpud daemon` and `gpud check-config`: build everything from the config and run it.
+//! `gpuq daemon` and `gpuq check-config`: build everything from the config and run it.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -91,7 +91,7 @@ fn build_cards(cfg: &Config) -> Result<Vec<arbiter::Card>, String> {
         .collect()
 }
 
-/// `gpud check-config`.
+/// `gpuq check-config`.
 pub fn check_config(path: Option<PathBuf>, strict: bool) -> ExitCode {
     let cfg = match Config::load(path.as_deref()) {
         Ok(c) => c,
@@ -128,9 +128,9 @@ pub fn check_config(path: Option<PathBuf>, strict: bool) -> ExitCode {
             Err(e) => {
                 failed = true;
                 if multi {
-                    eprintln!("gpud: warning: card {}: VRAM probe failed: {e}", c.name);
+                    eprintln!("gpuq: warning: card {}: VRAM probe failed: {e}", c.name);
                 } else {
-                    eprintln!("gpud: warning: VRAM probe failed: {e}");
+                    eprintln!("gpuq: warning: VRAM probe failed: {e}");
                 }
             }
         }
@@ -154,7 +154,7 @@ fn block_on_value<T: Send + 'static>(
 fn init_logging(verbose: bool) {
     use tracing_subscriber::EnvFilter;
     let default = if verbose { "debug" } else { "info" };
-    let filter = ["GPUD_LOG", "RUST_LOG"]
+    let filter = ["GPUQ_LOG", "RUST_LOG"]
         .iter()
         .find_map(|k| std::env::var(k).ok().filter(|v| !v.is_empty()))
         .and_then(|spec| EnvFilter::try_new(spec).ok())
@@ -217,7 +217,7 @@ fn build_backend(cfg: &Config) -> Result<Built, String> {
                 swap: Some(swap),
             }
         }
-        // gpud decides when models go: keep them loaded instead of Ollama's 5 min default.
+        // gpuq decides when models go: keep them loaded instead of Ollama's 5 min default.
         LlmBackend::Ollama => plain(Arc::new(
             Ollama::new(url)
                 .with_cpu_models(l.cpu_models.iter().cloned())
@@ -291,7 +291,7 @@ async fn stopped(mut rx: watch::Receiver<bool>) {
     let _ = rx.wait_for(|v| *v).await;
 }
 
-/// `gpud daemon`.
+/// `gpuq daemon`.
 pub fn run_daemon(path: Option<PathBuf>, verbose: bool) -> ExitCode {
     init_logging(verbose);
     let cfg = match Config::load(path.as_deref()) {
@@ -328,7 +328,7 @@ async fn serve(cfg: Config, path: Option<&Path>) -> Result<(), String> {
         _ => "built-in defaults".to_owned(),
     };
     tracing::info!(
-        "gpud {} starting, config: {source}, backend: {}",
+        "gpuq {} starting, config: {source}, backend: {}",
         env!("CARGO_PKG_VERSION"),
         cfg.llm.backend.as_str()
     );
@@ -432,7 +432,7 @@ async fn wait_for_signal() {
             _ = term.recv() => return,
             _ = int.recv() => return,
             _ = hup.recv() => {
-                tracing::warn!("config reload is not supported yet; restart gpud");
+                tracing::warn!("config reload is not supported yet; restart gpuq");
             }
         }
     }

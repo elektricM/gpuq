@@ -74,7 +74,7 @@ pub struct Immich {
         deserialize_with = "secs::deserialize"
     )]
     pub drain_poll: Duration,
-    /// JSON file remembering that gpud paused the queues.
+    /// JSON file remembering that gpuq paused the queues.
     #[serde(default)]
     pub state_file: Option<PathBuf>,
 }
@@ -122,8 +122,8 @@ fn default_drain_poll() -> Duration {
 }
 
 impl Immich {
-    /// `state_file`, else `$XDG_STATE_HOME/gpud/immich.json`, else
-    /// `~/.local/state/gpud/immich.json`. None when no home can be found.
+    /// `state_file`, else `$XDG_STATE_HOME/gpuq/immich.json`, else
+    /// `~/.local/state/gpuq/immich.json`. None when no home can be found.
     pub fn state_path(&self) -> Option<PathBuf> {
         if let Some(p) = &self.state_file {
             return Some(p.clone());
@@ -134,7 +134,7 @@ impl Immich {
                 .map(PathBuf::from)
         };
         let dir = env("XDG_STATE_HOME").or_else(|| env("HOME").map(|h| h.join(".local/state")))?;
-        Some(dir.join("gpud/immich.json"))
+        Some(dir.join("gpuq/immich.json"))
     }
 
     /// Problems with this section; `cards` are the configured card names.
@@ -201,7 +201,7 @@ impl Immich {
         p
     }
 
-    /// One line for `gpud check-config`.
+    /// One line for `gpuq check-config`.
     pub fn summary(&self) -> String {
         format!(
             "immich: {} queues [{}] class {} vram {} card {}, GPU at backlog >= {}, CPU ok at <= {}, service {}",

@@ -14,9 +14,9 @@ use tokio::task::AbortHandle;
 
 #[derive(Debug)]
 pub enum ClientError {
-    /// Nothing is listening: gpud is not running.
+    /// Nothing is listening: gpuq is not running.
     Down(String),
-    /// gpud answered but said no.
+    /// gpuq answered but said no.
     Refused(String),
     /// Anything else, e.g. the stream broke.
     Other(String),
@@ -36,9 +36,9 @@ impl std::fmt::Display for ClientError {
 #[derive(Debug, PartialEq, Eq)]
 pub struct Grant {
     pub id: String,
-    /// The yield signal gpud is configured with (if it says).
+    /// The yield signal gpuq is configured with (if it says).
     pub yield_signal: Option<String>,
-    /// The card the lease is on; None from a gpud that predates cards.
+    /// The card the lease is on; None from a gpuq that predates cards.
     pub card: Option<String>,
     pub env: Vec<(String, String)>,
 }
@@ -106,7 +106,7 @@ fn error_text(status: StatusCode, body: &str) -> String {
         .ok()
         .and_then(|v| v.get("error").and_then(Value::as_str).map(str::to_owned))
         .unwrap_or_else(|| body.trim().chars().take(200).collect());
-    format!("gpud refused the request ({status}): {msg}")
+    format!("gpuq refused the request ({status}): {msg}")
 }
 
 pub async fn get_json(addr: &str, path: &str) -> Result<Value, ClientError> {
@@ -148,7 +148,7 @@ impl LeaseStream {
         })
     }
 
-    /// The next event, or None when gpud closed the stream. Cancel safe.
+    /// The next event, or None when gpuq closed the stream. Cancel safe.
     pub async fn next(&mut self) -> Result<Option<Event>, ClientError> {
         loop {
             if let Some(i) = self.buf.iter().position(|&b| b == b'\n') {

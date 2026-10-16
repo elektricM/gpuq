@@ -11,7 +11,7 @@ use std::path::PathBuf;
 use std::time::{Duration, SystemTime};
 
 use fake_llamaswap::MODELS_YAML;
-use gpud::backend::models::ModelTable;
+use gpuq::backend::models::ModelTable;
 
 fn setup() -> (tempfile::TempDir, PathBuf) {
     let dir = tempfile::tempdir().unwrap();

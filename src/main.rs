@@ -2,5 +2,5 @@
 // Copyright (C) 2026 Martin Dolez
 
 fn main() -> std::process::ExitCode {
-    gpud::cli::main()
+    gpuq::cli::main()
 }

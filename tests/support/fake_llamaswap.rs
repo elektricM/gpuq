@@ -15,7 +15,7 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use gpud::probe::{ProbeError, VramProbe, VramReading};
+use gpuq::probe::{ProbeError, VramProbe, VramReading};
 use http_body_util::combinators::UnsyncBoxBody;
 use http_body_util::{BodyExt, Full};
 use hyper::body::{Body, Frame, Incoming};

@@ -1,8 +1,8 @@
 # Configuration reference
 
-gpud reads one TOML file. `gpud daemon -c FILE` and `gpud check-config -c FILE` take it
-explicitly. Without `-c` the first existing file of these wins: `/etc/gpud/config.toml`,
-then `$XDG_CONFIG_HOME/gpud/config.toml` (or `~/.config/gpud/config.toml`). With no file at all
+gpuq reads one TOML file. `gpuq daemon -c FILE` and `gpuq check-config -c FILE` take it
+explicitly. Without `-c` the first existing file of these wins: `/etc/gpuq/config.toml`,
+then `$XDG_CONFIG_HOME/gpuq/config.toml` (or `~/.config/gpuq/config.toml`). With no file at all
 the built-in defaults apply.
 
 Rules:
@@ -10,10 +10,10 @@ Rules:
 - Every key is optional. Tables merge into the defaults; lists and scalars replace them.
 - Unknown keys are an error, so a typo does not silently do nothing.
 - Durations are seconds (`_s` suffix), integer or float.
-- Run `gpud check-config` after every edit. It prints what it understood and reads the VRAM
+- Run `gpuq check-config` after every edit. It prints what it understood and reads the VRAM
   probe once. `--strict` makes a failing probe an error.
-- There is no reload. Restart gpud after editing (SIGHUP is logged and ignored).
-- `examples/gpud.toml` lists every key with its default and is checked against the code in the
+- There is no reload. Restart gpuq after editing (SIGHUP is logged and ignored).
+- `examples/gpuq.toml` lists every key with its default and is checked against the code in the
   test suite.
 
 ## [gate]
@@ -28,13 +28,13 @@ The reverse proxy in front of the LLM server.
 
 ## [api]
 
-The control API used by the `gpud` CLI and by lease clients (see `lease-api.md`). Keep it on
+The control API used by the `gpuq` CLI and by lease clients (see `lease-api.md`). Keep it on
 loopback: anyone who can reach it can take the card.
 
 | Key | Default | Meaning |
 |---|---|---|
 | `host` | `"127.0.0.1"` | Listen address. |
-| `port` | `9390` | Listen port. CLI: `--api HOST:PORT` or env `GPUD_API`. |
+| `port` | `9390` | Listen port. CLI: `--api HOST:PORT` or env `GPUQ_API`. |
 
 ## [gpu]
 
@@ -81,10 +81,10 @@ The first card is the primary card: jobs and services that name no card go there
 | `amd` | `HIP_VISIBLE_DEVICES` and `ROCR_VISIBLE_DEVICES` |
 | `command`, `intel` | `CUDA_VISIBLE_DEVICES` |
 
-The env is sent in the `granted` event, exported by `gpud run`, and passed to the start
+The env is sent in the `granted` event, exported by `gpuq run`, and passed to the start
 command of a managed service of `kind = "command"`. A card without `visible_devices` can be
-named (`--card gpu1`) but is skipped by `--card any`, because gpud could not tell the job where
-it landed. If no card has `visible_devices`, `--card any` is refused and `gpud check-config`
+named (`--card gpu1`) but is skipped by `--card any`, because gpuq could not tell the job where
+it landed. If no card has `visible_devices`, `--card any` is refused and `gpuq check-config`
 says so.
 
 ```toml
@@ -118,12 +118,12 @@ The LLM server behind the gate and when it gives up the card.
 
 | Key | Default | Meaning |
 |---|---|---|
-| `backend` | `"llama-swap"` | `llama-swap`, `ollama`, `llama-server`, `vllm`, `sglang` or `none`. `none` means no LLM gate: gpud only arbitrates leases and managed services. `llama-server`, `vllm` and `sglang` need `[llm.service]`. |
+| `backend` | `"llama-swap"` | `llama-swap`, `ollama`, `llama-server`, `vllm`, `sglang` or `none`. `none` means no LLM gate: gpuq only arbitrates leases and managed services. `llama-server`, `vllm` and `sglang` need `[llm.service]`. |
 | `llama_swap_config` | `"/etc/llama-swap/config.yaml"` | llama-swap's own YAML, read for aliases and CPU-only models. The old name `config` still works. |
 | `card` | first card | With several cards, the card the LLM server runs on. Must be a `[[gpu.card]]` name. |
 | `resident` | `""` | Model reloaded when the card goes idle. Empty = load on demand only. |
 | `cpu_models` | `[]` | Models that never use the GPU, for when the YAML cannot be read. |
-| `slot_save_models` | `[]` | Models started with `--slot-save-path`, for when the YAML cannot be read. gpud saves and restores slot 0 around an unload. |
+| `slot_save_models` | `[]` | Models started with `--slot-save-path`, for when the YAML cannot be read. gpuq saves and restores slot 0 around an unload. |
 | `cpu_markers` | `["HIP_VISIBLE_DEVICES=-1", "ROCR_VISIBLE_DEVICES=-1", "CUDA_VISIBLE_DEVICES=-1"]` | A llama-swap model whose `cmd` contains one of these is CPU-only. |
 | `load_timeout_s` | `600` | Time allowed for a model load. |
 | `idle_s` | `300` | LLM silence required before the classes in `idle_wait_classes` take the card. |
@@ -133,7 +133,7 @@ The LLM server behind the gate and when it gives up the card.
 | `reload_delay_s` | `20` | Pause after the last job before reloading the resident model. |
 | `reload_slack_mib` | `1024` | Reload once VRAM is within this of the level seen right after the unload... |
 | `reload_wait_s` | `120` | ...or after waiting this long. |
-| `resume_grace_s` | `30` | After a gpud restart, time for `gpud run` clients to re-adopt their leases. |
+| `resume_grace_s` | `30` | After a gpuq restart, time for `gpuq run` clients to re-adopt their leases. |
 | `batch_hold_s` | `0` | Hold LLM requests this long behind yieldable batch jobs. `0` = off. |
 | `batch_hold_count` | `0` | Hand over earlier once this many LLM requests are queued. `0` = timer only. |
 
@@ -170,7 +170,7 @@ service's `[service.control]`.
 | `start` | command | Argv. Required. |
 | `stop` | command | Argv. Required. |
 | `status` | command | Argv, optional. Exit 0 = running. |
-| `health_url` | all | Polled after a start; up when it answers 2xx. Without it gpud only checks that the service is running. |
+| `health_url` | all | Polled after a start; up when it answers 2xx. Without it gpuq only checks that the service is running. |
 | `start_timeout_s` | all | Default `120`. |
 
 Keys that do not belong to the chosen `kind` are an error.
@@ -194,22 +194,22 @@ override them).
 
 | Key | Default | Meaning |
 |---|---|---|
-| `yield_signal` | `"SIGUSR1"` | One of SIGHUP, SIGINT, SIGQUIT, SIGTERM, SIGUSR1, SIGUSR2, SIGALRM, SIGCONT, SIGTSTP. Sent by `gpud run` to a yieldable job when it is asked to yield. |
+| `yield_signal` | `"SIGUSR1"` | One of SIGHUP, SIGINT, SIGQUIT, SIGTERM, SIGUSR1, SIGUSR2, SIGALRM, SIGCONT, SIGTSTP. Sent by `gpuq run` to a yieldable job when it is asked to yield. |
 
-gpud announces this signal in every `granted` event; `gpud run --yield-signal` overrides it
+gpuq announces this signal in every `granted` event; `gpuq run --yield-signal` overrides it
 for one job.
 
 ## [immich]
 
-The Immich ML adapter. The section is off unless it is present. gpud watches Immich's ML job
+The Immich ML adapter. The section is off unless it is present. gpuq watches Immich's ML job
 queues and runs the GPU ML container only while it holds a lease. See `integrations.md`
 for the setup and `examples/immich.toml`.
 
 | Key | Default | Meaning |
 |---|---|---|
-| `url` | required | Immich server, e.g. `http://127.0.0.1:2283`. gpud adds `/api`. |
+| `url` | required | Immich server, e.g. `http://127.0.0.1:2283`. gpuq adds `/api`. |
 | `key_file` | required | File holding an Immich API key. Read on every call. |
-| `compose_dir` | required | Directory of the compose file; gpud runs docker compose there. |
+| `compose_dir` | required | Directory of the compose file; gpuq runs docker compose there. |
 | `service` | required | Compose service of the GPU ML container. |
 | `container` | required | Its container name, for `docker inspect` (health). |
 | `compose_profile` | `"gpu"` | `docker compose --profile <this> up -d <service>`. |
@@ -218,16 +218,16 @@ for the setup and `examples/immich.toml`.
 | `vram` | `"6G"` | VRAM the lease declares. |
 | `card` | primary card | A `[[gpu.card]]` name. |
 | `poll_s` | `30` | Time between backlog checks. |
-| `min_backlog` | `200` | Backlog that makes gpud pause the queues and ask for the card. |
+| `min_backlog` | `200` | Backlog that makes gpuq pause the queues and ask for the card. |
 | `cpu_ok_backlog` | `50` | After a release, a backlog this small is resumed for the CPU container; a larger one stays paused. |
 | `queues` | `["smartSearch", "faceDetection", "ocr"]` | The ML queues to watch, pause and resume. |
 | `gpu_concurrency` | `{ smartSearch = 8, faceDetection = 4, ocr = 2 }` | Queue concurrency while on the GPU. The old values come back on release. Names must be in `queues`. |
 | `health_timeout_s` | `600` | How long the container may take to become healthy. |
 | `settle_s` | `35` | Wait after "healthy" so Immich notices the container before the queues resume. |
 | `drain_poll_s` | `5` | Time between checks for active jobs on release (60 checks at most). |
-| `state_file` | `$XDG_STATE_HOME/gpud/immich.json`, else `~/.local/state/gpud/immich.json` | Remembers that gpud paused the queues. |
+| `state_file` | `$XDG_STATE_HOME/gpuq/immich.json`, else `~/.local/state/gpuq/immich.json` | Remembers that gpuq paused the queues. |
 
-The backlog is `waiting + active + delayed + paused` summed over `queues`. `gpud check-config`
+The backlog is `waiting + active + delayed + paused` summed over `queues`. `gpuq check-config`
 prints one `immich:` line for the section.
 
 ## [[service]]
@@ -236,27 +236,27 @@ A managed GPU service. Repeat the table for each one. See `integrations.md` for 
 
 | Key | Default | Meaning |
 |---|---|---|
-| `name` | required | Unique. Shown in `gpud status`, used as the lease name. |
+| `name` | required | Unique. Shown in `gpuq status`, used as the lease name. |
 | `class` | `"interactive"` | Priority class. |
 | `vram` | required | `"16G"`, `"6144M"`, `"512"` (MiB) or `"all"`. |
 | `yieldable` | `true` | May be asked to give the card back. When asked, the service is stopped (if it has `control`), the lease released, and held requests queue again. |
-| `stop_on_release` | `true` | Stop the service when its lease ends. With a gate, also stops it once at gpud start. |
+| `stop_on_release` | `true` | Stop the service when its lease ends. With a gate, also stops it once at gpuq start. |
 | `idle_release_s` | `120` | No in-flight GPU request and `busy_url` idle for this long: release the card. |
 | `flavor` | `"generic"` | `generic` or `comfyui`. `comfyui` needs a gate. |
 | `card` | primary card | The card the service runs on; a `[[gpu.card]]` name. `"any"` is not allowed: a service is bound to its device. |
 
-For `control.kind = "command"` gpud starts the process itself and gives it the card's env
+For `control.kind = "command"` gpuq starts the process itself and gives it the card's env
 (`CUDA_VISIBLE_DEVICES` and so on). For systemd, Docker and Podman pin the device in the
 unit or container (`Environment=CUDA_VISIBLE_DEVICES=1`, `--gpus device=1`); `card` then only
-tells gpud which card's VRAM the lease counts against.
+tells gpuq which card's VRAM the lease counts against.
 
-A service with no `[service.gate]` is "always wanted": gpud takes its lease at startup and
+A service with no `[service.gate]` is "always wanted": gpuq takes its lease at startup and
 holds it. It never idle-releases. When asked to yield it stops (if it has control), releases
 and queues again.
 
 ### [service.control]
 
-Optional. Omit it for a service gpud does not start or stop (then it only reserves VRAM and
+Optional. Omit it for a service gpuq does not start or stop (then it only reserves VRAM and
 gates requests). Same keys as `[llm.service]` above.
 
 ### [service.gate]
@@ -266,7 +266,7 @@ request that needs the GPU and releases the card when idle.
 
 | Key | Default | Meaning |
 |---|---|---|
-| `listen` | required | `host:port` gpud listens on. |
+| `listen` | required | `host:port` gpuq listens on. |
 | `backend` | required | URL requests are forwarded to. |
 | `gpu_paths` | `[]` | Path prefixes that need the card (query ignored). Empty = every request. |
 | `busy_url` | unset | GET URL; while it reports work the lease is kept. See `integrations.md`. |

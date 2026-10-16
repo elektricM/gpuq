@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Martin Dolez
 
-//! The `gpud` command line, run as a real subprocess against an in-process API server.
+//! The `gpuq` command line, run as a real subprocess against an in-process API server.
 //! Ported from tests/test_cli.py.
 
 mod support_api;
@@ -17,10 +17,10 @@ use tokio::time::timeout;
 
 const PING: Duration = Duration::from_millis(200);
 
-fn gpud(addr: SocketAddr, args: &[&str]) -> Command {
-    let mut cmd = Command::new(env!("CARGO_BIN_EXE_gpud"));
+fn gpuq(addr: SocketAddr, args: &[&str]) -> Command {
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_gpuq"));
     cmd.args(args)
-        .env("GPUD_API", addr.to_string())
+        .env("GPUQ_API", addr.to_string())
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -37,7 +37,7 @@ struct Done {
 async fn finish(child: Child) -> Done {
     let o = timeout(Duration::from_secs(20), child.wait_with_output())
         .await
-        .expect("gpud did not finish in 20 s")
+        .expect("gpuq did not finish in 20 s")
         .unwrap();
     Done {
         rc: o.status.code().unwrap_or(-1),
@@ -47,7 +47,7 @@ async fn finish(child: Child) -> Done {
 }
 
 async fn run(addr: SocketAddr, args: &[&str]) -> Done {
-    finish(gpud(addr, args).spawn().unwrap()).await
+    finish(gpuq(addr, args).spawn().unwrap()).await
 }
 
 /// A port for a listener that is bound later. It is taken below the kernel's ephemeral range
@@ -104,7 +104,7 @@ async fn job_killed_by_a_signal_gives_128_plus_it() {
 #[tokio::test]
 async fn run_holds_the_lease_while_the_job_runs() {
     let api = api().await;
-    let child = gpud(
+    let child = gpuq(
         api.addr,
         &[
             "run", "--vram", "1G", "--name", "napper", "--", "sleep", "1",
@@ -126,15 +126,15 @@ async fn run_holds_the_lease_while_the_job_runs() {
 async fn the_job_sees_its_lease_id_and_a_fresh_yield_file() {
     let api = api().await;
     let script = r#"
-        test -n "$GPUD_LEASE_ID" || exit 11
-        test -n "$GPUD_YIELD_FILE" || exit 12
-        test ! -e "$GPUD_YIELD_FILE" || exit 13
-        echo "$GPUD_LEASE_ID" > "$OUT"
-        echo "$GPUD_YIELD_FILE" >> "$OUT"
+        test -n "$GPUQ_LEASE_ID" || exit 11
+        test -n "$GPUQ_YIELD_FILE" || exit 12
+        test ! -e "$GPUQ_YIELD_FILE" || exit 13
+        echo "$GPUQ_LEASE_ID" > "$OUT"
+        echo "$GPUQ_YIELD_FILE" >> "$OUT"
     "#;
     let dir = tempfile::tempdir().unwrap();
     let out = dir.path().join("out");
-    let mut cmd = gpud(api.addr, &["run", "--vram", "1G", "--", "sh", "-c", script]);
+    let mut cmd = gpuq(api.addr, &["run", "--vram", "1G", "--", "sh", "-c", script]);
     cmd.env("OUT", &out);
     let d = finish(cmd.spawn().unwrap()).await;
     assert_eq!(d.rc, 0, "{}", d.err);
@@ -152,11 +152,11 @@ async fn yieldable_job_gets_the_signal_and_the_file_when_the_llm_needs_the_card(
     let dir = tempfile::tempdir().unwrap();
     let ready = dir.path().join("ready");
     let script = r#"
-        trap 'if [ -e "$GPUD_YIELD_FILE" ]; then exit 0; else exit 3; fi' USR1
+        trap 'if [ -e "$GPUQ_YIELD_FILE" ]; then exit 0; else exit 3; fi' USR1
         echo up > "$READY"
         while :; do sleep 0.05; done
     "#;
-    let mut cmd = gpud(
+    let mut cmd = gpuq(
         api.addr,
         &[
             "run",
@@ -201,7 +201,7 @@ async fn the_yield_signal_is_configurable() {
         echo up > "$READY"
         while :; do sleep 0.05; done
     "#;
-    let mut cmd = gpud(
+    let mut cmd = gpuq(
         api.addr,
         &[
             "run",
@@ -271,7 +271,7 @@ async fn status_shows_a_lease() {
 }
 
 #[tokio::test]
-async fn exit_code_69_when_gpud_is_down() {
+async fn exit_code_69_when_gpuq_is_down() {
     let addr = free_addr().await;
     let d = run(addr, &["status"]).await;
     assert_eq!(d.rc, 69);
@@ -283,7 +283,7 @@ async fn exit_code_69_when_gpud_is_down() {
 }
 
 #[tokio::test]
-async fn fallback_runs_the_job_without_gpud() {
+async fn fallback_runs_the_job_without_gpuq() {
     let addr = free_addr().await;
     let d = run(addr, &["run", "--fallback", "--", "true"]).await;
     assert_eq!(d.rc, 0, "{}", d.err);
@@ -295,7 +295,7 @@ async fn fallback_runs_the_job_without_gpud() {
 #[tokio::test]
 async fn hold_keeps_the_card_until_interrupted() {
     let api = api().await;
-    let child = gpud(api.addr, &["hold", "--vram", "1G"]).spawn().unwrap();
+    let child = gpuq(api.addr, &["hold", "--vram", "1G"]).spawn().unwrap();
     let pid = child.id().unwrap() as i32;
     assert!(
         status_within(&api.rig, Duration::from_secs(5), |s| s
@@ -318,7 +318,7 @@ async fn hold_keeps_the_card_until_interrupted() {
 }
 
 #[tokio::test]
-async fn run_re_adopts_its_lease_after_gpud_restarts() {
+async fn run_re_adopts_its_lease_after_gpuq_restarts() {
     let mut api = api().await;
     let dir = tempfile::tempdir().unwrap();
     let ready = dir.path().join("ready");
@@ -327,7 +327,7 @@ async fn run_re_adopts_its_lease_after_gpud_restarts() {
         echo up > "$READY"
         while [ ! -e "$STOP" ]; do sleep 0.05; done
     "#;
-    let mut cmd = gpud(
+    let mut cmd = gpuq(
         api.addr,
         &[
             "run", "--vram", "1G", "--name", "survivor", "--", "sh", "-c", script,
@@ -364,7 +364,7 @@ async fn eventually_exists(path: &std::path::Path) -> bool {
 
 #[tokio::test]
 async fn the_daemon_announces_its_yield_signal() {
-    // No --yield-signal: the job gets what gpud announced with the grant.
+    // No --yield-signal: the job gets what gpuq announced with the grant.
     let api = TestApi::start_with_yield_signal(PING, "SIGUSR2").await;
     let dir = tempfile::tempdir().unwrap();
     let ready = dir.path().join("ready");
@@ -373,7 +373,7 @@ async fn the_daemon_announces_its_yield_signal() {
         echo up > "$READY"
         while :; do sleep 0.05; done
     "#;
-    let mut cmd = gpud(
+    let mut cmd = gpuq(
         api.addr,
         &[
             "run",
@@ -407,7 +407,7 @@ async fn card_flag_names_the_card_and_the_job_sees_it() {
     let api = api().await;
     let dir = tempfile::tempdir().unwrap();
     let out = dir.path().join("out");
-    let mut cmd = gpud(
+    let mut cmd = gpuq(
         api.addr,
         &[
             "run",
@@ -418,7 +418,7 @@ async fn card_flag_names_the_card_and_the_job_sees_it() {
             "--",
             "sh",
             "-c",
-            r#"echo "$GPUD_CARD" > "$OUT""#,
+            r#"echo "$GPUQ_CARD" > "$OUT""#,
         ],
     );
     cmd.env("OUT", &out);
@@ -430,7 +430,7 @@ async fn card_flag_names_the_card_and_the_job_sees_it() {
 #[tokio::test]
 async fn the_card_is_exported_without_the_flag_too() {
     let api = api().await;
-    let script = r#"test "$GPUD_CARD" = gpu0 || exit 9"#;
+    let script = r#"test "$GPUQ_CARD" = gpu0 || exit 9"#;
     let d = run(api.addr, &["run", "--vram", "1G", "--", "sh", "-c", script]).await;
     assert_eq!(d.rc, 0, "{}", d.err);
 }
@@ -485,7 +485,7 @@ async fn a_job_on_gpu1_gets_that_cards_env() {
     .await;
     let dir = tempfile::tempdir().unwrap();
     let out = dir.path().join("out");
-    let mut cmd = gpud(
+    let mut cmd = gpuq(
         api.addr,
         &[
             "run",
@@ -496,7 +496,7 @@ async fn a_job_on_gpu1_gets_that_cards_env() {
             "--",
             "sh",
             "-c",
-            r#"echo "$GPUD_CARD $CUDA_VISIBLE_DEVICES" > "$OUT""#,
+            r#"echo "$GPUQ_CARD $CUDA_VISIBLE_DEVICES" > "$OUT""#,
         ],
     );
     cmd.env("OUT", &out);

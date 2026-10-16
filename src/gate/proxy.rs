@@ -196,7 +196,7 @@ impl Proxy {
         }
         full(
             StatusCode::BAD_GATEWAY,
-            format!("gpud: backend unreachable: {msg}\n"),
+            format!("gpuq: backend unreachable: {msg}\n"),
         )
     }
 
@@ -214,7 +214,7 @@ impl Proxy {
             Err(e) => {
                 return full(
                     StatusCode::BAD_REQUEST,
-                    format!("gpud: bad request uri: {e}\n"),
+                    format!("gpuq: bad request uri: {e}\n"),
                 )
             }
         };
@@ -260,7 +260,7 @@ impl Proxy {
             Err(e) => {
                 return full(
                     StatusCode::BAD_REQUEST,
-                    format!("gpud: bad request uri: {e}\n"),
+                    format!("gpuq: bad request uri: {e}\n"),
                 )
             }
         };

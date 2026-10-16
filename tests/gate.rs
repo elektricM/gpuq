@@ -15,10 +15,10 @@ use std::time::Instant;
 
 use common::{base_settings, ms, request, secs};
 use fake_llamaswap::{FakeLlamaSwap, MODELS_YAML};
-use gpud::arbiter::{self, Handle, Status, Vram};
-use gpud::backend::llamaswap::LlamaSwap;
-use gpud::backend::models::ModelTable;
-use gpud::gate::{model_of, Gate, GateOptions};
+use gpuq::arbiter::{self, Handle, Status, Vram};
+use gpuq::backend::llamaswap::LlamaSwap;
+use gpuq::backend::models::ModelTable;
+use gpuq::gate::{model_of, Gate, GateOptions};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::oneshot;
@@ -326,7 +326,7 @@ async fn backend_down_gives_502() {
         .text()
         .await
         .unwrap()
-        .starts_with("gpud: backend unreachable: "));
+        .starts_with("gpuq: backend unreachable: "));
 }
 
 #[tokio::test]

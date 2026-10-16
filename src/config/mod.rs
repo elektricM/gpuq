@@ -26,7 +26,7 @@ pub use immich::Immich;
 pub use service::{Flavor, Service, ServiceGate, ServiceKind, ServiceSpec};
 pub use vram::{parse_vram, VramParseError};
 
-/// Signals `gpud run` may send to a yieldable job.
+/// Signals `gpuq run` may send to a yieldable job.
 pub const YIELD_SIGNALS: &[&str] = &[
     "SIGHUP", "SIGINT", "SIGQUIT", "SIGTERM", "SIGUSR1", "SIGUSR2", "SIGALRM", "SIGCONT", "SIGTSTP",
 ];
@@ -371,7 +371,7 @@ impl Default for Llm {
 #[derive(Clone, Debug, PartialEq, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Run {
-    /// Signal `gpud run` sends to a yieldable job when asked to yield.
+    /// Signal `gpuq run` sends to a yieldable job when asked to yield.
     pub yield_signal: String,
 }
 
@@ -386,7 +386,7 @@ impl Default for Run {
 impl Config {
     /// Where `load(None)` looks, in order.
     pub fn search_paths() -> Vec<PathBuf> {
-        let mut paths = vec![PathBuf::from("/etc/gpud/config.toml")];
+        let mut paths = vec![PathBuf::from("/etc/gpuq/config.toml")];
         let user_dir = std::env::var_os("XDG_CONFIG_HOME")
             .filter(|v| !v.is_empty())
             .map(PathBuf::from)
@@ -396,7 +396,7 @@ impl Config {
                     .map(|h| PathBuf::from(h).join(".config"))
             });
         if let Some(dir) = user_dir {
-            paths.push(dir.join("gpud/config.toml"));
+            paths.push(dir.join("gpuq/config.toml"));
         }
         paths
     }
@@ -449,7 +449,7 @@ impl Config {
         if table.contains_key("comfyui") {
             return Err(parse_err(
                 "[comfyui] is no longer a built-in section; declare it as a [[service]] entry \
-                 (see examples/gpud.toml)"
+                 (see examples/gpuq.toml)"
                     .to_string(),
             ));
         }
@@ -634,7 +634,7 @@ impl Config {
         }
     }
 
-    /// Short human summary for `gpud check-config`.
+    /// Short human summary for `gpuq check-config`.
     pub fn describe(&self) -> String {
         let mut s = String::new();
         let _ = writeln!(s, "backend: {}", self.llm.backend.as_str());

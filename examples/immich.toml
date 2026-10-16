@@ -1,8 +1,8 @@
 # Immich machine learning on the GPU, driven by the queue backlog.
-# Install as /etc/gpud/config.toml, or paste the [immich] part into your own config.
+# Install as /etc/gpuq/config.toml, or paste the [immich] part into your own config.
 #
-# How it works: gpud watches the ML job queues through Immich's API. When the backlog reaches
-# min_backlog it pauses the queues and asks for the card. Once it has it, gpud starts the GPU
+# How it works: gpuq watches the ML job queues through Immich's API. When the backlog reaches
+# min_backlog it pauses the queues and asks for the card. Once it has it, gpuq starts the GPU
 # ML container, raises the queue concurrency and resumes the queues. When another job needs
 # the card (or the backlog is empty for two polls) it pauses, waits for active jobs, stops the
 # container and gives the card back. docs/integrations.md has the details.
@@ -11,13 +11,13 @@
 #   * Immich admin settings, Machine Learning: list two URLs, the GPU container first and a
 #     CPU-only ML container second. While the GPU container is stopped Immich uses the CPU one.
 #   * The GPU container is a compose service in a profile (profiles: ["gpu"]), so a plain
-#     `docker compose up` does not start it. gpud runs
+#     `docker compose up` does not start it. gpuq runs
 #     `docker compose --profile gpu up -d <service>` in compose_dir. Use restart: "no".
 #   * Create an Immich API key with the permissions queue.read, queue.update (list, pause and
 #     resume queues) and systemConfig.read, systemConfig.update (queue concurrency). Put it
-#     alone in key_file (mode 0600). gpud re-reads the file on every call, so rotating the
+#     alone in key_file (mode 0600). gpuq re-reads the file on every call, so rotating the
 #     key needs no restart.
-#   * Run gpud as a user in the docker group.
+#   * Run gpuq as a user in the docker group.
 
 [llm]
 backend = "none"                     # no LLM gate on this machine; remove for your own setup
@@ -27,7 +27,7 @@ immich = 3                           # same priority as "background"; lower numb
 
 [immich]
 url = "http://127.0.0.1:2283"        # the Immich server
-key_file = "/etc/gpud/immich.key"
+key_file = "/etc/gpuq/immich.key"
 compose_dir = "/srv/immich"          # where the compose file with the GPU ML service is
 service = "immich-machine-learning-gpu"
 container = "immich_machine_learning_gpu"
@@ -39,11 +39,11 @@ container = "immich_machine_learning_gpu"
 # vram = "6G"
 # card = "gpu1"                      # a [[gpu.card]] name; default the primary card
 # poll_s = 30
-# min_backlog = 200                  # jobs in the ML queues that make gpud ask for the card
+# min_backlog = 200                  # jobs in the ML queues that make gpuq ask for the card
 # cpu_ok_backlog = 50                # a leftover this small is finished by the CPU container
 # queues = ["smartSearch", "faceDetection", "ocr"]
 # gpu_concurrency = { smartSearch = 8, faceDetection = 4, ocr = 2 }
 # health_timeout_s = 600             # how long the container may take to become healthy
 # settle_s = 35                      # Immich re-checks ML availability about every 30 s
 # drain_poll_s = 5                   # up to 60 checks for active jobs before the container stops
-# state_file = "~/.local/state/gpud/immich.json"   # default: $XDG_STATE_HOME/gpud/immich.json
+# state_file = "~/.local/state/gpuq/immich.json"   # default: $XDG_STATE_HOME/gpuq/immich.json

@@ -1,14 +1,14 @@
 # A generic CUDA or ROCm daemon (a TTS or ASR HTTP server, an image API...) as a managed
-# service. Install as /etc/gpud/config.toml.
+# service. Install as /etc/gpuq/config.toml.
 #
 # What else to change:
-#   * Unit name, ports, vram, class. Start the daemon on 127.0.0.1:5001; gpud serves 5000.
+#   * Unit name, ports, vram, class. Start the daemon on 127.0.0.1:5001; gpuq serves 5000.
 #   * gpu_paths: URL prefixes that need the card. Query strings are ignored. An empty
 #     list means every request does.
 #   * Without busy_url, a request counts as work until its response ends. If the daemon
 #     queues work internally, set busy_url to a URL that returns a non-empty JSON list or
 #     object while it is busy.
-#   * A daemon that must stay loaded: drop [service.gate] and the idle settings. gpud then
+#   * A daemon that must stay loaded: drop [service.gate] and the idle settings. gpuq then
 #     takes the lease at startup and holds it, and the daemon stops only to let a higher
 #     class in (see docs/integrations.md).
 

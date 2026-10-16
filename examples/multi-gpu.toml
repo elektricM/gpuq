@@ -1,11 +1,11 @@
 # Two cards: an AMD card for the LLM and an NVIDIA card for ComfyUI.
-# Copy to /etc/gpud/config.toml and adjust the PCI address and device numbers.
+# Copy to /etc/gpuq/config.toml and adjust the PCI address and device numbers.
 #
-# gpud schedules the cards from one queue. A job asks for a card by name (`--card nvidia`),
+# gpuq schedules the cards from one queue. A job asks for a card by name (`--card nvidia`),
 # or for whichever has room (`--card any`). Leases on different cards run side by side;
 # the LLM only waits for jobs on its own card.
 #
-# `visible_devices` is what gpud hands to a lease holder so the program lands on the card it
+# `visible_devices` is what gpuq hands to a lease holder so the program lands on the card it
 # was granted: HIP_VISIBLE_DEVICES and ROCR_VISIBLE_DEVICES for AMD, CUDA_VISIBLE_DEVICES for
 # NVIDIA. Cards without it can still be named, but `--card any` skips them. Set
 # CUDA_DEVICE_ORDER=PCI_BUS_ID wherever CUDA programs start so the numbers match nvidia-smi.
@@ -33,7 +33,7 @@ visible_devices = "0"                # -> CUDA_VISIBLE_DEVICES=0
 margin_mib = 512                     # per-card override of [gpu] margin_mib
 # visible_devices_env = ["CUDA_VISIBLE_DEVICES"]   # override the variables for unusual stacks
 
-# ComfyUI is bound to the NVIDIA card. gpud starts it with CUDA_VISIBLE_DEVICES=0 in its
+# ComfyUI is bound to the NVIDIA card. gpuq starts it with CUDA_VISIBLE_DEVICES=0 in its
 # environment (kind = "command" only; for a systemd unit or a container, pin the device in
 # the unit or container config instead).
 [[service]]
@@ -59,8 +59,8 @@ gpu_paths = ["/prompt"]
 busy_url = "http://127.0.0.1:8189/queue"
 
 # Examples:
-#   gpud run --card nvidia --vram 8G -- python train.py      # exactly this card
-#   gpud run --card any --vram 8G -- python train.py         # the first card with room;
+#   gpuq run --card nvidia --vram 8G -- python train.py      # exactly this card
+#   gpuq run --card any --vram 8G -- python train.py         # the first card with room;
 #                                                            # CUDA/HIP_VISIBLE_DEVICES and
-#                                                            # GPUD_CARD tell the job where
-#   gpud status                                              # one line per card
+#                                                            # GPUQ_CARD tell the job where
+#   gpuq status                                              # one line per card

@@ -9,9 +9,9 @@ mod fake_llamaswap;
 use std::time::{Duration, Instant};
 
 use fake_llamaswap::{FakeLlamaSwap, MODELS_YAML};
-use gpud::backend::llamaswap::LlamaSwap;
-use gpud::backend::models::ModelTable;
-use gpud::backend::{Backend, BackendError};
+use gpuq::backend::llamaswap::LlamaSwap;
+use gpuq::backend::models::ModelTable;
+use gpuq::backend::{Backend, BackendError};
 
 struct Rig {
     fake: FakeLlamaSwap,

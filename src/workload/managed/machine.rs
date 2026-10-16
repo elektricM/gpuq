@@ -345,7 +345,7 @@ impl Machine {
                 State::Running(lease)
             }
             Err(e) => {
-                let why = format!("gpud: {} did not start: {e}", self.cfg.name);
+                let why = format!("gpuq: {} did not start: {e}", self.cfg.name);
                 tracing::warn!("{why}");
                 if let Some(c) = &self.cfg.control {
                     let _ = c.stop().await;

@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Martin Dolez
 
-//! The `gpud` command line: the daemon, and clients that talk to its control API.
+//! The `gpuq` command line: the daemon, and clients that talk to its control API.
 //!
 //! ```text
-//! gpud daemon [-c config] [-v]
-//! gpud check-config [-c config] [--strict]
-//! gpud status [--json]
-//! gpud run [--class C] [--vram 8G|all] [--card NAME|any] [--yieldable] [--fallback] [--name N] -- cmd ...
-//! gpud hold [--class C] [--vram all] [--card NAME|any] [--name N]
+//! gpuq daemon [-c config] [-v]
+//! gpuq check-config [-c config] [--strict]
+//! gpuq status [--json]
+//! gpuq run [--class C] [--vram 8G|all] [--card NAME|any] [--yieldable] [--fallback] [--name N] -- cmd ...
+//! gpuq hold [--class C] [--vram all] [--card NAME|any] [--name N]
 //! ```
 //!
-//! Clients find the daemon through `GPUD_API` (default `127.0.0.1:9390`) and exit with 69
+//! Clients find the daemon through `GPUQ_API` (default `127.0.0.1:9390`) and exit with 69
 //! when nothing answers there.
 
 mod client;
@@ -26,17 +26,17 @@ use clap::{Parser, Subcommand};
 
 use crate::arbiter::Vram;
 
-/// Exit code (EX_UNAVAILABLE) when gpud is not running.
+/// Exit code (EX_UNAVAILABLE) when gpuq is not running.
 pub const EX_UNAVAILABLE: u8 = 69;
 
 #[derive(Parser)]
 #[command(
-    name = "gpud",
+    name = "gpuq",
     version,
-    about = "GPU manager and queue: one or more cards, many workloads"
+    about = "GPU scheduler for Linux"
 )]
 struct Cli {
-    /// Address of the gpud control API (default: $GPUD_API, else 127.0.0.1:9390).
+    /// Address of the gpuq control API (default: $GPUQ_API, else 127.0.0.1:9390).
     #[arg(long, global = true, value_name = "HOST:PORT")]
     api: Option<String>,
     #[command(subcommand)]
@@ -76,7 +76,7 @@ pub fn main() -> ExitCode {
     let cli = Cli::parse();
     let api = cli
         .api
-        .or_else(|| std::env::var("GPUD_API").ok().filter(|v| !v.is_empty()))
+        .or_else(|| std::env::var("GPUQ_API").ok().filter(|v| !v.is_empty()))
         .unwrap_or_else(|| "127.0.0.1:9390".to_owned());
     match cli.cmd {
         Cmd::Daemon { config, verbose } => daemon::run_daemon(config, verbose),
@@ -101,7 +101,7 @@ fn block_on(fut: impl std::future::Future<Output = ExitCode>) -> ExitCode {
 }
 
 fn say(msg: &str) {
-    eprintln!("gpud: {msg}");
+    eprintln!("gpuq: {msg}");
 }
 
 /// `8G`, `3000M`, `512` (MiB) or `all`; see [`crate::config::parse_vram`].

@@ -12,8 +12,8 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use bytes::Bytes;
-use gpud::config::Config;
-use gpud::workload::immich::{self, ImmichView};
+use gpuq::config::Config;
+use gpuq::workload::immich::{self, ImmichView};
 use http_body_util::{BodyExt, Full};
 use hyper::{Request, Response};
 use hyper_util::rt::TokioIo;
@@ -71,7 +71,7 @@ impl FakeImmich {
             .iter()
             .map(|q| (q.to_string(), Queue::default()))
             .collect();
-        // A queue gpud does not manage; its backlog must never count.
+        // A queue gpuq does not manage; its backlog must never count.
         queues.insert(
             "thumbnailGeneration".into(),
             Queue {
@@ -274,7 +274,7 @@ fn route(st: &Mutex<Inner>, method: &str, path: &str, key: &str, body: &[u8]) ->
             )
         }
         ("PUT", "/api/admin/config") => {
-            // The whole config comes back, including sections gpud does not touch.
+            // The whole config comes back, including sections gpuq does not touch.
             assert!(body["machineLearning"]["urls"].is_array(), "{body}");
             let job = body["job"].as_object().unwrap().clone();
             for (q, v) in job {
@@ -506,7 +506,7 @@ impl Harness {
 
     pub fn state_paused(&self) -> Option<bool> {
         let text = std::fs::read_to_string(&self.state_file).ok()?;
-        serde_json::from_str::<Value>(&text).ok()?["paused_by_gpud"].as_bool()
+        serde_json::from_str::<Value>(&text).ok()?["paused_by_gpuq"].as_bool()
     }
 
     pub fn view_state(&self) -> String {

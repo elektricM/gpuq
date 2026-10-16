@@ -6,10 +6,10 @@
 # The job is not yieldable, so it always runs to completion. Reserve only what it needs so
 # a second job could share the card.
 #
-# Change the model path and the --vram figure. If gpud is not running, `gpud run` exits
+# Change the model path and the --vram figure. If gpuq is not running, `gpuq run` exits
 # with 69; add --fallback to run without a lease instead.
 #
 # Usage: whisper.sh recording.wav
 set -eu
-exec gpud run --class realtime --vram 4G --name transcribe -- \
+exec gpuq run --class realtime --vram 4G --name transcribe -- \
     whisper-cli -m /models/ggml-large-v3-turbo.bin -f "$1" -otxt

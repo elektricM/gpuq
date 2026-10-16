@@ -7,11 +7,11 @@ use std::fs;
 use std::path::Path;
 use std::time::Duration;
 
-use gpud::probe::amd::{find_amd_device, AmdSysfsProbe};
-use gpud::probe::command::CommandProbe;
-use gpud::probe::detect::{make_probe, ProbeOptions, Vendor};
-use gpud::probe::intel::IntelProbe;
-use gpud::probe::{ProbeError, VramProbe, VramReading};
+use gpuq::probe::amd::{find_amd_device, AmdSysfsProbe};
+use gpuq::probe::command::CommandProbe;
+use gpuq::probe::detect::{make_probe, ProbeOptions, Vendor};
+use gpuq::probe::intel::IntelProbe;
+use gpuq::probe::{ProbeError, VramProbe, VramReading};
 
 const MIB: u64 = 1024 * 1024;
 
@@ -155,7 +155,7 @@ fn intel_is_not_supported_yet() {
 #[cfg(unix)]
 mod tools {
     use super::*;
-    use gpud::probe::nvidia::NvidiaSmiProbe;
+    use gpuq::probe::nvidia::NvidiaSmiProbe;
     use std::os::unix::fs::PermissionsExt;
 
     fn script(path: &Path, body: &str) -> String {
