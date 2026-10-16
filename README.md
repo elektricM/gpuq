@@ -4,162 +4,165 @@
 [![release](https://img.shields.io/github/v/release/elektricM/gpud)](https://github.com/elektricM/gpud/releases/latest)
 [![license](https://img.shields.io/github/license/elektricM/gpud)](LICENSE)
 
-A queue and arbiter for one GPU shared by many AI programs.
+**A scheduler for one GPU.** Every program that wants the card asks gpud first, waits its
+turn by priority, and gives the card back when asked.
 
-Your LLM server stays loaded so chat answers right away. When another program needs the card
-(ComfyUI, a training run, whisper, vLLM, any CUDA or ROCm app), it waits in a priority queue.
-gpud unloads the LLM at a quiet moment, the job runs, and the LLM comes back with its KV cache.
-One static binary, no GPU libraries, no changes to your clients.
+Running an LLM server, ComfyUI, a training script and Immich on the same card usually ends in
+out-of-memory crashes or in stopping things by hand. gpud queues them instead, hands the card
+over at the right moment, and starts or stops services for you.
 
-## Architecture
+## How it works
 
 ```mermaid
 flowchart LR
-    clients["Chat clients<br/>(OpenAI API)"] --> gate
-    cli["gpud run / hold / status"] --> api
-    native["Your own program"] --> api
-    sclients["ComfyUI clients"] --> sgate
-
-    subgraph gpud
-        gate["LLM gate<br/>:8080"]
-        api["Control API<br/>:9390"]
-        sgate["Service gates"]
-        arbiter(["Arbiter<br/>priority queue + leases"])
-        probe["VRAM probe<br/>AMD, NVIDIA, command"]
-        gate <--> arbiter
-        api <--> arbiter
-        sgate <--> arbiter
-        probe --> arbiter
+    subgraph programs["Your programs"]
+        direction TB
+        cmd["Scripts and jobs<br/>gpud run -- cmd"]
+        svc["GPU services<br/>ComfyUI, Immich ML, TTS, ..."]
+        llm["LLM servers<br/>llama-swap, Ollama, vLLM, ..."]
+        own["Your own app<br/>lease API"]
     end
 
-    gate --> llm["LLM server :8081<br/>llama-swap, Ollama,<br/>llama-server, vLLM, SGLang"]
-    sgate --> svc["Managed services<br/>ComfyUI, Immich ML,<br/>any GPU daemon"]
-    arbiter -. "unload / load,<br/>slot save / restore" .-> llm
-    arbiter -. "start / stop<br/>(systemd, docker, podman)" .-> svc
-    arbiter -. "yield signal" .-> jobs["gpud run jobs"]
+    subgraph gpud["gpud"]
+        queue(["Priority queue<br/>and leases"])
+        probe["VRAM probe"]
+        probe --> queue
+    end
+
+    cmd -- "ask for a lease" --> queue
+    own -- "ask for a lease" --> queue
+    svc -- "requests pass through gpud" --> queue
+    llm -- "requests pass through gpud" --> queue
+    queue -- "grant, ask to yield,<br/>start / stop, unload / reload" --> programs
+    queue --- gpu[("GPU")]
 ```
 
-- **LLM gate** sits on the port your clients already use and forwards to the real server.
-  Requests for GPU models are held while a job has the card. CPU-only models always pass.
-- **Control API** hands out leases over HTTP. A lease is an open NDJSON stream, so it ends
-  when the client exits or crashes.
-- **Service gates** (optional) do the same for services like ComfyUI: a request starts the
-  service and takes a lease, and the lease is released once the service is idle.
-- **Arbiter** is a single task that owns all state. Everything else sends it messages.
-- **VRAM probe** reads used and total memory, so jobs can share the card by declared size.
+Four ideas cover everything:
 
-## How the queue works
+- **Lease.** A program holds the card through a lease that names its class and how much VRAM it
+  needs. The lease is an open connection, so it ends when the program exits or crashes.
+- **Class.** Each lease has a priority class. Higher classes go first; programs that fit in the
+  free VRAM can share the card.
+- **Yield.** Nothing is killed. When a higher class needs the card, gpud asks a yieldable
+  program to step aside (a signal, a file, or stopping its service) and waits for it.
+- **Resident.** One program can be kept loaded whenever the card is idle, usually an LLM so
+  chat answers right away. gpud unloads it for other work and reloads it after, KV cache
+  included where the server supports it. This is optional.
 
-```mermaid
-stateDiagram-v2
-    direction LR
-    llm: LLM loaded
-    unloading: Unloading
-    jobs: Jobs running
-    restoring: Restoring
-    llm --> unloading: job waiting, LLM quiet
-    unloading --> jobs: VRAM free
-    jobs --> restoring: last lease released
-    restoring --> llm: model and KV slot back
-```
+## An evening with gpud
 
-Every request and job has a class. Lower number wins.
-
-| Class | Priority | Typical use |
+| Time | What happens | What gpud does |
 |---|---|---|
-| `realtime` | 0 | Work that must never wait, like live transcription |
+| 18:00 | You chat with your local LLM | It is the resident program, already loaded |
+| 18:05 | You queue a ComfyUI render | Waits for a 10 s pause in the chat, unloads the LLM, starts ComfyUI |
+| 18:20 | The render is done | ComfyUI idles for 2 min, gpud stops it and reloads the LLM with its cache |
+| 18:30 | `gpud run --class batch --yieldable -- train.py` | Waits until the chat has been quiet for 5 min, then runs it |
+| 18:45 | A chat message arrives | Asks the training to yield; it saves and exits, the LLM reloads and answers |
+
+All the timings are settings.
+
+## Priorities
+
+| Class | Default | Typical use |
+|---|---|---|
+| `realtime` | 0 | Must never wait, like live transcription |
 | `llm` | 1 | Requests through the LLM gate |
-| `interactive` | 2 | You at the keyboard: ComfyUI, `gpud hold` |
-| `background` | 3 | Services that can wait for a quiet moment, like Immich ML |
-| `batch` | 4 | Training, bulk processing, long jobs |
+| `interactive` | 2 | You at the keyboard: ComfyUI, `gpud hold`, a game |
+| `background` | 3 | Services that can wait, like Immich ML |
+| `batch` | 4 | Training, bulk processing |
 
-- `background` and `batch` take the card only after the LLM has been quiet for `idle_s`.
-  Other classes below the LLM wait `gap_s`.
-- Jobs share the card by declared VRAM (`--vram 8G`) plus a safety margin.
-- Nothing is killed. When a higher class needs the card, a yieldable job gets a signal or a
-  file and exits when it is ready.
-- `batch_hold_s` and `batch_hold_count` let LLM requests wait briefly behind a batch job, so
-  several of them share one hand-over instead of interrupting it each time.
-- When the card is free again, gpud reloads the resident model and restores its KV slot, so
-  the last conversation does not have to be read again.
+Lower number wins. The order is yours to change, for example to put your own work above the LLM:
 
-## Supported
+```toml
+[classes]
+interactive = 1
+llm = 2
+```
 
-**LLM servers**
+## What you can plug in
 
-| Server | How gpud frees the card | KV slot restore |
+| Type | Programs | gpud controls it by |
 |---|---|---|
-| llama-swap | unload and load at runtime | yes |
-| Ollama | `keep_alive: 0`, empty generate to load | no |
-| llama-server | stops and starts the service | yes |
-| vLLM | stops and starts the service | no |
-| SGLang | stops and starts the service | no |
+| Command | training, whisper, ffmpeg, any CUDA or ROCm script | `gpud run`, yield by signal or file |
+| GPU service | ComfyUI, Immich ML, TTS or ASR servers, any GPU daemon | systemd, docker, podman or commands, with an optional request gate |
+| LLM server | llama-swap, Ollama, llama-server, vLLM, SGLang | unload and reload at runtime, or stop and start the service |
+| Your own app | anything that can open an HTTP connection | the [lease API](docs/lease-api.md) |
 
-**Other GPU programs**
+GPUs: AMD (sysfs) and NVIDIA (`nvidia-smi`). Anything else works through a `command` probe
+that prints used and total MiB.
 
-| Kind | Examples | How |
-|---|---|---|
-| Managed service | ComfyUI, Immich ML, TTS or ASR servers, any CUDA/ROCm daemon | `[[service]]`, controlled by systemd, docker, podman or commands |
-| Command | training, whisper, ffmpeg, scripts | `gpud run -- cmd` |
-| Native client | your own program | HTTP lease API |
+The [integrations guide](docs/integrations.md) has a ready config for each program in
+[examples/](examples/).
 
-**GPUs**
+## Getting started
 
-| Vendor | VRAM reading |
+**Install**
+
+| System | How |
 |---|---|
-| AMD | sysfs, tested on real hardware |
-| NVIDIA | `nvidia-smi` |
-| Intel or other | `command` probe: any program that prints used and total MiB |
-
-Every integration is covered by tests against fake servers and fake service control.
-
-## Install
-
-| Source | How |
-|---|---|
-| Static binary | [latest release](https://github.com/elektricM/gpud/releases/latest), x86_64 and aarch64 |
+| Any Linux | static binary from the [latest release](https://github.com/elektricM/gpud/releases/latest) (x86_64, aarch64) |
 | Debian, Ubuntu | `sudo apt install ./gpud_*_amd64.deb` from the release |
 | Fedora, RHEL | `sudo dnf install ./gpud-*.x86_64.rpm` from the release |
 | Arch | `packaging/aur/PKGBUILD` (AUR package coming) |
-| Cargo | `cargo install --git https://github.com/elektricM/gpud` |
+| From source | `cargo install --git https://github.com/elektricM/gpud` |
 
-## Quick start
+**Configure** `/etc/gpud/config.toml`. The smallest setup, jobs only, no LLM:
 
-Move your LLM server from port 8080 to 8081, then write `/etc/gpud/config.toml`:
+```toml
+[llm]
+backend = "none"
+```
+
+With an LLM server: move it from port 8080 to 8081, and gpud takes 8080 so your clients do
+not change.
 
 ```toml
 [gate]
 backend = "http://127.0.0.1:8081"
 
 [llm]
-backend = "llama-swap"
+backend = "llama-swap"     # or ollama, llama-server, vllm, sglang
 resident = "chat"
 ```
 
+**Run**
+
 ```sh
-gpud check-config
+gpud check-config                 # validates the file and reads your GPU
 sudo systemctl enable --now gpud
 ```
 
-Clients keep using port 8080. Use the user unit (`gpud.user.service`) when gpud has to
-control `systemctl --user` services such as ComfyUI.
+Use the user unit (`gpud.user.service`) instead when gpud has to control `systemctl --user`
+services.
 
-## CLI
+## Commands
 
 ```sh
-gpud run --class batch --vram 8G --yieldable -- python train.py   # queue, run, release
-gpud hold --class interactive --vram all                          # keep the card until Ctrl-C
+gpud run --class batch --vram 8G --yieldable -- python train.py   # wait, run, release
+gpud hold --class interactive --vram all                          # take the whole card until Ctrl-C
 gpud status                                                       # who has the card, who waits
-gpud check-config -c examples/comfyui.toml                        # validate a config, read VRAM
+gpud check-config -c examples/comfyui.toml                        # check a config before using it
 ```
+
+## Roadmap
+
+| Planned | Until then |
+|---|---|
+| Automatic desktop and game detection, card handed back afterwards | `gpud run --class interactive --vram all -- game` |
+| Several GPUs | one card per gpud for now |
+| Prometheus metrics | `gpud status` and `GET /status` |
+| Config reload without restart | restart the service; live leases are re-adopted |
+| Intel VRAM probe | the `command` probe |
+| Immich adapter that pauses its job queues | Immich ML as a gated service |
+
+Details in [docs/roadmap.md](docs/roadmap.md).
 
 ## Documentation
 
-- [Integrations](docs/integrations.md): plug in your LLM server, service or job
+- [Integrations](docs/integrations.md): how to plug in each kind of program
 - [Configuration](docs/config.md): every key and its default
 - [Lease API](docs/lease-api.md): the HTTP protocol, with a short Python client
-- [Roadmap](docs/roadmap.md): desktop reclaim, multi-GPU, metrics
-- [Examples](examples/): ready configs for each supported program
+- [Examples](examples/): ready configs
 
 ## License
 
