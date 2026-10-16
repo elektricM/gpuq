@@ -1,6 +1,7 @@
 //! Everything that uses the GPU besides the LLM backend: commands, hooks, managed services.
 
 pub mod hook;
+pub mod service;
 
 use std::io;
 use std::time::Duration;

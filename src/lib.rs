@@ -4,6 +4,7 @@ pub mod arbiter;
 pub mod backend;
 pub mod cli;
 pub mod config;
+pub mod gate;
 pub mod probe;
 pub mod workload;
 

@@ -4,6 +4,13 @@
 //! at runtime (vLLM, SGLang, plain llama-server) implements `unload_all` by stopping its
 //! service and `load` by starting it again.
 
+pub mod llama_server;
+pub mod llamaswap;
+pub mod models;
+pub mod none;
+pub mod ollama;
+pub mod stopstart;
+
 use async_trait::async_trait;
 use serde::Serialize;
 
