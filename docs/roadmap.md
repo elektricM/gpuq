@@ -13,12 +13,17 @@ Today it is manual. The `interactive` class outranks `background` and `batch`, a
 Yieldable jobs get asked to give it up; the LLM is unloaded. Wrap a game launcher in
 `gpud run --class interactive --vram all -- game` to get the same without remembering.
 
-## Multi-GPU
+## Multi-GPU leftovers
 
-gpud arbitrates one card. The goal is one queue for several cards: a lease names a card or
-takes any card with enough free VRAM, and each LLM server or service is pinned to its card. The config already has a `gpu.device` field and the state carries a
-device, so leases can later name a card. Needed: one probe per device, per-device VRAM
-accounting, and a way to say which backend lives on which card.
+Several cards work: one queue, a probe and an env per card, leases that name a card or take
+`any` (see `integrations.md`). Still to do:
+
+- Several LLM servers, one per card, each behind its own gate. Today the LLM lives on one card
+  (`llm.card`).
+- Automatic `visible_devices`. You write the device number or UUID per card; gpud could work
+  out the mapping from PCI addresses.
+- Multi-card `auto`. `vendor = "auto"` only works with a single card, so each card names its
+  vendor.
 
 ## Web UI
 

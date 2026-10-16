@@ -181,18 +181,42 @@ gpud run --class batch --vram all --yieldable --name train -- python train.py
 `examples/batch-job.sh` has these and a resumable training loop; `examples/whisper.sh` is a
 realtime-class job.
 
-`gpud run [--class batch] [--vram all] [--name N] [--yieldable] [--yield-signal SIGUSR1]
-[--fallback] -- cmd...`
+`gpud run [--class batch] [--vram all] [--card NAME|any] [--name N] [--yieldable]
+[--yield-signal SIGUSR1] [--fallback] -- cmd...`
 
-- Waits in the queue, then runs the command with `GPUD_LEASE_ID` and `GPUD_YIELD_FILE` in its
-  environment.
+- Waits in the queue, then runs the command with `GPUD_LEASE_ID`, `GPUD_YIELD_FILE` and
+  `GPUD_CARD` (the card it got) in its environment, plus the card's
+  `CUDA_VISIBLE_DEVICES` or similar when the config sets `visible_devices`.
 - Exit code is the command's (128 + signal if it died of one). 69 if gpud is not running,
   unless `--fallback` (run without a lease, with a warning). 1 for an unknown class, 2 for
   usage errors, 126/127 if the command cannot be started.
 - SIGINT, SIGTERM and SIGHUP are forwarded to the command.
 - If the connection to gpud drops, `gpud run` re-adopts the lease every 2 s.
-- `gpud hold [--class] [--vram] [--name]` takes a lease and holds it until Ctrl-C. Use it to
+- `gpud hold [--class] [--vram] [--card] [--name]` takes a lease and holds it until Ctrl-C. Use it to
   reserve the card by hand.
+
+## Several GPUs
+
+With `[[gpu.card]]` entries (see `examples/multi-gpu.toml` and `config.md`) gpud schedules each
+card on its own from one queue.
+
+- **Pinning.** `gpud run --card nvidia -- cmd` waits for that card only. A `[[service]]` with
+  `card = "nvidia"` is bound to it. The LLM server's card is `llm.card` (default: the first).
+  Nothing named runs on the primary card, the first one in the config.
+- **Any.** `gpud run --card any -- cmd` takes the first card with room, otherwise waits.
+  Only cards with `visible_devices` qualify, since the job has to be told where it landed.
+- **visible_devices.** gpud hands the card's env to the job (`CUDA_VISIBLE_DEVICES` for NVIDIA,
+  `HIP_VISIBLE_DEVICES` and `ROCR_VISIBLE_DEVICES` for AMD), and the job's `GPUD_CARD` names
+  the card. Native clients read `card` and `env` from the `granted` event. A `kind = "command"`
+  service is started with the env too; for systemd and containers, pin the device in the unit
+  or container, for example `Environment=CUDA_VISIBLE_DEVICES=1` or `--gpus device=1`.
+- **Why you set it yourself.** CUDA numbers devices fastest-first by default, which is not the
+  order of `nvidia-smi` or of `nvidia_index`. gpud cannot guess what the number means to your
+  stack, so you write it. Put `CUDA_DEVICE_ORDER=PCI_BUS_ID` in the environment of the
+  programs (and of gpud's services) so CUDA and `nvidia-smi` agree. A GPU UUID in
+  `visible_devices` avoids ordering altogether.
+- One LLM server runs on one card. Running a server per card, each with its own gate, is on the
+  roadmap.
 
 ## The yield contract
 

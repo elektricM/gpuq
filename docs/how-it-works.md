@@ -24,6 +24,20 @@ gpud rests on four ideas.
 
 All the timings are settings.
 
+## Several cards
+
+With more than one card, every card has its own state, its own VRAM accounting and its own
+yields, but there is still one queue.
+
+- A waiter only blocks on the cards it can use. A job pinned to one card never holds up a
+  job for another.
+- Yields are per card: when the LLM needs its card back, only the yieldable jobs on that card
+  are asked to step aside.
+- `--card any` takes the first card with enough room. If none has, it waits under the rules of
+  the LLM's card.
+
+Details are in [integrations.md](integrations.md#several-gpus).
+
 ## Priorities
 
 | Class | Default | Typical use |

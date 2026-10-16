@@ -20,10 +20,13 @@ Body: a JSON object (at most 64 KiB). Every field is optional.
 | `yieldable` | `false` | If true, gpud may ask you to give the card back. |
 | `name` | none | Shown in `gpud status`. |
 | `pid` | none | Your process id, shown in status. |
+| `card` | primary card | A card name from `gpud status`, or `"any"` for the first card with room. Missing or `null` means the primary (first) card. With `resume_id`, the lease is re-adopted on that card. |
 | `resume_id` | none | Re-adopt a lease you held before (for example across a gpud restart) under the same id, without queueing. |
 
 Errors come back as plain HTTP 400 with a JSON body, for example
-`{"error": "unknown class 'x'; known: realtime, llm, interactive, background, batch"}`.
+`{"error": "unknown class 'x'; known: realtime, llm, interactive, background, batch"}`. An
+unknown card is `{"error": "unknown card 'x'; known: gpu0, gpu1"}`; `"any"` is refused when no
+card can be steered, that is, with several cards and none has `visible_devices`.
 
 On success the answer is `200` with `Content-Type: application/x-ndjson`, chunked, one JSON
 object per line:
@@ -32,7 +35,7 @@ object per line:
 |---|---|
 | `{"event":"queued"}` | Immediately. |
 | `{"event":"ping"}` | Every 15 s while queued and while holding. Ignore it. |
-| `{"event":"granted","id":"...","yield_signal":"SIGUSR1"}` | Once, when the card is yours. `yield_signal` is gpud's configured `[run] yield_signal`, for clients that pass yields on as a signal. |
+| `{"event":"granted","id":"...","card":"gpu0","env":{},"yield_signal":"SIGUSR1"}` | Once, when the card is yours. `card` is the card you got (never `any`). `env` is an object of variables that point your program at it, for example `{"CUDA_VISIBLE_DEVICES":"1"}`; empty when the card has none. `yield_signal` is gpud's configured `[run] yield_signal`, for clients that pass yields on as a signal. |
 | `{"event":"yield"}` | At most once, only for yieldable leases, when something more important is waiting. |
 
 There is no terminal event. The stream just stays open.
@@ -50,7 +53,7 @@ There is no terminal event. The stream just stays open.
 
 | Route | Answer |
 |---|---|
-| `GET /status` | JSON: arbiter state, leases, queue, and `backend` (`kind`, `models` with `state`). |
+| `GET /status` | JSON: arbiter state, leases, queue, `cards` (one entry per card: `name`, `device`, `state`, `llm`, `vram`) and `backend` (`kind`, `models` with `state`). The top-level `state`, `device` and `vram` are the primary card's. Each lease and queue entry has a `card`. |
 | `GET /healthz` | `ok` |
 
 Unknown path: 404. Wrong method: 405. Arbiter stopped: 503.
@@ -62,7 +65,7 @@ Unknown path: 404. Wrong method: 405. Arbiter stopped: 503.
 curl -N -X POST http://127.0.0.1:9390/lease \
   -d '{"class":"batch","vram":"8G","yieldable":true,"name":"my-job"}'
 # {"event":"queued"}
-# {"event":"granted","id":"L3f2a1-3","yield_signal":"SIGUSR1"}
+# {"event":"granted","id":"L3f2a1-3","card":"gpu0","env":{},"yield_signal":"SIGUSR1"}
 # {"event":"ping"}
 # {"event":"yield"}        <- something more important wants the card
 

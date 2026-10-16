@@ -48,11 +48,61 @@ How VRAM is read and how much room to leave.
 | `nvidia_index` | `0` | NVIDIA: GPU index passed to `nvidia-smi -i`. |
 | `nvidia_smi` | `"nvidia-smi"` | NVIDIA: the binary to run. |
 | `command` | `[]` | Argv of a program that prints `used_mib total_mib` (an optional third number is GTT in MiB). Required for `vendor = "command"`. |
-| `device` | unset | Label only. Reserved for multi-GPU. |
+| `device` | unset | Name of the card in status and leases when there is no `[[gpu.card]]`. Default `gpu0`. |
 | `margin_mib` | `256` | VRAM kept free on top of what leases declare. |
 | `settle_timeout_s` | `60` | How long to wait for the backend to report its models unloaded. |
 | `driver_settle_s` | `2` | Pause after an unload so the driver releases VRAM. |
 | `whole_card_baseline_mib` | `512` | `--vram all` needs at most this much used by other processes. |
+
+### [[gpu.card]]
+
+Several cards: write one `[[gpu.card]]` table per GPU. When present they replace the single
+card described by the keys above (`margin_mib`, `settle_timeout_s`, `driver_settle_s` and
+`whole_card_baseline_mib` stay the defaults for all cards). Without any `[[gpu.card]]`, the
+`[gpu]` table is one card named `gpu.device`, else `gpu0`, with no env, exactly as before.
+The first card is the primary card: jobs and services that name no card go there.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `name` | required | Unique; `a-z`, `0-9`, `_` and `-`; not `any` or `primary`. Used in `--card`, status and the API. |
+| `vendor` | `"auto"` | `amd`, `nvidia`, `intel` or `command`. `auto` is accepted only when there is a single card. |
+| `pci`, `nvidia_index`, `command` | as in `[gpu]` | The probe options of this card. |
+| `sysfs_root`, `nvidia_smi` | the `[gpu]` value | Probe options that default to the `[gpu]` table. |
+| `visible_devices` | unset | The device list that points a program at this card, for example `"1"` or a GPU UUID. Exported to lease holders, see below. |
+| `visible_devices_env` | by vendor | Variables to export `visible_devices` as, for stacks that use other names. Needs `visible_devices`. |
+| `margin_mib` | `gpu.margin_mib` | VRAM kept free on this card. |
+| `whole_card_baseline_mib` | `gpu.whole_card_baseline_mib` | Baseline for `--vram all` on this card. |
+
+`visible_devices` becomes the card's env by vendor:
+
+| Vendor | Variables set to `visible_devices` |
+|---|---|
+| `nvidia` | `CUDA_VISIBLE_DEVICES` |
+| `amd` | `HIP_VISIBLE_DEVICES` and `ROCR_VISIBLE_DEVICES` |
+| `command`, `intel` | `CUDA_VISIBLE_DEVICES` |
+
+The env is sent in the `granted` event, exported by `gpud run`, and passed to the start
+command of a managed service of `kind = "command"`. A card without `visible_devices` can be
+named (`--card gpu1`) but is skipped by `--card any`, because gpud could not tell the job where
+it landed. If no card has `visible_devices`, `--card any` is refused and `gpud check-config`
+says so.
+
+```toml
+[[gpu.card]]
+name = "amd"
+vendor = "amd"
+pci = "0000:03:00.0"
+visible_devices = "0"
+
+[[gpu.card]]
+name = "nvidia"
+vendor = "nvidia"
+nvidia_index = 0
+visible_devices = "0"
+```
+
+A full file is in `examples/multi-gpu.toml`. `gpu.device` cannot be combined with
+`[[gpu.card]]`.
 
 ## [hooks]
 
@@ -70,6 +120,7 @@ The LLM server behind the gate and when it gives up the card.
 |---|---|---|
 | `backend` | `"llama-swap"` | `llama-swap`, `ollama`, `llama-server`, `vllm`, `sglang` or `none`. `none` means no LLM gate: gpud only arbitrates leases and managed services. `llama-server`, `vllm` and `sglang` need `[llm.service]`. |
 | `llama_swap_config` | `"/etc/llama-swap/config.yaml"` | llama-swap's own YAML, read for aliases and CPU-only models. The old name `config` still works. |
+| `card` | first card | With several cards, the card the LLM server runs on. Must be a `[[gpu.card]]` name. |
 | `resident` | `""` | Model reloaded when the card goes idle. Empty = load on demand only. |
 | `cpu_models` | `[]` | Models that never use the GPU, for when the YAML cannot be read. |
 | `slot_save_models` | `[]` | Models started with `--slot-save-path`, for when the YAML cannot be read. gpud saves and restores slot 0 around an unload. |
@@ -161,6 +212,12 @@ A managed GPU service. Repeat the table for each one. See `integrations.md` for 
 | `stop_on_release` | `true` | Stop the service when its lease ends. With a gate, also stops it once at gpud start. |
 | `idle_release_s` | `120` | No in-flight GPU request and `busy_url` idle for this long: release the card. |
 | `flavor` | `"generic"` | `generic` or `comfyui`. `comfyui` needs a gate. |
+| `card` | primary card | The card the service runs on; a `[[gpu.card]]` name. `"any"` is not allowed: a service is bound to its device. |
+
+For `control.kind = "command"` gpud starts the process itself and gives it the card's env
+(`CUDA_VISIBLE_DEVICES` and so on). For systemd, Docker and Podman pin the device in the
+unit or container (`Environment=CUDA_VISIBLE_DEVICES=1`, `--gpus device=1`); `card` then only
+tells gpud which card's VRAM the lease counts against.
 
 A service with no `[service.gate]` is "always wanted": gpud takes its lease at startup and
 holds it. It never idle-releases. When asked to yield it stops (if it has control), releases
