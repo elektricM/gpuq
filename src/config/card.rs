@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Martin Dolez
+
 //! `[[gpu.card]]` entries and the `CardSpec` the daemon builds probes from.
 
 use std::collections::HashSet;

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Martin Dolez
+
 //! Rig for several fake cards. Each card has its own `FakeCard` (VRAM model) and its own probe
 //! with a failure switch; the fake llama-swap is attached to the LLM card only.
 #![allow(dead_code)]

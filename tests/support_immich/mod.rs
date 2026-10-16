@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Martin Dolez
+
 //! Test doubles for the Immich adapter: a fake Immich API on a loopback port, a fake docker
 //! script, and a harness that runs `workload::immich::run` against the in-memory arbiter rig.
 #![allow(dead_code)]

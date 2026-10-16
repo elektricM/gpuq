@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Martin Dolez
+
 //! The `[immich]` section: the queue-aware Immich ML adapter.
 
 use std::collections::BTreeMap;

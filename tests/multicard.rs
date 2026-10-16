@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Martin Dolez
+
 //! Arbiter scheduling across several fake cards. These are the spec for multi-card behaviour:
 //! cards[0] is primary, the LLM lives on one card, jobs can be pinned or sent to "any".
 //! Time is paused, so the suite is deterministic.

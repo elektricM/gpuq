@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Martin Dolez
+
 //! `gpud run` killed with SIGKILL takes its job down with it (Linux only: PR_SET_PDEATHSIG).
 #![cfg(target_os = "linux")]
 

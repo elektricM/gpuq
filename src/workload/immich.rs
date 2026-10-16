@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Martin Dolez
+
 //! Immich ML on the GPU, only while gpud grants a lease.
 //!
 //! Immich is configured with two ML URLs, the GPU container first and a CPU one second. The

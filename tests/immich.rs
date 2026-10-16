@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Martin Dolez
+
 //! The Immich ML adapter: queue backlog to lease to container, against a fake Immich API, a
 //! fake docker script and the in-memory arbiter rig. Real sockets and processes, short
 //! intervals (a poll is 50 ms).
