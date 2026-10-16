@@ -14,28 +14,17 @@ over at the right moment, and starts or stops services for you.
 ## How it works
 
 ```mermaid
-flowchart LR
-    subgraph programs["Your programs"]
-        direction TB
-        cmd["Scripts and jobs<br/>gpud run -- cmd"]
-        svc["GPU services<br/>ComfyUI, Immich ML, TTS, ..."]
-        llm["LLM servers<br/>llama-swap, Ollama, vLLM, ..."]
-        own["Your own app<br/>lease API"]
-    end
-
-    subgraph gpud["gpud"]
-        queue(["Priority queue<br/>and leases"])
-        probe["VRAM probe"]
-        probe --> queue
-    end
-
-    cmd -- "ask for a lease" --> queue
-    own -- "ask for a lease" --> queue
-    svc -- "requests pass through gpud" --> queue
-    llm -- "requests pass through gpud" --> queue
-    queue -- "grant, ask to yield,<br/>start / stop, unload / reload" --> programs
-    queue --- gpu[("GPU")]
+flowchart TB
+    cmd["Scripts and jobs<br/><i>gpud run -- cmd</i>"] --> queue
+    svc["GPU services<br/><i>ComfyUI, Immich ML, TTS</i>"] --> queue
+    llm["LLM servers<br/><i>llama-swap, Ollama, vLLM</i>"] --> queue
+    app["Your own app<br/><i>lease API</i>"] --> queue
+    queue(["<b>gpud</b><br/>priority queue and leases"]) ==> gpu[("GPU")]
 ```
+
+Every program goes through gpud before it touches the card. gpud reads the card's VRAM, grants
+the card in priority order, and when someone more important arrives it asks the current holder
+to yield, stops or starts its service, or unloads the LLM.
 
 Four ideas cover everything:
 
