@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 The gpud authors
+
 //! Model table parsed from llama-swap's YAML: which models use the GPU, aliases, slot saving.
 //!
 //! The file is re-read when its mtime changes. This is a cache, so a plain mutex is enough.

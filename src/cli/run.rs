@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 The gpud authors
+
 //! `gpud run` and `gpud hold`: keep a lease open for as long as the work lasts.
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;

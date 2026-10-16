@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 The gpud authors
+
 //! VRAM probes against fake sysfs trees and fake tools. Ported from tests/test_vram.py.
 
 use std::fs;

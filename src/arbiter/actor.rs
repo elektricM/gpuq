@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 The gpud authors
+
 //! The arbiter task: owns all scheduling state and changes it only in response to messages.
 //!
 //! The loop waits on three things: the message channel, a timer at the next decision deadline

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 The gpud authors
+
 //! LLM servers that sit behind the gate.
 //!
 //! The arbiter only talks to a backend through [`Backend`]. A server that cannot drop a model

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 The gpud authors
+
 //! NVIDIA memory from `nvidia-smi --query-gpu`.
 
 use std::time::{Duration, Instant};

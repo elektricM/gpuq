@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 The gpud authors
+
 //! Control API: status, and leases bound to a streaming connection.
 //!
 //! * `GET /status`: arbiter status as JSON, plus whatever the [`StatusExtra`] adds.

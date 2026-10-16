@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 The gpud authors
+
 //! llama-swap model table (ports tests/test_models.py).
 
 #[path = "support/fake_llamaswap.rs"]

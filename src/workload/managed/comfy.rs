@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 The gpud authors
+
 //! ComfyUI specifics: prompts are held by gpud and submitted once the lease is held.
 
 use std::collections::{BTreeSet, HashMap, VecDeque};

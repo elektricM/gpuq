@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 The gpud authors
+
 //! The ComfyUI flavor against a fake ComfyUI. Ports tests/test_comfyui.py.
 
 mod common;

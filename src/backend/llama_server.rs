@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 The gpud authors
+
 //! Plain llama.cpp `llama-server`: one model per process, so unloading means stopping it.
 
 use std::time::Duration;

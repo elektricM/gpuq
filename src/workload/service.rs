@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 The gpud authors
+
 //! Start, stop and check a GPU service: a systemd unit, a container, or plain commands.
 
 use std::path::{Path, PathBuf};

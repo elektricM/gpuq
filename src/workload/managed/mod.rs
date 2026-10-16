@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 The gpud authors
+
 //! Managed GPU services (ComfyUI, an ML server, a TTS server...): gpud holds a lease for them
 //! while they work, starts and stops them, and can gate their HTTP port.
 //!

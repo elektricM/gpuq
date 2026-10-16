@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 The gpud authors
+
 //! Ollama, llama-server and stop/start backends against fake servers and fake service binaries.
 
 #[path = "support_backends/mod.rs"]

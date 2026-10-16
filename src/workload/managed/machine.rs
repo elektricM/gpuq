@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 The gpud authors
+
 //! The per-service state machine. One task owns it; the HTTP gate talks to it over a channel
 //! and reads what it needs (is the service up, which prompts are held) from a watch channel.
 //!

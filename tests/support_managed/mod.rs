@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 The gpud authors
+
 //! Fakes for the managed-service tests: a tiny HTTP server helper, a fake GPU service driven
 //! by command-kind start/stop scripts, a fake ComfyUI, and a harness that runs
 //! `workload::managed::run` against the in-memory arbiter rig.

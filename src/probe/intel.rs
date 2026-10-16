@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 The gpud authors
+
 //! Intel GPUs are not supported yet.
 //!
 //! i915 and xe do not expose a stable, documented used/total VRAM file in sysfs that we can

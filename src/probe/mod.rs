@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 The gpud authors
+
 //! VRAM probes: how much of the card is in use, whoever uses it.
 
 pub mod amd;

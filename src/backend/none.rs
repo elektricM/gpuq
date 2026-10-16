@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 The gpud authors
+
 //! The "no LLM" backend: gpud only arbitrates leases and services.
 
 use async_trait::async_trait;

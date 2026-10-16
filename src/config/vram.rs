@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 The gpud authors
+
 //! VRAM size strings such as "16G", "6144M", "512" or "all".
 
 use crate::arbiter::Vram;

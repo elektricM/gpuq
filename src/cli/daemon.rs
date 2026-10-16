@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 The gpud authors
+
 //! `gpud daemon` and `gpud check-config`: build everything from the config and run it.
 
 use std::collections::HashMap;

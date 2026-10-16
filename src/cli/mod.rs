@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 The gpud authors
+
 //! The `gpud` command line: the daemon, and clients that talk to its control API.
 //!
 //! ```text

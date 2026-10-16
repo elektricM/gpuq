@@ -7,7 +7,7 @@ description = "GPU manager and queue: one card, many AI and GPU workloads"
 license = "GPL-3.0-or-later"
 repository = "https://github.com/elektricM/gpud"
 readme = "README.md"
-authors = ["Martin Dolez"]
+authors = ["The gpud authors"]
 homepage = "https://github.com/elektricM/gpud"
 keywords = ["gpu", "llm", "scheduler", "vram", "queue"]
 categories = ["command-line-utilities"]
@@ -45,7 +45,7 @@ strip = true
 
 [package.metadata.deb]
 maintainer = "Martin"
-copyright = "Martin"
+copyright = "2026 The gpud authors"
 section = "utils"
 priority = "optional"
 extended-description = """\

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 The gpud authors
+
 //! The llama-swap client against the fake server.
 
 #[path = "support/fake_llamaswap.rs"]

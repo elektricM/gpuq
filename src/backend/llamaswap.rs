@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 The gpud authors
+
 //! Client for the llama-swap instance behind the gate.
 //!
 //! Unload everything, save and restore a llama-server KV slot, preload a model by polling its

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 The gpud authors
+
 //! Ollama: models load on demand and unload with `keep_alive: 0`.
 
 use std::collections::HashSet;

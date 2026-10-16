@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 The gpud authors
+
 //! Pick a probe from the GPU options. Independent of the config module.
 
 use std::path::{Path, PathBuf};

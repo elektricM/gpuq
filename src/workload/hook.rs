@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 The gpud authors
+
 //! Offload hook: a command run when a job does not fit.
 
 use std::time::Duration;

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 The gpud authors
+
 //! TOML configuration: built-in defaults, overridden by an optional file.
 //!
 //! Every section is `deny_unknown_fields`, so a typo is an error instead of a silent default.

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 The gpud authors
+
 //! The gate: a reverse proxy in front of the LLM server.
 //!
 //! A request for a GPU model is announced to the arbiter and held until the card is the LLM's;

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 The gpud authors
+
 //! The real `gpud` binary: check-config, then the daemon on loopback ports against a fake
 //! llama-swap. Unix only (shell-script probe, signals, unix datagram sockets).
 #![cfg(unix)]

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 The gpud authors
+
 //! The arbiter: one owner of the card at a time, a priority queue for everyone else.
 //!
 //! ```text

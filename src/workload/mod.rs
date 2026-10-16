@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 The gpud authors
+
 //! Everything that uses the GPU besides the LLM backend: commands, hooks, managed services.
 
 pub mod hook;

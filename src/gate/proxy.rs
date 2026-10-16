@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 The gpud authors
+
 //! Streaming reverse proxy with an optional guard held for the whole response.
 //!
 //! The gate uses it in front of llama-swap; managed services (ComfyUI and friends) can put

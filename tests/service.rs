@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 The gpud authors
+
 //! ServiceControl against fake systemctl/docker scripts and plain commands.
 #![cfg(unix)]
 
