@@ -6,6 +6,7 @@
 //! Every section is `deny_unknown_fields`, so a typo is an error instead of a silent default.
 //! Durations are written as seconds (integer or float) and exposed as [`Duration`].
 
+mod card;
 mod service;
 mod vram;
 
@@ -19,6 +20,7 @@ use serde::{Deserialize, Deserializer};
 use crate::arbiter::{ClassTuning, Classes, Settings, Tuning};
 use crate::Mib;
 
+pub use card::{default_env_vars, CardSpec, GpuCard};
 pub use service::{Flavor, Service, ServiceGate, ServiceKind, ServiceSpec};
 pub use vram::{parse_vram, VramParseError};
 
@@ -186,7 +188,7 @@ pub struct Gpu {
     pub nvidia_smi: String,
     /// Command probe: argv printing "used_mib total_mib".
     pub command: Vec<String>,
-    /// Informational; reserved for multi-GPU.
+    /// Name of the single card when no `[[gpu.card]]` is given (default "gpu0").
     pub device: Option<String>,
     /// VRAM kept free on top of what leases declare.
     pub margin_mib: Mib,
@@ -195,6 +197,8 @@ pub struct Gpu {
     #[serde(rename = "driver_settle_s", deserialize_with = "secs::deserialize")]
     pub driver_settle: Duration,
     pub whole_card_baseline_mib: Mib,
+    /// `[[gpu.card]]` entries. When present they replace the single card described above.
+    pub card: Vec<GpuCard>,
 }
 
 impl Default for Gpu {
@@ -211,6 +215,7 @@ impl Default for Gpu {
             settle_timeout: Duration::from_secs(60),
             driver_settle: Duration::from_secs(2),
             whole_card_baseline_mib: 512,
+            card: Vec::new(),
         }
     }
 }
@@ -288,6 +293,8 @@ pub struct ClassTuningCfg {
 #[serde(default, deny_unknown_fields)]
 pub struct Llm {
     pub backend: LlmBackend,
+    /// The card the LLM server runs on; default the first card.
+    pub card: Option<String>,
     /// Model reloaded when the card goes idle. Empty means load on demand only.
     pub resident: String,
     pub cpu_models: Vec<String>,
@@ -326,6 +333,7 @@ impl Default for Llm {
     fn default() -> Self {
         Llm {
             backend: LlmBackend::LlamaSwap,
+            card: None,
             resident: String::new(),
             cpu_models: Vec::new(),
             slot_save_models: Vec::new(),
@@ -484,6 +492,7 @@ impl Config {
             need_class(format!("service #{} ({})", i + 1, s.name), &s.class);
         }
 
+        p.extend(self.card_problems());
         if self.gate.port == 0 {
             p.push("gate.port must be non-zero".into());
         }
@@ -635,14 +644,7 @@ impl Config {
             self.gate.host, self.gate.port, self.gate.backend
         );
         let _ = writeln!(s, "api: {}:{}", self.api.host, self.api.port);
-        let mut gpu = format!("gpu: {}", self.gpu.vendor.as_str());
-        if !self.gpu.pci.is_empty() {
-            let _ = write!(gpu, " pci={}", self.gpu.pci);
-        }
-        if let Some(d) = &self.gpu.device {
-            let _ = write!(gpu, " device={d}");
-        }
-        let _ = writeln!(s, "{gpu} (margin {} MiB)", self.gpu.margin_mib);
+        self.describe_cards(&mut s);
         let mut ordered: Vec<_> = self.classes.iter().collect();
         ordered.sort_by_key(|(n, p)| (**p, n.as_str()));
         let list: Vec<String> = ordered.iter().map(|(n, p)| format!("{n}={p}")).collect();

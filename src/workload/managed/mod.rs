@@ -96,7 +96,7 @@ impl Cfg {
             busy_url,
             backend,
             comfy,
-            card: CardSel::Primary,
+            card: svc.card.clone().map_or(CardSel::Primary, CardSel::Named),
             poll: (svc.idle_release / 4).clamp(Duration::from_millis(20), Duration::from_secs(1)),
         })
     }

@@ -255,6 +255,8 @@ pub struct Service {
     pub idle_release: Duration,
     pub gate: Option<ServiceGate>,
     pub flavor: Flavor,
+    /// Card the service runs on; default the primary card. "any" is not allowed.
+    pub card: Option<String>,
 }
 
 impl Default for Service {
@@ -269,6 +271,7 @@ impl Default for Service {
             idle_release: Duration::from_secs(120),
             gate: None,
             flavor: Flavor::Generic,
+            card: None,
         }
     }
 }
@@ -287,6 +290,9 @@ impl Service {
         }
         if let Some(g) = &self.gate {
             s.push_str(&format!(", gate {} -> {}", g.listen, g.backend));
+        }
+        if let Some(c) = &self.card {
+            s.push_str(&format!(", card {c}"));
         }
         s.push(')');
         s

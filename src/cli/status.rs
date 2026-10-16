@@ -40,6 +40,8 @@ fn n(v: &Value, key: &str) -> u64 {
 /// The text form of a status object.
 fn render(st: &Value) -> String {
     let mut out = String::new();
+    let cards = arr(st, "cards");
+    let many = cards.len() > 1;
     let mut put = |label: &str, text: String| {
         out.push_str(&format!("{label:<10} {text}\n"));
     };
@@ -52,10 +54,13 @@ fn render(st: &Value) -> String {
             n(st, "llm_idle_s")
         ),
     );
-    if let Some(dev) = st.get("device").and_then(Value::as_str) {
+    for c in cards.iter().filter(|_| many) {
+        put("card", card_line(c));
+    }
+    if let (false, Some(dev)) = (many, st.get("device").and_then(Value::as_str)) {
         put("device", dev.to_owned());
     }
-    if let Some(v) = st.get("vram").filter(|v| v.is_object()) {
+    if let (false, Some(v)) = (many, st.get("vram").filter(|v| v.is_object())) {
         let gtt = match v.get("gtt_mib").and_then(Value::as_u64) {
             Some(g) if g > 0 => format!("   gtt {g} MiB"),
             _ => String::new(),
@@ -65,7 +70,7 @@ fn render(st: &Value) -> String {
             format!("{}/{} MiB{gtt}", n(v, "used_mib"), n(v, "total_mib")),
         );
     }
-    if let Some(e) = st.get("vram_error").and_then(Value::as_str) {
+    if let (false, Some(e)) = (many, st.get("vram_error").and_then(Value::as_str)) {
         put("vram", format!("unreadable: {e}"));
     }
     match st.get("backend") {
@@ -96,10 +101,15 @@ fn render(st: &Value) -> String {
             .get("pid")
             .and_then(Value::as_u64)
             .map_or("-".to_owned(), |p| p.to_string());
+        let on = if many {
+            format!(" on {}", s(l, "card"))
+        } else {
+            String::new()
+        };
         put(
             "lease",
             format!(
-                "{} {}/{} vram={} {}s pid={pid}{y}",
+                "{} {}/{}{on} vram={} {}s pid={pid}{y}",
                 s(l, "id"),
                 s(l, "class"),
                 s(l, "name"),
@@ -113,10 +123,15 @@ fn render(st: &Value) -> String {
             .get("vram")
             .and_then(Value::as_str)
             .map_or(String::new(), |v| format!("vram={v} "));
+        let on = if many {
+            format!(" on {}", s(w, "card"))
+        } else {
+            String::new()
+        };
         put(
             "queued",
             format!(
-                "{} {}/{} {vram}{}s  {}",
+                "{} {}/{}{on} {vram}{}s  {}",
                 s(w, "kind"),
                 s(w, "class"),
                 s(w, "name"),
@@ -153,6 +168,28 @@ fn clock(t: u64) -> String {
     }
     let d = t % 86_400;
     format!("{:02}:{:02}:{:02}", d / 3600, d / 60 % 60, d % 60)
+}
+
+/// `gpu0  nvidia:0  jobs  1024/8192 MiB  llm` for one entry of `cards`.
+fn card_line(c: &Value) -> String {
+    let vram = match c.get("vram").filter(|v| v.is_object()) {
+        Some(v) => format!("{}/{} MiB", n(v, "used_mib"), n(v, "total_mib")),
+        None => match c.get("vram_error").and_then(Value::as_str) {
+            Some(e) => format!("unreadable: {e}"),
+            None => "?".to_owned(),
+        },
+    };
+    let llm = if c.get("llm").and_then(Value::as_bool) == Some(true) {
+        "  llm"
+    } else {
+        ""
+    };
+    format!(
+        "{}  {}  {}  {vram}{llm}",
+        s(c, "name"),
+        s(c, "device"),
+        s(c, "state")
+    )
 }
 
 fn arr<'a>(v: &'a Value, key: &str) -> &'a [Value] {
@@ -206,6 +243,37 @@ mod tests {
         assert!(!t.contains("1792177510"), "{t}");
         assert_eq!(clock.len(), 8, "{line}");
         assert_eq!(clock.matches(':').count(), 2, "{line}");
+    }
+
+    #[test]
+    fn renders_one_line_per_card() {
+        let st = json!({
+            "state": "llm", "device": "nvidia:0", "inflight_llm": 0, "llm_idle_s": 0,
+            "vram": {"used_mib": 1, "total_mib": 2},
+            "cards": [
+                {"name": "gpu0", "device": "nvidia:0", "state": "llm", "llm": true,
+                 "vram": {"used_mib": 100, "total_mib": 200}},
+                {"name": "gpu1", "device": "nvidia:1", "state": "jobs", "llm": false,
+                 "vram": null, "vram_error": "gone"}
+            ],
+            "leases": [{"id": "a1", "card": "gpu1", "class": "batch", "name": "job",
+                        "vram": "all", "age_s": 3, "pid": 7}],
+            "queue": [{"kind": "job", "card": "any", "class": "batch", "name": "w",
+                       "vram": "512MiB", "wait_s": 2, "why": "busy"}],
+            "history": []
+        });
+        let t = render(&st);
+        assert!(
+            t.contains("card       gpu0  nvidia:0  llm  100/200 MiB  llm\n"),
+            "{t}"
+        );
+        assert!(
+            t.contains("gpu1  nvidia:1  jobs  unreadable: gone\n"),
+            "{t}"
+        );
+        assert!(t.contains("job on gpu1 vram=all"), "{t}");
+        assert!(t.contains("w on any vram=512MiB"), "{t}");
+        assert!(!t.contains("device "), "{t}");
     }
 
     #[test]

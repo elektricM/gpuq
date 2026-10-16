@@ -7,8 +7,8 @@
 //! gpud daemon [-c config] [-v]
 //! gpud check-config [-c config] [--strict]
 //! gpud status [--json]
-//! gpud run [--class C] [--vram 8G|all] [--yieldable] [--fallback] [--name N] -- cmd ...
-//! gpud hold [--class C] [--vram all] [--name N]
+//! gpud run [--class C] [--vram 8G|all] [--card NAME|any] [--yieldable] [--fallback] [--name N] -- cmd ...
+//! gpud hold [--class C] [--vram all] [--card NAME|any] [--name N]
 //! ```
 //!
 //! Clients find the daemon through `GPUD_API` (default `127.0.0.1:9390`) and exit with 69
@@ -33,7 +33,7 @@ pub const EX_UNAVAILABLE: u8 = 69;
 #[command(
     name = "gpud",
     version,
-    about = "GPU manager and queue: one card, many workloads"
+    about = "GPU manager and queue: one or more cards, many workloads"
 )]
 struct Cli {
     /// Address of the gpud control API (default: $GPUD_API, else 127.0.0.1:9390).

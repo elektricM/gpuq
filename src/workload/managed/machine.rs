@@ -323,6 +323,7 @@ impl Machine {
         let Some(control) = self.cfg.control.clone() else {
             return State::Running(lease);
         };
+        let control = control.with_env(lease.env().to_vec());
         let (health, timeout) = (self.cfg.health_url.clone(), self.cfg.start_timeout);
         tracing::info!("{}: lease granted, starting", self.cfg.name);
         let start = async move {
@@ -459,7 +460,7 @@ impl Machine {
                 if self.busy().await {
                     return;
                 }
-                self.fresh_comfyui().await;
+                self.fresh_comfyui(lease.env()).await;
             }
             let Some(c) = &mut self.comfy else { return };
             c.held.pop_front();
@@ -469,8 +470,9 @@ impl Machine {
         }
     }
 
-    async fn fresh_comfyui(&mut self) {
+    async fn fresh_comfyui(&mut self, env: &[(String, String)]) {
         if let Some(control) = self.cfg.control.clone() {
+            let control = control.with_env(env.to_vec());
             tracing::info!(
                 "{}: restarting, the next prompt uses other models",
                 self.cfg.name

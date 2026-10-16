@@ -204,6 +204,9 @@ impl Api {
                     "unknown class '{}'; known: {}", lease_req.class, known.join(", "))}),
             );
         }
+        if let Err(e) = self.arbiter.check_card(&lease_req.card) {
+            return json_resp(StatusCode::BAD_REQUEST, json!({"error": e.to_string()}));
+        }
         let (tx, rx) = mpsc::channel(8);
         let task = tokio::spawn(lease_stream(
             self.arbiter.clone(),
@@ -258,6 +261,13 @@ fn parse_lease_request(raw: &[u8]) -> Result<LeaseRequest, String> {
         Some(Value::String(_)) => None,
         Some(v) => return Err(format!("bad resume_id {v}")),
     };
+    let card = match obj.get("card") {
+        None | Some(Value::Null) => CardSel::Primary,
+        Some(Value::String(s)) if s == "any" => CardSel::Any,
+        Some(Value::String(s)) if s == "primary" => CardSel::Primary,
+        Some(Value::String(s)) if !s.is_empty() => CardSel::Named(s.clone()),
+        Some(v) => return Err(format!("card must be a card name or \"any\", not {v}")),
+    };
     Ok(LeaseRequest {
         class,
         vram,
@@ -271,7 +281,7 @@ fn parse_lease_request(raw: &[u8]) -> Result<LeaseRequest, String> {
             .unwrap_or("")
             .to_owned(),
         pid,
-        card: CardSel::Primary,
+        card,
         resume_id,
     })
 }
@@ -335,7 +345,17 @@ async fn lease_stream(
             _ = tx.closed() => return,
         }
     };
-    let mut granted = json!({"event": "granted", "id": lease.id()});
+    let env: serde_json::Map<String, Value> = lease
+        .env()
+        .iter()
+        .map(|(k, v)| (k.clone(), json!(v)))
+        .collect();
+    let mut granted = json!({
+        "event": "granted",
+        "id": lease.id(),
+        "card": lease.card(),
+        "env": env,
+    });
     if let Some(sig) = &yield_signal {
         granted["yield_signal"] = json!(sig);
     }

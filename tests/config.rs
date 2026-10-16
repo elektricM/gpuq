@@ -359,3 +359,222 @@ fn describe_mentions_the_essentials() {
         assert!(text.contains(needle), "missing {needle:?} in:\n{text}");
     }
 }
+
+// ---------------------------------------------------------------------- several cards
+
+const TWO_CARDS: &str = r#"
+[gpu]
+margin_mib = 300
+
+[[gpu.card]]
+name = "big"
+vendor = "amd"
+pci = "0000:03:00.0"
+visible_devices = "0"
+
+[[gpu.card]]
+name = "small"
+vendor = "nvidia"
+nvidia_index = 1
+visible_devices = "1"
+margin_mib = 100
+whole_card_baseline_mib = 900
+"#;
+
+fn env_of(cfg: &Config, card: &str) -> Vec<(String, String)> {
+    cfg.cards()
+        .into_iter()
+        .find(|c| c.name == card)
+        .unwrap()
+        .env
+}
+
+fn kv(k: &str, v: &str) -> (String, String) {
+    (k.to_owned(), v.to_owned())
+}
+
+#[test]
+fn legacy_gpu_table_is_one_card_without_env() {
+    let cards = Config::default().cards();
+    assert_eq!(cards.len(), 1);
+    assert_eq!(cards[0].name, "gpu0");
+    assert!(cards[0].env.is_empty());
+    assert_eq!(cards[0].margin_mib, 256);
+    assert_eq!(cards[0].whole_card_baseline_mib, 512);
+    let cfg = parse("[gpu]\ndevice = \"main\"\nmargin_mib = 400\nnvidia_index = 2\n").unwrap();
+    let cards = cfg.cards();
+    assert_eq!(cards.len(), 1);
+    assert_eq!(cards[0].name, "main");
+    assert_eq!(cards[0].margin_mib, 400);
+    assert_eq!(cards[0].nvidia_index, 2);
+    assert_eq!(cfg.llm_card_index(), 0);
+    assert!(!cfg.any_card_unavailable());
+}
+
+#[test]
+fn two_cards_parse_with_defaults_from_gpu() {
+    let cfg = parse(TWO_CARDS).unwrap();
+    let cards = cfg.cards();
+    assert_eq!(cards.len(), 2);
+    assert_eq!(cards[0].name, "big");
+    assert_eq!(cards[0].vendor, GpuVendor::Amd);
+    assert_eq!(cards[0].pci, "0000:03:00.0");
+    assert_eq!(cards[0].margin_mib, 300);
+    assert_eq!(cards[0].whole_card_baseline_mib, 512);
+    assert_eq!(cards[0].nvidia_smi, "nvidia-smi");
+    assert_eq!(cards[1].name, "small");
+    assert_eq!(cards[1].nvidia_index, 1);
+    assert_eq!(cards[1].margin_mib, 100);
+    assert_eq!(cards[1].whole_card_baseline_mib, 900);
+    assert_eq!(cfg.llm_card_index(), 0);
+    assert!(!cfg.any_card_unavailable());
+}
+
+#[test]
+fn visible_devices_becomes_env_by_vendor() {
+    let cfg = parse(TWO_CARDS).unwrap();
+    assert_eq!(
+        env_of(&cfg, "big"),
+        [
+            kv("HIP_VISIBLE_DEVICES", "0"),
+            kv("ROCR_VISIBLE_DEVICES", "0")
+        ]
+    );
+    assert_eq!(env_of(&cfg, "small"), [kv("CUDA_VISIBLE_DEVICES", "1")]);
+
+    let cfg = parse(
+        r#"
+[[gpu.card]]
+name = "a"
+vendor = "command"
+command = ["true"]
+visible_devices = "GPU-abc"
+[[gpu.card]]
+name = "b"
+vendor = "intel"
+visible_devices = "2"
+[[gpu.card]]
+name = "c"
+vendor = "nvidia"
+"#,
+    )
+    .unwrap();
+    assert_eq!(env_of(&cfg, "a"), [kv("CUDA_VISIBLE_DEVICES", "GPU-abc")]);
+    assert_eq!(env_of(&cfg, "b"), [kv("CUDA_VISIBLE_DEVICES", "2")]);
+    assert!(env_of(&cfg, "c").is_empty());
+}
+
+#[test]
+fn visible_devices_env_overrides_the_vendor_default() {
+    let cfg = parse(
+        r#"
+[[gpu.card]]
+name = "a"
+vendor = "amd"
+visible_devices = "1"
+visible_devices_env = ["ONEAPI_DEVICE_SELECTOR", "MY_GPU"]
+[[gpu.card]]
+name = "b"
+vendor = "nvidia"
+"#,
+    )
+    .unwrap();
+    assert_eq!(
+        env_of(&cfg, "a"),
+        [kv("ONEAPI_DEVICE_SELECTOR", "1"), kv("MY_GPU", "1")]
+    );
+}
+
+#[test]
+fn bad_card_lists_are_rejected() {
+    let card = |name: &str| format!("[[gpu.card]]\nname = \"{name}\"\nvendor = \"nvidia\"\n");
+    let two = |a: &str, b: &str| format!("{}{}", card(a), card(b));
+    assert!(err_text(&two("a", "a")).contains("duplicate card name"));
+    assert!(err_text(&two("a", "any")).contains("reserved"));
+    assert!(err_text(&two("a", "primary")).contains("reserved"));
+    assert!(err_text(&two("a", "Big")).contains("a-z"));
+    assert!(err_text(&two("a", "my gpu")).contains("a-z"));
+    assert!(err_text(&two("a", "")).contains("name is required"));
+    assert!(parse(&two("gpu-1", "gpu_2")).is_ok());
+
+    let e =
+        err_text("[[gpu.card]]\nname = \"a\"\n[[gpu.card]]\nname = \"b\"\nvendor = \"nvidia\"\n");
+    assert!(e.contains("set vendor"), "{e}");
+    // One card may stay on auto.
+    assert!(parse("[[gpu.card]]\nname = \"a\"\n").is_ok());
+
+    let e = err_text(
+        "[[gpu.card]]\nname = \"a\"\nvendor = \"nvidia\"\nvisible_devices_env = [\"X\"]\n",
+    );
+    assert!(e.contains("needs visible_devices"), "{e}");
+    let e = err_text(
+        "[[gpu.card]]\nname = \"a\"\nvendor = \"nvidia\"\nvisible_devices = \"0\"\nvisible_devices_env = [\"bad name\"]\n",
+    );
+    assert!(e.contains("not a variable name"), "{e}");
+    let e = err_text("[[gpu.card]]\nname = \"a\"\nvendor = \"command\"\n");
+    assert!(e.contains("needs command"), "{e}");
+    let e = err_text("[gpu]\ndevice = \"x\"\n[[gpu.card]]\nname = \"a\"\nvendor = \"nvidia\"\n");
+    assert!(e.contains("gpu.device"), "{e}");
+}
+
+#[test]
+fn llm_card_must_name_a_card() {
+    let cfg = parse(&format!("{TWO_CARDS}\n[llm]\ncard = \"small\"\n")).unwrap();
+    assert_eq!(cfg.llm_card_index(), 1);
+    let e = err_text(&format!("{TWO_CARDS}\n[llm]\ncard = \"nope\"\n"));
+    assert!(e.contains("llm.card"), "{e}");
+    assert!(e.contains("known: big, small"), "{e}");
+    // The legacy card is named gpu0 unless gpu.device says otherwise.
+    assert!(parse("[llm]\ncard = \"gpu0\"\n").is_ok());
+    assert!(parse("[llm]\ncard = \"gpu1\"\n").is_err());
+}
+
+#[test]
+fn service_card_must_name_a_card_and_cannot_be_any() {
+    let svc = |card: &str| {
+        format!("{TWO_CARDS}\n[[service]]\nname = \"tts\"\nvram = \"2G\"\ncard = \"{card}\"\n")
+    };
+    let cfg = parse(&svc("small")).unwrap();
+    assert_eq!(cfg.service[0].card.as_deref(), Some("small"));
+    let e = err_text(&svc("nope"));
+    assert!(
+        e.contains("service \"tts\"") && e.contains("unknown card"),
+        "{e}"
+    );
+    let e = err_text(&svc("any"));
+    assert!(e.contains("not allowed for services"), "{e}");
+    let cfg = parse("[[service]]\nname = \"tts\"\nvram = \"2G\"\n").unwrap();
+    assert_eq!(cfg.service[0].card, None);
+}
+
+#[test]
+fn describe_lists_the_cards_and_notes_a_missing_any() {
+    let text = parse(&format!("{TWO_CARDS}\n[llm]\ncard = \"small\"\n"))
+        .unwrap()
+        .describe();
+    assert!(text.contains("big: amd"), "{text}");
+    assert!(
+        text.contains("small: nvidia index=1, CUDA_VISIBLE_DEVICES=1"),
+        "{text}"
+    );
+    assert!(
+        text.contains("(primary)") && text.contains("(llm)"),
+        "{text}"
+    );
+    assert!(!text.contains("--card any"), "{text}");
+
+    let text = parse(
+        "[[gpu.card]]\nname = \"a\"\nvendor = \"nvidia\"\n[[gpu.card]]\nname = \"b\"\nvendor = \"nvidia\"\nnvidia_index = 1\n",
+    )
+    .unwrap()
+    .describe();
+    assert!(text.contains("`--card any` is unavailable"), "{text}");
+}
+
+#[test]
+fn multi_gpu_example_is_valid() {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("examples/multi-gpu.toml");
+    let cfg = Config::load(Some(&path)).unwrap();
+    assert!(cfg.cards().len() >= 2);
+    assert!(cfg.cards().iter().all(|c| !c.env.is_empty()));
+}

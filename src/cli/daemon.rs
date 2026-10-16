@@ -25,10 +25,9 @@ use crate::backend::none::NoBackend;
 use crate::backend::ollama::Ollama;
 use crate::backend::stopstart::StopStart;
 use crate::backend::Backend;
-use crate::config::{Config, ConfigError, GpuVendor, LlmBackend};
+use crate::config::{CardSpec, Config, ConfigError, GpuVendor, LlmBackend};
 use crate::gate::{Gate, GateOptions};
 use crate::probe::detect::{make_probe, ProbeOptions, Vendor};
-use crate::probe::VramProbe;
 use crate::workload::hook::CommandHook;
 use crate::workload::managed;
 use crate::workload::service::ServiceControl;
@@ -50,22 +49,43 @@ fn report_config_error(e: &ConfigError) {
     }
 }
 
-fn probe_options(cfg: &Config) -> ProbeOptions {
-    let g = &cfg.gpu;
+fn probe_options(c: &CardSpec) -> ProbeOptions {
     ProbeOptions {
-        vendor: match g.vendor {
+        vendor: match c.vendor {
             GpuVendor::Auto => Vendor::Auto,
             GpuVendor::Amd => Vendor::Amd,
             GpuVendor::Nvidia => Vendor::Nvidia,
             GpuVendor::Intel => Vendor::Intel,
             GpuVendor::Command => Vendor::Command,
         },
-        pci: g.pci.clone(),
-        sysfs_root: g.sysfs_root.clone(),
-        nvidia_index: g.nvidia_index,
-        nvidia_smi: g.nvidia_smi.clone(),
-        command: g.command.clone(),
+        pci: c.pci.clone(),
+        sysfs_root: c.sysfs_root.clone(),
+        nvidia_index: c.nvidia_index,
+        nvidia_smi: c.nvidia_smi.clone(),
+        command: c.command.clone(),
     }
+}
+
+/// One probe per configured card. A card whose probe cannot be built is an error naming it.
+fn build_cards(cfg: &Config) -> Result<Vec<arbiter::Card>, String> {
+    cfg.cards()
+        .into_iter()
+        .map(|c| {
+            let probe = make_probe(&probe_options(&c))
+                .map_err(|e| format!("card {}: no usable VRAM probe: {e}", c.name))?;
+            match c.env_summary() {
+                Some(env) => tracing::info!("card {}: {}, {env}", c.name, probe.device()),
+                None => tracing::info!("card {}: {}", c.name, probe.device()),
+            }
+            Ok(arbiter::Card {
+                name: c.name,
+                probe,
+                margin_mib: c.margin_mib,
+                whole_card_baseline_mib: c.whole_card_baseline_mib,
+                env: c.env,
+            })
+        })
+        .collect()
 }
 
 /// `gpud check-config`.
@@ -82,28 +102,40 @@ pub fn check_config(path: Option<PathBuf>, strict: bool) -> ExitCode {
         _ => println!("config: built-in defaults"),
     }
     print!("{}", cfg.describe());
-    let reading = match make_probe(&probe_options(&cfg)) {
-        Ok(probe) => block_on_value(async move {
-            let device = probe.device();
-            (device, probe.read().await.map_err(|e| e.to_string()))
-        })
-        .map_err(|e| e.to_string())
-        .and_then(|(device, r)| r.map(|r| (device, r))),
-        Err(e) => Err(e.to_string()),
-    };
-    match reading {
-        Ok((device, r)) => {
-            println!("probe: {device}, {} / {} MiB used", r.used_mib, r.total_mib);
-            ExitCode::SUCCESS
-        }
-        Err(e) => {
-            eprintln!("gpud: warning: VRAM probe failed: {e}");
-            if strict {
-                ExitCode::FAILURE
-            } else {
-                ExitCode::SUCCESS
+    let mut failed = false;
+    for c in cfg.cards() {
+        let reading = match make_probe(&probe_options(&c)) {
+            Ok(probe) => block_on_value(async move {
+                let device = probe.device();
+                (device, probe.read().await.map_err(|e| e.to_string()))
+            })
+            .map_err(|e| e.to_string())
+            .and_then(|(device, r)| r.map(|r| (device, r))),
+            Err(e) => Err(e.to_string()),
+        };
+        let multi = cfg.has_card_list();
+        match reading {
+            Ok((device, r)) if multi => println!(
+                "probe {}: {device}, {} / {} MiB used",
+                c.name, r.used_mib, r.total_mib
+            ),
+            Ok((device, r)) => {
+                println!("probe: {device}, {} / {} MiB used", r.used_mib, r.total_mib)
+            }
+            Err(e) => {
+                failed = true;
+                if multi {
+                    eprintln!("gpud: warning: card {}: VRAM probe failed: {e}", c.name);
+                } else {
+                    eprintln!("gpud: warning: VRAM probe failed: {e}");
+                }
             }
         }
+    }
+    if failed && strict {
+        ExitCode::FAILURE
+    } else {
+        ExitCode::SUCCESS
     }
 }
 
@@ -293,9 +325,7 @@ async fn serve(cfg: Config, path: Option<&Path>) -> Result<(), String> {
         cfg.llm.backend.as_str()
     );
 
-    let probe: Arc<dyn VramProbe> =
-        make_probe(&probe_options(&cfg)).map_err(|e| format!("no usable VRAM probe: {e}"))?;
-    tracing::info!("vram probe: {}", probe.device());
+    let cards = build_cards(&cfg)?;
     let Built { backend, swap } = build_backend(&cfg)?;
     let hook: Option<Arc<dyn OffloadHook>> = (!cfg.hooks.offload.is_empty()).then(|| {
         Arc::new(CommandHook::new(
@@ -310,7 +340,13 @@ async fn serve(cfg: Config, path: Option<&Path>) -> Result<(), String> {
     };
     let api_listener = bind("api", &cfg.api.host, cfg.api.port).await?;
 
-    let handle = arbiter::spawn(cfg.arbiter_settings(), backend.clone(), probe, hook);
+    let handle = arbiter::spawn_cards(
+        cfg.arbiter_settings(),
+        cards,
+        cfg.llm_card_index(),
+        backend.clone(),
+        hook,
+    );
     let (stop_tx, stop_rx) = watch::channel(false);
     let mut tasks = JoinSet::new();
 

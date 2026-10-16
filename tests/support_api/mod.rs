@@ -14,6 +14,7 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use gpud::api::{Api, StatusExtra};
+use gpud::arbiter::{self, Card};
 use serde_json::{json, Value};
 use tokio::net::TcpListener;
 use tokio::sync::oneshot;
@@ -62,6 +63,38 @@ impl TestApi {
         };
         t.serve(listener);
         t
+    }
+
+    /// A rig with two cards, "gpu0" and "gpu1", each with its own fake card state. `env0` and
+    /// `env1` are the environment each card hands to lease holders. `rig.card` is gpu0's.
+    pub async fn start_two_cards(
+        env0: &[(&str, &str)],
+        env1: &[(&str, &str)],
+        ping: Duration,
+    ) -> (TestApi, FakeCard) {
+        let (card0, card1) = (FakeCard::default(), FakeCard::default());
+        card0.preload("big");
+        let backend = Arc::new(FakeBackend::new(card0.clone()));
+        let env = |e: &[(&str, &str)]| {
+            e.iter()
+                .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
+                .collect::<Vec<_>>()
+        };
+        let mk = |name: &str, card: &FakeCard, e: Vec<(String, String)>| Card {
+            name: name.into(),
+            probe: Arc::new(FakeProbe::new(card.clone())),
+            margin_mib: 256,
+            whole_card_baseline_mib: 512,
+            env: e,
+        };
+        let cards = vec![mk("gpu0", &card0, env(env0)), mk("gpu1", &card1, env(env1))];
+        let handle = arbiter::spawn_cards(base_settings(), cards, 0, backend.clone(), None);
+        let rig = Rig {
+            handle,
+            card: card0,
+            backend,
+        };
+        (Self::start_on(rig, ping).await, card1)
     }
 
     pub async fn start_on(rig: Rig, ping: Duration) -> TestApi {

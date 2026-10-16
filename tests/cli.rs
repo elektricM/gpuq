@@ -387,3 +387,110 @@ async fn the_daemon_announces_its_yield_signal() {
     api.rig.card.set_job_vram(0);
     assert_eq!(done(chat).await, 200);
 }
+
+// ---------------------------------------------------------------------- cards
+
+#[tokio::test]
+async fn card_flag_names_the_card_and_the_job_sees_it() {
+    let api = api().await;
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("out");
+    let mut cmd = gpud(
+        api.addr,
+        &[
+            "run",
+            "--card",
+            "gpu0",
+            "--vram",
+            "1G",
+            "--",
+            "sh",
+            "-c",
+            r#"echo "$GPUD_CARD" > "$OUT""#,
+        ],
+    );
+    cmd.env("OUT", &out);
+    let d = finish(cmd.spawn().unwrap()).await;
+    assert_eq!(d.rc, 0, "{}", d.err);
+    assert_eq!(std::fs::read_to_string(&out).unwrap().trim(), "gpu0");
+}
+
+#[tokio::test]
+async fn the_card_is_exported_without_the_flag_too() {
+    let api = api().await;
+    let script = r#"test "$GPUD_CARD" = gpu0 || exit 9"#;
+    let d = run(api.addr, &["run", "--vram", "1G", "--", "sh", "-c", script]).await;
+    assert_eq!(d.rc, 0, "{}", d.err);
+}
+
+#[tokio::test]
+async fn an_unknown_card_exits_1() {
+    let api = api().await;
+    let d = run(
+        api.addr,
+        &["run", "--card", "nope", "--vram", "1G", "--", "true"],
+    )
+    .await;
+    assert_eq!(d.rc, 1);
+    assert!(d.err.contains("unknown card"), "{}", d.err);
+    assert!(d.err.contains("known: gpu0"), "{}", d.err);
+    let d = run(api.addr, &["hold", "--card", "nope"]).await;
+    assert_eq!(d.rc, 1);
+    assert!(d.err.contains("unknown card"), "{}", d.err);
+}
+
+#[tokio::test]
+async fn status_with_one_card_has_no_card_lines() {
+    let api = api().await;
+    let d = run(api.addr, &["status"]).await;
+    assert_eq!(d.rc, 0, "{}", d.err);
+    assert!(!d.out.contains("card "), "{}", d.out);
+    assert!(d.out.contains("device"), "{}", d.out);
+}
+
+#[tokio::test]
+#[ignore = "needs multi-card actor"]
+async fn status_with_two_cards_has_a_line_each() {
+    let (api, _gpu1) = TestApi::start_two_cards(&[], &[], PING).await;
+    let d = run(api.addr, &["status"]).await;
+    assert_eq!(d.rc, 0, "{}", d.err);
+    let cards: Vec<&str> = d.out.lines().filter(|l| l.starts_with("card ")).collect();
+    assert_eq!(cards.len(), 2, "{}", d.out);
+    assert!(
+        cards[0].contains("gpu0") && cards[0].contains("llm"),
+        "{}",
+        d.out
+    );
+    assert!(cards[1].contains("gpu1"), "{}", d.out);
+}
+
+#[tokio::test]
+#[ignore = "needs multi-card actor"]
+async fn a_job_on_gpu1_gets_that_cards_env() {
+    let (api, _gpu1) = TestApi::start_two_cards(
+        &[("CUDA_VISIBLE_DEVICES", "0")],
+        &[("CUDA_VISIBLE_DEVICES", "1")],
+        PING,
+    )
+    .await;
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("out");
+    let mut cmd = gpud(
+        api.addr,
+        &[
+            "run",
+            "--card",
+            "gpu1",
+            "--vram",
+            "1G",
+            "--",
+            "sh",
+            "-c",
+            r#"echo "$GPUD_CARD $CUDA_VISIBLE_DEVICES" > "$OUT""#,
+        ],
+    );
+    cmd.env("OUT", &out);
+    let d = finish(cmd.spawn().unwrap()).await;
+    assert_eq!(d.rc, 0, "{}", d.err);
+    assert_eq!(std::fs::read_to_string(&out).unwrap().trim(), "gpu1 1");
+}

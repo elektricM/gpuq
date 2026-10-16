@@ -87,6 +87,7 @@ pub struct ServiceControl {
     bin: Option<PathBuf>,
     cmd_timeout: Duration,
     poll: Duration,
+    env: Vec<(String, String)>,
 }
 
 impl ServiceControl {
@@ -96,6 +97,7 @@ impl ServiceControl {
             bin: None,
             cmd_timeout: DEFAULT_CMD_TIMEOUT,
             poll: DEFAULT_POLL,
+            env: Vec::new(),
         }
     }
 
@@ -148,6 +150,14 @@ impl ServiceControl {
     /// Limit for a single start, stop or status command.
     pub fn with_command_timeout(mut self, t: Duration) -> Self {
         self.cmd_timeout = t;
+        self
+    }
+
+    /// Environment for the commands of a `Commands` service (e.g. the card's
+    /// `CUDA_VISIBLE_DEVICES`). Systemd and containers are pinned in their own unit or
+    /// container config, so it has no effect there.
+    pub fn with_env(mut self, env: Vec<(String, String)>) -> Self {
+        self.env = env;
         self
     }
 
@@ -223,6 +233,9 @@ impl ServiceControl {
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .kill_on_drop(true);
+        if matches!(self.kind, ServiceKind::Commands { .. }) {
+            command.envs(self.env.iter().map(|(k, v)| (k, v)));
+        }
         let child = async { super::spawn(&mut command).await?.wait_with_output().await };
         let out = match tokio::time::timeout(self.cmd_timeout, child).await {
             Err(_) => {
@@ -342,5 +355,25 @@ pub(crate) async fn wait_down(url: &str, timeout: Duration, poll: Duration) -> R
             return Err(ServiceError::StillUp(timeout));
         }
         sleep(poll.min(left)).await;
+    }
+}
+
+#[cfg(all(test, unix))]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn command_services_get_the_card_env() {
+        let dir = tempfile::tempdir().unwrap();
+        let out = dir.path().join("seen");
+        let script = format!("echo \"$CUDA_VISIBLE_DEVICES\" > {}", out.display());
+        let control = ServiceControl::commands(
+            vec!["sh".into(), "-c".into(), script],
+            vec!["true".into()],
+            None,
+        )
+        .with_env(vec![("CUDA_VISIBLE_DEVICES".into(), "1".into())]);
+        control.start().await.unwrap();
+        assert_eq!(std::fs::read_to_string(out).unwrap().trim(), "1");
     }
 }

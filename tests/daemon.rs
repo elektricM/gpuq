@@ -395,3 +395,172 @@ async fn backend_none_has_no_gate_but_grants_leases() {
     daemon.wait_healthy().await;
     assert_eq!(daemon.terminate().await, 0);
 }
+
+// ---------------------------------------------------------------------- several cards
+
+impl Setup {
+    /// A config with two cards, each with its own command probe.
+    fn two_card_config(&self, backend_url: &str, extra: &str) -> PathBuf {
+        use std::os::unix::fs::PermissionsExt;
+        let probe = |name: &str, used: u32| {
+            let p = self.path(name);
+            std::fs::write(&p, format!("#!/bin/sh\necho {used} 24560\n")).unwrap();
+            std::fs::set_permissions(&p, std::fs::Permissions::from_mode(0o755)).unwrap();
+            p
+        };
+        let (p0, p1) = (probe("probe0.sh", 100), probe("probe1.sh", 200));
+        let models = self.path("models.yaml");
+        std::fs::write(&models, MODELS_YAML).unwrap();
+        let text = format!(
+            r#"
+[gate]
+port = {gate}
+backend = "{backend_url}"
+
+[api]
+port = {api}
+
+[gpu]
+driver_settle_s = 0.05
+settle_timeout_s = 2
+
+[[gpu.card]]
+name = "left"
+vendor = "command"
+command = ["{p0}"]
+visible_devices = "0"
+
+[[gpu.card]]
+name = "right"
+vendor = "command"
+command = ["{p1}"]
+visible_devices = "1"
+
+[llm]
+llama_swap_config = "{models}"
+reload_when_idle = false
+{extra}
+"#,
+            gate = self.gate_port,
+            api = self.api_port,
+            p0 = p0.display(),
+            p1 = p1.display(),
+            models = models.display(),
+        );
+        let p = self.path("gpud.toml");
+        std::fs::write(&p, text).unwrap();
+        p
+    }
+}
+
+#[tokio::test]
+async fn check_config_reads_every_card() {
+    let setup = Setup::new();
+    let cfg = setup.two_card_config("http://127.0.0.1:1", "");
+    let d = run_cli(&["check-config", "-c", cfg.to_str().unwrap(), "--strict"]).await;
+    assert_eq!(d.rc, 0, "{}", d.err);
+    assert!(d.out.contains("left: command"), "{}", d.out);
+    assert!(d.out.contains("CUDA_VISIBLE_DEVICES=1"), "{}", d.out);
+    assert!(d.out.contains("probe left:"), "{}", d.out);
+    assert!(d.out.contains("100 / 24560 MiB"), "{}", d.out);
+    assert!(d.out.contains("probe right:"), "{}", d.out);
+    assert!(d.out.contains("200 / 24560 MiB"), "{}", d.out);
+}
+
+#[tokio::test]
+async fn check_config_strict_fails_when_any_card_probe_fails() {
+    let setup = Setup::new();
+    let cfg = setup.two_card_config("http://127.0.0.1:1", "");
+    let text = std::fs::read_to_string(&cfg)
+        .unwrap()
+        .replace("probe1.sh", "missing.sh");
+    std::fs::write(&cfg, text).unwrap();
+    let c = cfg.to_str().unwrap();
+    let d = run_cli(&["check-config", "-c", c]).await;
+    assert_eq!(d.rc, 0, "{}", d.err);
+    assert!(d.err.contains("card right"), "{}", d.err);
+    assert!(d.out.contains("probe left:"), "{}", d.out);
+    let d = run_cli(&["check-config", "-c", c, "--strict"]).await;
+    assert_eq!(d.rc, 1);
+}
+
+#[tokio::test]
+async fn check_config_notes_when_any_is_unavailable() {
+    let setup = Setup::new();
+    let cfg = setup.two_card_config("http://127.0.0.1:1", "");
+    let text = std::fs::read_to_string(&cfg)
+        .unwrap()
+        .lines()
+        .filter(|l| !l.starts_with("visible_devices"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    std::fs::write(&cfg, text).unwrap();
+    let d = run_cli(&["check-config", "-c", cfg.to_str().unwrap()]).await;
+    assert_eq!(d.rc, 0, "{}", d.err);
+    assert!(d.out.contains("--card any"), "{}", d.out);
+}
+
+#[tokio::test]
+async fn daemon_with_two_cards_starts_and_serves_leases() {
+    let setup = Setup::new();
+    let cfg = setup.two_card_config("http://127.0.0.1:1", "backend = \"none\"");
+    let daemon = Daemon::start(&setup, &cfg).await;
+    let d = finish(
+        daemon
+            .cli(&["run", "--card", "left", "--vram", "1G", "--", "true"])
+            .spawn()
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(d.rc, 0, "{}", d.err);
+    let d = finish(
+        daemon
+            .cli(&["run", "--card", "nope", "--vram", "1G", "--", "true"])
+            .spawn()
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(d.rc, 1);
+    assert!(d.err.contains("known: left, right"), "{}", d.err);
+    assert_eq!(daemon.terminate().await, 0);
+}
+
+#[tokio::test]
+#[ignore = "needs multi-card actor"]
+async fn daemon_with_two_cards_lists_both_in_status() {
+    let setup = Setup::new();
+    let cfg = setup.two_card_config("http://127.0.0.1:1", "backend = \"none\"\ncard = \"right\"");
+    let daemon = Daemon::start(&setup, &cfg).await;
+    let st = daemon.status_json().await;
+    let cards = st["cards"].as_array().unwrap();
+    assert_eq!(cards.len(), 2, "{st}");
+    assert_eq!(cards[0]["name"], "left", "{st}");
+    assert_eq!(cards[1]["name"], "right", "{st}");
+    assert_eq!(cards[0]["llm"], false, "{st}");
+    assert_eq!(cards[1]["llm"], true, "{st}");
+
+    let d = finish(daemon.cli(&["status"]).spawn().unwrap()).await;
+    assert_eq!(d.rc, 0, "{}", d.err);
+    assert_eq!(d.out.lines().filter(|l| l.starts_with("card ")).count(), 2);
+    assert_eq!(daemon.terminate().await, 0);
+}
+
+#[tokio::test]
+async fn daemon_names_the_card_whose_probe_cannot_be_built() {
+    let setup = Setup::new();
+    let cfg = setup.two_card_config("http://127.0.0.1:1", "backend = \"none\"");
+    let empty = setup.path("sysfs");
+    std::fs::create_dir(&empty).unwrap();
+    let mut lines: Vec<String> = std::fs::read_to_string(&cfg)
+        .unwrap()
+        .lines()
+        .map(str::to_owned)
+        .collect();
+    let at = lines.iter().position(|l| l.contains("probe1.sh")).unwrap();
+    lines[at - 1] = "vendor = \"amd\"".into();
+    lines[at] = format!("sysfs_root = \"{}\"", empty.display());
+    std::fs::write(&cfg, lines.join("\n")).unwrap();
+    let d = run_cli(&["daemon", "-c", cfg.to_str().unwrap()]).await;
+    assert_eq!(d.rc, 1);
+    assert!(d.err.contains("card right"), "{}", d.err);
+}

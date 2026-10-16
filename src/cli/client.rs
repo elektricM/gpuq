@@ -32,13 +32,23 @@ impl std::fmt::Display for ClientError {
     }
 }
 
+/// What a `granted` event carries.
+#[derive(Debug, PartialEq, Eq)]
+pub struct Grant {
+    pub id: String,
+    /// The yield signal gpud is configured with (if it says).
+    pub yield_signal: Option<String>,
+    /// The card the lease is on; None from a gpud that predates cards.
+    pub card: Option<String>,
+    pub env: Vec<(String, String)>,
+}
+
 /// One line of the lease stream.
 #[derive(Debug, PartialEq, Eq)]
 pub enum Event {
     Queued,
     Ping,
-    /// Lease id, and the yield signal gpud is configured with (if it says).
-    Granted(String, Option<String>),
+    Granted(Grant),
     Yield,
     Unknown,
 }
@@ -170,12 +180,23 @@ fn parse_event(raw: &[u8]) -> Event {
         Some("ping") => Event::Ping,
         Some("yield") => Event::Yield,
         Some("granted") => match v.get("id").and_then(Value::as_str) {
-            Some(id) => Event::Granted(
-                id.to_owned(),
-                v.get("yield_signal")
+            Some(id) => Event::Granted(Grant {
+                id: id.to_owned(),
+                yield_signal: v
+                    .get("yield_signal")
                     .and_then(Value::as_str)
                     .map(str::to_owned),
-            ),
+                card: v.get("card").and_then(Value::as_str).map(str::to_owned),
+                env: v
+                    .get("env")
+                    .and_then(Value::as_object)
+                    .map(|o| {
+                        o.iter()
+                            .filter_map(|(k, v)| Some((k.clone(), v.as_str()?.to_owned())))
+                            .collect()
+                    })
+                    .unwrap_or_default(),
+            }),
             None => Event::Unknown,
         },
         _ => Event::Unknown,

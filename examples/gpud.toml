@@ -24,11 +24,22 @@ sysfs_root = "/sys/bus/pci/devices"
 nvidia_index = 0           # NVIDIA: GPU index passed to nvidia-smi -i
 nvidia_smi = "nvidia-smi"
 command = []               # vendor = "command": argv that prints "used_mib total_mib"
-# device = "card0"         # informational; reserved for multi-GPU
+# device = "card0"         # name of the card in status and leases (default "gpu0")
 margin_mib = 256           # VRAM kept free on top of what leases declare
 settle_timeout_s = 60      # how long to wait for the backend to report models unloaded
 driver_settle_s = 2        # pause after an unload for the driver to release VRAM
 whole_card_baseline_mib = 512   # `--vram all` needs at most this much used by other processes
+
+# Several cards: replace the single card above with one [[gpu.card]] per GPU. See
+# examples/multi-gpu.toml and docs/config.md.
+# [[gpu.card]]
+# name = "gpu0"             # a-z, 0-9, _ and -; not "any" or "primary"
+# vendor = "nvidia"         # explicit (no "auto") when there are several cards
+# nvidia_index = 0          # plus pci, sysfs_root, nvidia_smi, command like [gpu]
+# visible_devices = "0"     # handed to jobs as CUDA_VISIBLE_DEVICES (AMD: HIP_ and ROCR_VISIBLE_DEVICES)
+# visible_devices_env = []  # optional: other variable names to export it as
+# margin_mib = 256          # default: [gpu] margin_mib
+# whole_card_baseline_mib = 512
 
 [hooks]
 # Run once per waiting job when it does not fit and no lease is active, e.g. to move a
@@ -39,6 +50,7 @@ offload_settle_s = 3
 
 [llm]
 backend = "llama-swap"     # llama-swap | ollama | llama-server | vllm | sglang | none
+# card = "gpu0"            # with several cards: the one the LLM server runs on (default: the first)
 llama_swap_config = "/etc/llama-swap/config.yaml"   # llama-swap's config (older name: config)
 resident = ""              # model to reload when the card goes idle, e.g. "my-model"
 cpu_models = []            # names that never use the GPU (when the YAML cannot be read)
@@ -100,6 +112,7 @@ yield_signal = "SIGUSR1"   # what `gpud run` sends a yieldable job; --yield-sign
 # stop_on_release = true    # stop the service when its lease ends
 # idle_release_s = 120      # no work for this long: release the card
 # flavor = "comfyui"        # generic | comfyui
+# card = "gpu1"             # with several cards: the card it runs on (default: the first; not "any")
 #
 # [service.control]         # omit for a service that is always running
 # kind = "systemd"

@@ -1,0 +1,66 @@
+# Two cards: an AMD card for the LLM and an NVIDIA card for ComfyUI.
+# Copy to /etc/gpud/config.toml and adjust the PCI address and device numbers.
+#
+# gpud schedules the cards from one queue. A job asks for a card by name (`--card nvidia`),
+# or for whichever has room (`--card any`). Leases on different cards run side by side;
+# the LLM only waits for jobs on its own card.
+#
+# `visible_devices` is what gpud hands to a lease holder so the program lands on the card it
+# was granted: HIP_VISIBLE_DEVICES and ROCR_VISIBLE_DEVICES for AMD, CUDA_VISIBLE_DEVICES for
+# NVIDIA. Cards without it can still be named, but `--card any` skips them. Set
+# CUDA_DEVICE_ORDER=PCI_BUS_ID wherever CUDA programs start so the numbers match nvidia-smi.
+
+[gate]
+port = 8080
+backend = "http://127.0.0.1:8081"    # llama-swap, moved here from 8080
+
+[llm]
+backend = "llama-swap"
+llama_swap_config = "/etc/llama-swap/config.yaml"
+card = "amd"                         # the LLM server runs on this card (default: the first)
+
+[[gpu.card]]
+name = "amd"                         # a-z, 0-9, _ and -; not "any" or "primary"
+vendor = "amd"
+pci = "0000:03:00.0"
+visible_devices = "0"                # -> HIP_VISIBLE_DEVICES=0, ROCR_VISIBLE_DEVICES=0
+
+[[gpu.card]]
+name = "nvidia"
+vendor = "nvidia"
+nvidia_index = 0
+visible_devices = "0"                # -> CUDA_VISIBLE_DEVICES=0
+margin_mib = 512                     # per-card override of [gpu] margin_mib
+# visible_devices_env = ["CUDA_VISIBLE_DEVICES"]   # override the variables for unusual stacks
+
+# ComfyUI is bound to the NVIDIA card. gpud starts it with CUDA_VISIBLE_DEVICES=0 in its
+# environment (kind = "command" only; for a systemd unit or a container, pin the device in
+# the unit or container config instead).
+[[service]]
+name = "comfyui"
+card = "nvidia"                      # a card name; "any" is not allowed for services
+flavor = "comfyui"
+class = "interactive"
+vram = "16G"
+yieldable = true
+idle_release_s = 120
+
+[service.control]
+kind = "command"
+start = ["/usr/local/bin/comfyui-start"]
+stop = ["/usr/local/bin/comfyui-stop"]
+health_url = "http://127.0.0.1:8189/system_stats"
+start_timeout_s = 180
+
+[service.gate]
+listen = "127.0.0.1:8188"
+backend = "http://127.0.0.1:8189"
+gpu_paths = ["/prompt"]
+busy_url = "http://127.0.0.1:8189/queue"
+
+# Examples:
+#   gpud run --card nvidia --vram 8G -- python train.py      # exactly this card
+#   gpud run --card any --vram 8G -- python train.py         # the first card with room;
+#                                                            # CUDA/HIP_VISIBLE_DEVICES and
+#                                                            # GPUD_CARD tell the job where
+#   gpud status                                              # one line per card

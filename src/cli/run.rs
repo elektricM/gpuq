@@ -14,7 +14,7 @@ use serde_json::{json, Value};
 use tokio::process::Command;
 use tokio::signal::unix::{signal, Signal as SigStream, SignalKind};
 
-use super::client::{ClientError, Event, LeaseStream};
+use super::client::{ClientError, Event, Grant, LeaseStream};
 use super::{parse_vram, say, vram_mib_json, EX_UNAVAILABLE};
 
 /// How often a lost lease connection is retried.
@@ -38,6 +38,10 @@ pub struct RunArgs {
     /// `[run] yield_signal`, else SIGUSR1.
     #[arg(long, value_name = "SIGNAL")]
     yield_signal: Option<String>,
+    /// Card to run on: a name from `gpud status`, or `any` for the first card with room.
+    /// Default: the primary card.
+    #[arg(long, value_name = "NAME|any")]
+    card: Option<String>,
     /// If gpud is not running, run the command anyway.
     #[arg(long)]
     fallback: bool,
@@ -54,6 +58,9 @@ pub struct HoldArgs {
     vram: String,
     #[arg(long, default_value = "manual")]
     name: String,
+    /// Card to hold: a name from `gpud status`, or `any`. Default: the primary card.
+    #[arg(long, value_name = "NAME|any")]
+    card: Option<String>,
 }
 
 /// SIGINT, SIGTERM and SIGHUP, which `run` forwards and `hold` treats as "release now".
@@ -115,6 +122,9 @@ struct Session {
     id: String,
     /// The yield signal gpud announced with the grant.
     yield_signal: Option<String>,
+    /// The card the lease is on, and the environment that points a program at it.
+    card: Option<String>,
+    env: Vec<(String, String)>,
     stream: Option<LeaseStream>,
 }
 
@@ -132,7 +142,7 @@ impl Session {
         loop {
             tokio::select! {
                 ev = stream.next() => match ev {
-                    Ok(Some(Event::Granted(id, yield_signal))) => {
+                    Ok(Some(Event::Granted(Grant { id, yield_signal, card, env }))) => {
                         if told {
                             say(&format!("granted {id} after {:.0}s", t0.elapsed().as_secs_f64()));
                         }
@@ -141,6 +151,8 @@ impl Session {
                             body,
                             id,
                             yield_signal,
+                            card,
+                            env,
                             stream: Some(stream),
                         });
                     }
@@ -179,6 +191,10 @@ impl Session {
     async fn readopt(&self) -> LeaseStream {
         let mut body = self.body.clone();
         body["resume_id"] = json!(self.id);
+        // Adopt on the card that was granted, not on "any".
+        if let Some(card) = &self.card {
+            body["card"] = json!(card);
+        }
         loop {
             if let Ok(mut stream) = LeaseStream::open(&self.addr, &body).await {
                 loop {
@@ -205,15 +221,25 @@ async fn yield_of(session: &mut Option<Session>) {
     }
 }
 
-fn lease_body(class: &str, vram: &str, name: &str, yieldable: bool) -> Result<Value, String> {
+fn lease_body(
+    class: &str,
+    vram: &str,
+    name: &str,
+    yieldable: bool,
+    card: Option<&str>,
+) -> Result<Value, String> {
     let vram = parse_vram(vram)?;
-    Ok(json!({
+    let mut body = json!({
         "class": class,
         "vram_mib": vram_mib_json(vram),
         "yieldable": yieldable,
         "name": name,
         "pid": std::process::id(),
-    }))
+    });
+    if let Some(card) = card {
+        body["card"] = json!(card);
+    }
+    Ok(body)
 }
 
 /// `SIGUSR1`, `USR1` and `usr1` all mean the same.
@@ -273,7 +299,7 @@ pub async fn run(addr: &str, a: RunArgs) -> ExitCode {
             .file_name()
             .map_or_else(|| program.clone(), |n| n.to_string_lossy().into_owned())
     });
-    let body = match lease_body(&a.class, &a.vram, &name, a.yieldable) {
+    let body = match lease_body(&a.class, &a.vram, &name, a.yieldable, a.card.as_deref()) {
         Ok(b) => b,
         Err(e) => {
             say(&e);
@@ -314,6 +340,10 @@ pub async fn run(addr: &str, a: RunArgs) -> ExitCode {
     cmd.args(&a.cmd[1..]);
     if let (Some(s), Some(f)) = (&session, &yield_file) {
         cmd.env("GPUD_LEASE_ID", &s.id).env("GPUD_YIELD_FILE", f);
+        cmd.envs(s.env.iter().map(|(k, v)| (k, v)));
+        if let Some(card) = &s.card {
+            cmd.env("GPUD_CARD", card);
+        }
     }
     die_with_parent(&mut cmd);
     let mut child = match cmd.spawn() {
@@ -371,7 +401,7 @@ pub async fn run(addr: &str, a: RunArgs) -> ExitCode {
 }
 
 pub async fn hold(addr: &str, a: HoldArgs) -> ExitCode {
-    let body = match lease_body(&a.class, &a.vram, &a.name, false) {
+    let body = match lease_body(&a.class, &a.vram, &a.name, false, a.card.as_deref()) {
         Ok(b) => b,
         Err(e) => {
             say(&e);
@@ -390,8 +420,12 @@ pub async fn hold(addr: &str, a: HoldArgs) -> ExitCode {
         Err(Fail::Signal(_)) => return ExitCode::SUCCESS,
         Err(f) => return f.exit(addr),
     };
+    let on = match (&a.card, &session.card) {
+        (Some(_), Some(card)) => format!(" on {card}"),
+        _ => String::new(),
+    };
     say(&format!(
-        "holding the GPU as {}; Ctrl-C to release",
+        "holding the GPU{on} as {}; Ctrl-C to release",
         session.id
     ));
     loop {

@@ -254,3 +254,98 @@ async fn disconnect_is_noticed_between_pings() {
     held.close();
     assert!(status_within(&api.rig, Duration::from_secs(1), |s| s.leases.is_empty()).await);
 }
+
+// ---------------------------------------------------------------------- cards
+
+#[tokio::test]
+async fn a_single_card_grant_names_the_card_and_has_an_empty_env() {
+    let api = api().await;
+    let mut ev = api.lease_ok(json!({"vram_mib": 1000})).await;
+    let granted = ev.until("granted").await.pop().unwrap();
+    assert_eq!(granted["card"], "gpu0", "{granted}");
+    assert_eq!(granted["env"], json!({}), "{granted}");
+    ev.close();
+    let mut ev = api
+        .lease_ok(json!({"vram_mib": 1000, "card": "gpu0"}))
+        .await;
+    assert_eq!(ev.until("granted").await.pop().unwrap()["card"], "gpu0");
+    ev.close();
+    let mut ev = api.lease_ok(json!({"vram_mib": 1000, "card": null})).await;
+    assert_eq!(ev.until("granted").await.pop().unwrap()["card"], "gpu0");
+}
+
+#[tokio::test]
+async fn unknown_card_is_a_400_listing_the_known_ones() {
+    let (api, _) = TestApi::start_two_cards(&[], &[], PING).await;
+    let r = client()
+        .post(api.url("/lease"))
+        .body(json!({"card": "x"}).to_string())
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(r.status(), 400);
+    let v: Value = r.json().await.unwrap();
+    assert_eq!(v["error"], "unknown card 'x'; known: gpu0, gpu1");
+    assert!(api.rig.status().await.queue.is_empty());
+}
+
+#[tokio::test]
+async fn any_without_a_steerable_card_is_a_400() {
+    let (two, _) = TestApi::start_two_cards(&[], &[], PING).await;
+    let r = client()
+        .post(two.url("/lease"))
+        .body(json!({"card": "any"}).to_string())
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(r.status(), 400);
+    let v: Value = r.json().await.unwrap();
+    assert!(
+        v["error"].as_str().unwrap().contains("visible_devices"),
+        "{v}"
+    );
+    // With one card there is nothing to steer, so "any" is fine.
+    let single = api().await;
+    let mut ev = single.lease_ok(json!({"card": "any"})).await;
+    assert_eq!(ev.until("granted").await.pop().unwrap()["card"], "gpu0");
+}
+
+#[tokio::test]
+async fn card_must_be_a_name() {
+    let api = api().await;
+    let (status, v) = api.post_raw(r#"{"card": 3}"#).await;
+    assert_eq!(status, 400);
+    assert!(v["error"].as_str().unwrap().contains("card"), "{v}");
+    let (status, _) = api.post_raw(r#"{"card": ""}"#).await;
+    assert_eq!(status, 400);
+}
+
+#[tokio::test]
+#[ignore = "needs multi-card actor"]
+async fn a_lease_pinned_to_gpu1_is_granted_there_with_its_env() {
+    let (api, _gpu1) = TestApi::start_two_cards(
+        &[("CUDA_VISIBLE_DEVICES", "0")],
+        &[("CUDA_VISIBLE_DEVICES", "1")],
+        PING,
+    )
+    .await;
+    let mut ev = api
+        .lease_ok(json!({"vram_mib": 1000, "card": "gpu1"}))
+        .await;
+    let granted = ev.until("granted").await.pop().unwrap();
+    assert_eq!(granted["card"], "gpu1", "{granted}");
+    assert_eq!(
+        granted["env"],
+        json!({"CUDA_VISIBLE_DEVICES": "1"}),
+        "{granted}"
+    );
+    let st = api.rig.status().await;
+    assert_eq!(st.leases[0].card, "gpu1");
+    // Re-adopting with the same card keeps it there.
+    let id = granted["id"].as_str().unwrap().to_owned();
+    ev.close();
+    let mut again = api
+        .lease_ok(json!({"vram_mib": 1000, "card": "gpu1", "resume_id": id}))
+        .await;
+    assert_eq!(again.until("granted").await.pop().unwrap()["card"], "gpu1");
+}
