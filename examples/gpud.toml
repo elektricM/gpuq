@@ -1,0 +1,115 @@
+# gpud configuration. Copy to /etc/gpud/config.toml (or ~/.config/gpud/config.toml).
+#
+# Every key is shown with its default. Keep only the ones you change; missing keys fall
+# back to the built-in value. Tables are merged into the defaults, lists and scalars are
+# replaced. Unknown keys are an error. Durations are seconds.
+
+[gate]
+# gpud listens where your clients already point (llama-swap's usual port) and forwards to
+# the LLM server, which you move to `backend`. Use "*" to listen on all interfaces.
+host = "127.0.0.1"
+port = 8080
+backend = "http://127.0.0.1:8081"
+
+[api]
+# Control API used by the `gpud` CLI and by lease clients. Keep it on loopback: anyone who
+# can reach it can take the card.
+host = "127.0.0.1"
+port = 9390
+
+[gpu]
+vendor = "auto"            # auto | amd | nvidia | intel | command
+pci = ""                   # AMD: PCI address, e.g. "0000:03:00.0". Empty = largest amdgpu device.
+sysfs_root = "/sys/bus/pci/devices"
+nvidia_index = 0           # NVIDIA: GPU index passed to nvidia-smi -i
+nvidia_smi = "nvidia-smi"
+command = []               # vendor = "command": argv that prints "used_mib total_mib"
+# device = "card0"         # informational; reserved for multi-GPU
+margin_mib = 256           # VRAM kept free on top of what leases declare
+settle_timeout_s = 60      # how long to wait for the backend to report models unloaded
+driver_settle_s = 2        # pause after an unload for the driver to release VRAM
+whole_card_baseline_mib = 512   # `--vram all` needs at most this much used by other processes
+
+[hooks]
+# Run once per waiting job when it does not fit and no lease is active, e.g. to move a
+# desktop session off the card. The command is executed directly, not through a shell.
+offload = []               # e.g. ["/usr/local/bin/free-the-gpu", "offload"]
+offload_timeout_s = 180
+offload_settle_s = 3
+
+[llm]
+backend = "llama-swap"     # llama-swap | ollama | llama-server | vllm | sglang | none
+llama_swap_config = "/etc/llama-swap/config.yaml"   # llama-swap's config (older name: config)
+resident = ""              # model to reload when the card goes idle, e.g. "my-model"
+cpu_models = []            # names that never use the GPU (when the YAML cannot be read)
+slot_save_models = []      # names started with --slot-save-path (same caveat)
+cpu_markers = ["HIP_VISIBLE_DEVICES=-1", "ROCR_VISIBLE_DEVICES=-1", "CUDA_VISIBLE_DEVICES=-1"]
+
+load_timeout_s = 600
+idle_s = 300               # silence required before background/batch jobs take the card
+idle_wait_classes = ["background", "batch"]
+gap_s = 10                 # silence required before other classes below the LLM take it
+reload_when_idle = true
+reload_delay_s = 20        # pause after the last job before reloading the resident model
+reload_slack_mib = 1024    # reload once VRAM is within this of the post-unload level...
+reload_wait_s = 120        # ...or after waiting this long
+resume_grace_s = 30        # after a gpud restart, time for `gpud run` clients to re-adopt leases
+
+batch_hold_s = 0           # hold LLM requests this long behind yieldable batch jobs (0 = off)
+batch_hold_count = 0       # ...but hand over as soon as this many are queued (0 = timer only)
+
+# Requests for these models are scheduled as the given class instead of "llm".
+[llm.model_classes]
+# "summarizer" = "realtime"
+
+# Per-class overrides of gap_s and reload_delay_s.
+# [llm.class_tuning.realtime]
+# gap_s = 120              # a following LLM request of this class is likely: wait longer
+# reload_delay_s = 180
+
+# Backends that unload by stopping the server (vllm, sglang, llama-server) need this.
+# [llm.service]
+# kind = "systemd"         # systemd | docker | podman | command
+# unit = "vllm.service"    # systemd
+# user = false             # systemd: --user unit
+# container = "vllm"       # docker, podman
+# start = ["/usr/local/bin/llm-start"]   # command
+# stop = ["/usr/local/bin/llm-stop"]     # command
+# status = ["/usr/local/bin/llm-status"] # command, optional: exit 0 = running
+# health_url = "http://127.0.0.1:8081/health"
+# start_timeout_s = 120
+
+[classes]
+# Lower number = more important. "llm" must exist; "batch" is the fallback for unknown names.
+# Your keys are added to these (or override them).
+realtime = 0
+llm = 1
+interactive = 2
+background = 3
+batch = 4
+
+[run]
+yield_signal = "SIGUSR1"   # what `gpud run` sends a yieldable job; --yield-signal overrides it
+
+# Managed GPU services: ComfyUI, an ML container, a TTS server... One table each.
+# [[service]]
+# name = "comfyui"          # unique
+# class = "interactive"
+# vram = "16G"              # 6144M, 512 (MiB) or "all"
+# yieldable = true
+# stop_on_release = true    # stop the service when its lease ends
+# idle_release_s = 120      # no work for this long: release the card
+# flavor = "comfyui"        # generic | comfyui
+#
+# [service.control]         # omit for a service that is always running
+# kind = "systemd"
+# unit = "comfyui.service"
+# user = true
+# health_url = "http://127.0.0.1:8189/system_stats"
+# start_timeout_s = 120
+#
+# [service.gate]            # optional: start on first request, release when idle
+# listen = "127.0.0.1:8188"
+# backend = "http://127.0.0.1:8189"
+# gpu_paths = ["/prompt"]   # empty = every request needs the card
+# busy_url = "http://127.0.0.1:8189/queue"   # while this reports work, keep the lease
