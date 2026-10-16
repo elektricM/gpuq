@@ -13,7 +13,7 @@ the names and ports, run `gpud check-config -c FILE`.
 | Native lease client | Your own program | HTTP calls (`lease-api.md`) | Same lease, as an NDJSON stream. |
 
 Everything shares one card through priority classes (`realtime`, `llm`, `interactive`,
-`background`, `batch`). The README has the short version of how the queue works.
+`background`, `batch`). [how-it-works.md](how-it-works.md) explains the queue.
 
 ## LLM backends
 
