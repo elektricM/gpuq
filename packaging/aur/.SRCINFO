@@ -10,6 +10,6 @@ pkgbase = gpud
 	options = !lto
 	backup = etc/gpud/config.toml
 	source = gpud-0.1.0.tar.gz::https://github.com/elektricM/gpud/archive/refs/tags/v0.1.0.tar.gz
-	sha256sums = 69f329711aace56bcda190989bcf754e87b7cbe65879a962162493d33cb21820
+	sha256sums = 38bedbacf1d248c8d1fd17900d7e75c458aa23e7c4b5d7ef05725992180a09fe
 
 pkgname = gpud
