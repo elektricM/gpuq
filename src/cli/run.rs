@@ -52,10 +52,13 @@ pub struct RunArgs {
 
 #[derive(Args)]
 pub struct HoldArgs {
+    /// Priority class from gpuq's [classes] table.
     #[arg(long, default_value = "batch")]
     class: String,
+    /// VRAM to reserve, e.g. 8G, 3000M or all.
     #[arg(long, default_value = "all")]
     vram: String,
+    /// Lease name shown in `gpuq status`.
     #[arg(long, default_value = "manual")]
     name: String,
     /// Card to hold: a name from `gpuq status`, or `any`. Default: the primary card.

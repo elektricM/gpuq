@@ -1,0 +1,69 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH gpuq 1  "gpuq 0.2.0" 
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH NAME
+gpuq \- GPU scheduler for Linux
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH SYNOPSIS
+\fBgpuq\fR [\fB\-\-api\fR] [\fB\-h\fR|\fB\-\-help\fR] [\fB\-V\fR|\fB\-\-version\fR] <\fIsubcommands\fR>
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH DESCRIPTION
+GPU scheduler for Linux. Programs request a GPU through gpuq, which grants it by priority class and available VRAM. To free a card, gpuq can signal running jobs, stop and start services, and unload models from LLM servers.
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH OPTIONS
+.TP
+\fB\-\-api\fR \fI<HOST:PORT>\fR
+Address of the gpuq control API (default: $GPUQ_API, else 127.0.0.1:9390)
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help (see a summary with \*(Aq\-h\*(Aq)
+.TP
+\fB\-V\fR, \fB\-\-version\fR
+Print version
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH SUBCOMMANDS
+.TP
+gpuq\-daemon(1)
+Run the daemon
+.TP
+gpuq\-check\-config(1)
+Load and validate the config, then exit
+.TP
+gpuq\-status(1)
+Show the arbiter state, leases and queue
+.TP
+gpuq\-run(1)
+Run a command under a GPU lease
+.TP
+gpuq\-hold(1)
+Hold a lease until Ctrl\-C
+.TP
+gpuq\-help(1)
+Print this message or the help of the given subcommand(s)
+.SH FILES
+.TP
+\fI/etc/gpuq/config.toml\fR
+System configuration.
+.TP
+\fI~/.config/gpuq/config.toml\fR
+User configuration, read when the system one does not exist.
+.SH ENVIRONMENT
+.TP
+\fBGPUQ_API\fR
+Address of the control API used by the client commands. Default: 127.0.0.1:9390.
+.TP
+\fBGPUQ_LOG\fR
+Log filter for the daemon, for example \fBdebug\fR. \fBRUST_LOG\fR is read when it is unset.
+.PP
+Commands started by \fBgpuq run\fR receive \fBGPUQ_LEASE_ID\fR, \fBGPUQ_YIELD_FILE\fR
+and \fBGPUQ_CARD\fR, the card they got.
+.SH EXIT STATUS
+The client commands exit with 69 when the daemon does not answer.
+.SH SEE ALSO
+Configuration reference and integration guides: https://github.com/elektricM/gpuq

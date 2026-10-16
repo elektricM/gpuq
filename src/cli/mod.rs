@@ -22,7 +22,7 @@ mod status;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use clap::{Parser, Subcommand};
+use clap::{CommandFactory, Parser, Subcommand};
 
 use crate::arbiter::Vram;
 
@@ -33,7 +33,18 @@ pub const EX_UNAVAILABLE: u8 = 69;
 #[command(
     name = "gpuq",
     version,
-    about = "GPU scheduler for Linux"
+    about = "GPU scheduler for Linux",
+    long_about = "GPU scheduler for Linux. Programs request a GPU through gpuq, which grants it \
+by priority class and available VRAM. To free a card, gpuq can signal running jobs, stop and \
+start services, and unload models from LLM servers.",
+    after_long_help = "Files:\n  \
+/etc/gpuq/config.toml            system configuration\n  \
+~/.config/gpuq/config.toml       user configuration, read when the system one is missing\n\n\
+Environment:\n  \
+GPUQ_API    address of the control API, used by the client commands\n  \
+GPUQ_LOG    log filter for the daemon, e.g. debug or gpuq=trace (RUST_LOG also works)\n\n\
+Jobs started by `gpuq run` get GPUQ_LEASE_ID, GPUQ_YIELD_FILE and GPUQ_CARD.\n\n\
+Documentation: https://github.com/elektricM/gpuq"
 )]
 struct Cli {
     /// Address of the gpuq control API (default: $GPUQ_API, else 127.0.0.1:9390).
@@ -50,11 +61,13 @@ enum Cmd {
         /// Config file (default: search the usual places).
         #[arg(short, long)]
         config: Option<PathBuf>,
+        /// Log at debug level (GPUQ_LOG overrides it).
         #[arg(short, long)]
         verbose: bool,
     },
     /// Load and validate the config, then exit.
     CheckConfig {
+        /// Config file (default: search the usual places).
         #[arg(short, long)]
         config: Option<PathBuf>,
         /// Also fail when the VRAM probe does not work.
@@ -63,6 +76,7 @@ enum Cmd {
     },
     /// Show the arbiter state, leases and queue.
     Status {
+        /// Print the state as JSON.
         #[arg(long)]
         json: bool,
     },
@@ -70,6 +84,11 @@ enum Cmd {
     Run(run::RunArgs),
     /// Hold a lease until Ctrl-C.
     Hold(run::HoldArgs),
+}
+
+/// The clap command, used to generate the man pages and shell completions.
+pub fn command() -> clap::Command {
+    Cli::command()
 }
 
 pub fn main() -> ExitCode {

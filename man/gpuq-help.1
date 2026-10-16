@@ -1,0 +1,38 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH gpuq-help 1  "gpuq 0.2.0" 
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH NAME
+gpuq\-help \- Print this message or the help of the given subcommand(s)
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH SYNOPSIS
+\fBgpuq help\fR [\fIsubcommands\fR]
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH DESCRIPTION
+Print this message or the help of the given subcommand(s)
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH SUBCOMMANDS
+.TP
+gpuq\-help\-daemon(1)
+Run the daemon
+.TP
+gpuq\-help\-check\-config(1)
+Load and validate the config, then exit
+.TP
+gpuq\-help\-status(1)
+Show the arbiter state, leases and queue
+.TP
+gpuq\-help\-run(1)
+Run a command under a GPU lease
+.TP
+gpuq\-help\-hold(1)
+Hold a lease until Ctrl\-C
+.TP
+gpuq\-help\-help(1)
+Print this message or the help of the given subcommand(s)
+.SH SEE ALSO
+\fBgpuq\fR(1)

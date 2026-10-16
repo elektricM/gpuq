@@ -1,0 +1,32 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH gpuq-daemon 1  "gpuq 0.2.0" 
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH NAME
+gpuq\-daemon \- Run the daemon
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH SYNOPSIS
+\fBgpuq daemon\fR [\fB\-\-api\fR] [\fB\-c\fR|\fB\-\-config\fR] [\fB\-v\fR|\fB\-\-verbose\fR] [\fB\-h\fR|\fB\-\-help\fR] 
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH DESCRIPTION
+Run the daemon
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH OPTIONS
+.TP
+\fB\-\-api\fR \fI<HOST:PORT>\fR
+Address of the gpuq control API (default: $GPUQ_API, else 127.0.0.1:9390)
+.TP
+\fB\-c\fR, \fB\-\-config\fR \fI<CONFIG>\fR
+Config file (default: search the usual places)
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+Log at debug level (GPUQ_LOG overrides it)
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help
+.SH SEE ALSO
+\fBgpuq\fR(1)

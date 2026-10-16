@@ -1,6 +1,6 @@
 [package]
 name = "gpuq"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2021"
 rust-version = "1.80"
 description = "GPU scheduler for Linux: priority classes, leases and VRAM accounting for jobs and services"
@@ -9,8 +9,23 @@ repository = "https://github.com/elektricM/gpuq"
 readme = "README.md"
 authors = ["Martin Dolez"]
 homepage = "https://github.com/elektricM/gpuq"
-keywords = ["gpu", "llm", "scheduler", "vram", "queue"]
+keywords = ["gpu", "scheduler", "vram", "queue", "llm"]
 categories = ["command-line-utilities"]
+include = [
+    "/src/",
+    "/tests/",
+    "/docs/",
+    "/examples/",
+    "/man/",
+    "/completions/",
+    "/packaging/systemd/",
+    "/README.md",
+    "/CHANGELOG.md",
+    "/LICENSE",
+]
+
+[workspace]
+members = ["xtask"]
 
 [dependencies]
 anyhow = "1"
@@ -45,7 +60,7 @@ codegen-units = 1
 strip = true
 
 [package.metadata.deb]
-maintainer = "Martin"
+maintainer = "Martin Dolez <martin@dolez.fr>"
 copyright = "2026 Martin Dolez"
 section = "utils"
 priority = "optional"
@@ -60,9 +75,14 @@ assets = [
     ["packaging/systemd/gpuq.user.service", "usr/lib/systemd/user/gpuq.service", "644"],
     ["packaging/systemd/gpuq.sysusers", "usr/lib/sysusers.d/gpuq.conf", "644"],
     ["examples/gpuq.toml", "etc/gpuq/config.toml", "644"],
-    ["examples/*.toml", "usr/share/doc/gpuq/examples/", "644"],
+    ["examples/*", "usr/share/doc/gpuq/examples/", "644"],
+    ["man/*.1", "usr/share/man/man1/", "644"],
+    ["completions/gpuq.bash", "usr/share/bash-completion/completions/gpuq", "644"],
+    ["completions/_gpuq", "usr/share/zsh/vendor-completions/_gpuq", "644"],
+    ["completions/gpuq.fish", "usr/share/fish/vendor_completions.d/gpuq.fish", "644"],
     ["README.md", "usr/share/doc/gpuq/README.md", "644"],
-    ["LICENSE", "usr/share/doc/gpuq/LICENSE", "644"],
+    ["CHANGELOG.md", "usr/share/doc/gpuq/CHANGELOG.md", "644"],
+    ["docs/*.md", "usr/share/doc/gpuq/docs/", "644"],
 ]
 
 [package.metadata.generate-rpm]
@@ -72,8 +92,14 @@ assets = [
     { source = "packaging/systemd/gpuq.user.service", dest = "/usr/lib/systemd/user/gpuq.service", mode = "644" },
     { source = "packaging/systemd/gpuq.sysusers", dest = "/usr/lib/sysusers.d/gpuq.conf", mode = "644" },
     { source = "examples/gpuq.toml", dest = "/etc/gpuq/config.toml", mode = "644", config = "noreplace" },
-    { source = "examples/*.toml", dest = "/usr/share/doc/gpuq/examples/", mode = "644", doc = true },
+    { source = "examples/*", dest = "/usr/share/doc/gpuq/examples/", mode = "644", doc = true },
+    { source = "man/*.1", dest = "/usr/share/man/man1/", mode = "644", doc = true },
+    { source = "completions/gpuq.bash", dest = "/usr/share/bash-completion/completions/gpuq", mode = "644" },
+    { source = "completions/_gpuq", dest = "/usr/share/zsh/site-functions/_gpuq", mode = "644" },
+    { source = "completions/gpuq.fish", dest = "/usr/share/fish/vendor_completions.d/gpuq.fish", mode = "644" },
     { source = "README.md", dest = "/usr/share/doc/gpuq/README.md", mode = "644", doc = true },
-    { source = "LICENSE", dest = "/usr/share/doc/gpuq/LICENSE", mode = "644", doc = true },
+    { source = "CHANGELOG.md", dest = "/usr/share/doc/gpuq/CHANGELOG.md", mode = "644", doc = true },
+    { source = "docs/*.md", dest = "/usr/share/doc/gpuq/docs/", mode = "644", doc = true },
+    { source = "LICENSE", dest = "/usr/share/licenses/gpuq/LICENSE", mode = "644", doc = true },
 ]
 post_install_script = "command -v systemd-sysusers >/dev/null 2>&1 && systemd-sysusers gpuq.conf || true"

@@ -1,0 +1,32 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH gpuq-check-config 1  "gpuq 0.2.0" 
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH NAME
+gpuq\-check\-config \- Load and validate the config, then exit
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH SYNOPSIS
+\fBgpuq check config\fR [\fB\-\-api\fR] [\fB\-c\fR|\fB\-\-config\fR] [\fB\-\-strict\fR] [\fB\-h\fR|\fB\-\-help\fR] 
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH DESCRIPTION
+Load and validate the config, then exit
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH OPTIONS
+.TP
+\fB\-\-api\fR \fI<HOST:PORT>\fR
+Address of the gpuq control API (default: $GPUQ_API, else 127.0.0.1:9390)
+.TP
+\fB\-c\fR, \fB\-\-config\fR \fI<CONFIG>\fR
+Config file (default: search the usual places)
+.TP
+\fB\-\-strict\fR
+Also fail when the VRAM probe does not work
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help
+.SH SEE ALSO
+\fBgpuq\fR(1)

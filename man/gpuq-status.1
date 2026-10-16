@@ -1,0 +1,29 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH gpuq-status 1  "gpuq 0.2.0" 
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH NAME
+gpuq\-status \- Show the arbiter state, leases and queue
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH SYNOPSIS
+\fBgpuq status\fR [\fB\-\-api\fR] [\fB\-\-json\fR] [\fB\-h\fR|\fB\-\-help\fR] 
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH DESCRIPTION
+Show the arbiter state, leases and queue
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH OPTIONS
+.TP
+\fB\-\-api\fR \fI<HOST:PORT>\fR
+Address of the gpuq control API (default: $GPUQ_API, else 127.0.0.1:9390)
+.TP
+\fB\-\-json\fR
+Print the state as JSON
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help
+.SH SEE ALSO
+\fBgpuq\fR(1)

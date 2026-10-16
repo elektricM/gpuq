@@ -1,0 +1,216 @@
+#compdef gpuq
+
+autoload -U is-at-least
+
+_gpuq() {
+    typeset -A opt_args
+    typeset -a _arguments_options
+    local ret=1
+
+    if is-at-least 5.2; then
+        _arguments_options=(-s -S -C)
+    else
+        _arguments_options=(-s -C)
+    fi
+
+    local context curcontext="$curcontext" state line
+    _arguments "${_arguments_options[@]}" : \
+'--api=[Address of the gpuq control API (default\: \$GPUQ_API, else 127.0.0.1\:9390)]:HOST:PORT:_default' \
+'-h[Print help (see more with '\''--help'\'')]' \
+'--help[Print help (see more with '\''--help'\'')]' \
+'-V[Print version]' \
+'--version[Print version]' \
+":: :_gpuq_commands" \
+"*::: :->gpuq" \
+&& ret=0
+    case $state in
+    (gpuq)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:gpuq-command-$line[1]:"
+        case $line[1] in
+            (daemon)
+_arguments "${_arguments_options[@]}" : \
+'-c+[Config file (default\: search the usual places)]:CONFIG:_files' \
+'--config=[Config file (default\: search the usual places)]:CONFIG:_files' \
+'--api=[Address of the gpuq control API (default\: \$GPUQ_API, else 127.0.0.1\:9390)]:HOST:PORT:_default' \
+'-v[Log at debug level (GPUQ_LOG overrides it)]' \
+'--verbose[Log at debug level (GPUQ_LOG overrides it)]' \
+'-h[Print help]' \
+'--help[Print help]' \
+&& ret=0
+;;
+(check-config)
+_arguments "${_arguments_options[@]}" : \
+'-c+[Config file (default\: search the usual places)]:CONFIG:_files' \
+'--config=[Config file (default\: search the usual places)]:CONFIG:_files' \
+'--api=[Address of the gpuq control API (default\: \$GPUQ_API, else 127.0.0.1\:9390)]:HOST:PORT:_default' \
+'--strict[Also fail when the VRAM probe does not work]' \
+'-h[Print help]' \
+'--help[Print help]' \
+&& ret=0
+;;
+(status)
+_arguments "${_arguments_options[@]}" : \
+'--api=[Address of the gpuq control API (default\: \$GPUQ_API, else 127.0.0.1\:9390)]:HOST:PORT:_default' \
+'--json[Print the state as JSON]' \
+'-h[Print help]' \
+'--help[Print help]' \
+&& ret=0
+;;
+(run)
+_arguments "${_arguments_options[@]}" : \
+'--class=[Priority class from gpuq'\''s \[classes\] table]:CLASS:_default' \
+'--vram=[VRAM to reserve, e.g. 8G, 3000M or all]:VRAM:_default' \
+'--name=[Lease name shown in \`gpuq status\` (default\: the command'\''s basename)]:NAME:_default' \
+'--yield-signal=[Signal sent on a yield request, e.g. SIGUSR1 or TERM. Default\: gpuq'\''s \`\[run\] yield_signal\`, else SIGUSR1]:SIGNAL:_default' \
+'--card=[Card to run on\: a name from \`gpuq status\`, or \`any\` for the first card with room. Default\: the primary card]:NAME|any:_default' \
+'--api=[Address of the gpuq control API (default\: \$GPUQ_API, else 127.0.0.1\:9390)]:HOST:PORT:_default' \
+'--yieldable[Signal the job when something more important needs the card]' \
+'--fallback[If gpuq is not running, run the command anyway]' \
+'-h[Print help]' \
+'--help[Print help]' \
+'*::cmd -- The command, after `--`:_default' \
+&& ret=0
+;;
+(hold)
+_arguments "${_arguments_options[@]}" : \
+'--class=[Priority class from gpuq'\''s \[classes\] table]:CLASS:_default' \
+'--vram=[VRAM to reserve, e.g. 8G, 3000M or all]:VRAM:_default' \
+'--name=[Lease name shown in \`gpuq status\`]:NAME:_default' \
+'--card=[Card to hold\: a name from \`gpuq status\`, or \`any\`. Default\: the primary card]:NAME|any:_default' \
+'--api=[Address of the gpuq control API (default\: \$GPUQ_API, else 127.0.0.1\:9390)]:HOST:PORT:_default' \
+'-h[Print help]' \
+'--help[Print help]' \
+&& ret=0
+;;
+(help)
+_arguments "${_arguments_options[@]}" : \
+":: :_gpuq__help_commands" \
+"*::: :->help" \
+&& ret=0
+
+    case $state in
+    (help)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:gpuq-help-command-$line[1]:"
+        case $line[1] in
+            (daemon)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(check-config)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(status)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(run)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(hold)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(help)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+        esac
+    ;;
+esac
+;;
+        esac
+    ;;
+esac
+}
+
+(( $+functions[_gpuq_commands] )) ||
+_gpuq_commands() {
+    local commands; commands=(
+'daemon:Run the daemon' \
+'check-config:Load and validate the config, then exit' \
+'status:Show the arbiter state, leases and queue' \
+'run:Run a command under a GPU lease' \
+'hold:Hold a lease until Ctrl-C' \
+'help:Print this message or the help of the given subcommand(s)' \
+    )
+    _describe -t commands 'gpuq commands' commands "$@"
+}
+(( $+functions[_gpuq__check-config_commands] )) ||
+_gpuq__check-config_commands() {
+    local commands; commands=()
+    _describe -t commands 'gpuq check-config commands' commands "$@"
+}
+(( $+functions[_gpuq__daemon_commands] )) ||
+_gpuq__daemon_commands() {
+    local commands; commands=()
+    _describe -t commands 'gpuq daemon commands' commands "$@"
+}
+(( $+functions[_gpuq__help_commands] )) ||
+_gpuq__help_commands() {
+    local commands; commands=(
+'daemon:Run the daemon' \
+'check-config:Load and validate the config, then exit' \
+'status:Show the arbiter state, leases and queue' \
+'run:Run a command under a GPU lease' \
+'hold:Hold a lease until Ctrl-C' \
+'help:Print this message or the help of the given subcommand(s)' \
+    )
+    _describe -t commands 'gpuq help commands' commands "$@"
+}
+(( $+functions[_gpuq__help__check-config_commands] )) ||
+_gpuq__help__check-config_commands() {
+    local commands; commands=()
+    _describe -t commands 'gpuq help check-config commands' commands "$@"
+}
+(( $+functions[_gpuq__help__daemon_commands] )) ||
+_gpuq__help__daemon_commands() {
+    local commands; commands=()
+    _describe -t commands 'gpuq help daemon commands' commands "$@"
+}
+(( $+functions[_gpuq__help__help_commands] )) ||
+_gpuq__help__help_commands() {
+    local commands; commands=()
+    _describe -t commands 'gpuq help help commands' commands "$@"
+}
+(( $+functions[_gpuq__help__hold_commands] )) ||
+_gpuq__help__hold_commands() {
+    local commands; commands=()
+    _describe -t commands 'gpuq help hold commands' commands "$@"
+}
+(( $+functions[_gpuq__help__run_commands] )) ||
+_gpuq__help__run_commands() {
+    local commands; commands=()
+    _describe -t commands 'gpuq help run commands' commands "$@"
+}
+(( $+functions[_gpuq__help__status_commands] )) ||
+_gpuq__help__status_commands() {
+    local commands; commands=()
+    _describe -t commands 'gpuq help status commands' commands "$@"
+}
+(( $+functions[_gpuq__hold_commands] )) ||
+_gpuq__hold_commands() {
+    local commands; commands=()
+    _describe -t commands 'gpuq hold commands' commands "$@"
+}
+(( $+functions[_gpuq__run_commands] )) ||
+_gpuq__run_commands() {
+    local commands; commands=()
+    _describe -t commands 'gpuq run commands' commands "$@"
+}
+(( $+functions[_gpuq__status_commands] )) ||
+_gpuq__status_commands() {
+    local commands; commands=()
+    _describe -t commands 'gpuq status commands' commands "$@"
+}
+
+if [ "$funcstack[1]" = "_gpuq" ]; then
+    _gpuq "$@"
+else
+    compdef _gpuq gpuq
+fi

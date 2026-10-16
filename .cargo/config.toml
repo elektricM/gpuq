@@ -1,0 +1,6 @@
+[alias]
+xtask = "run --quiet --package xtask --"
+
+# Keep Cargo.lock within rust-version when running `cargo update`.
+[resolver]
+incompatible-rust-versions = "fallback"
