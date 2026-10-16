@@ -10,7 +10,7 @@ makedepends=(cargo)
 backup=('etc/gpud/config.toml')
 options=('!lto')  # makepkg's LTO flags break ring's assembly at link time
 source=("$pkgname-$pkgver.tar.gz::https://github.com/elektricM/gpud/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('38bedbacf1d248c8d1fd17900d7e75c458aa23e7c4b5d7ef05725992180a09fe')
+sha256sums=('98de4e15e1385165060931e3e4106a936a6fcd16fd92de3590d6a10258b7e41e')
 
 prepare() {
   cd "$pkgname-$pkgver"
