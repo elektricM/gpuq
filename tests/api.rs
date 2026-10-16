@@ -321,7 +321,6 @@ async fn card_must_be_a_name() {
 }
 
 #[tokio::test]
-#[ignore = "needs multi-card actor"]
 async fn a_lease_pinned_to_gpu1_is_granted_there_with_its_env() {
     let (api, _gpu1) = TestApi::start_two_cards(
         &[("CUDA_VISIBLE_DEVICES", "0")],

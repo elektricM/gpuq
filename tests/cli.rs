@@ -449,7 +449,6 @@ async fn status_with_one_card_has_no_card_lines() {
 }
 
 #[tokio::test]
-#[ignore = "needs multi-card actor"]
 async fn status_with_two_cards_has_a_line_each() {
     let (api, _gpu1) = TestApi::start_two_cards(&[], &[], PING).await;
     let d = run(api.addr, &["status"]).await;
@@ -465,7 +464,6 @@ async fn status_with_two_cards_has_a_line_each() {
 }
 
 #[tokio::test]
-#[ignore = "needs multi-card actor"]
 async fn a_job_on_gpu1_gets_that_cards_env() {
     let (api, _gpu1) = TestApi::start_two_cards(
         &[("CUDA_VISIBLE_DEVICES", "0")],

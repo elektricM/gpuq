@@ -526,7 +526,6 @@ async fn daemon_with_two_cards_starts_and_serves_leases() {
 }
 
 #[tokio::test]
-#[ignore = "needs multi-card actor"]
 async fn daemon_with_two_cards_lists_both_in_status() {
     let setup = Setup::new();
     let cfg = setup.two_card_config("http://127.0.0.1:1", "backend = \"none\"\ncard = \"right\"");
