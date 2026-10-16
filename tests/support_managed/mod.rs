@@ -198,7 +198,7 @@ impl FakeService {
                 stop: vec!["sh".into(), "-c".into(), stop],
                 status: None,
             },
-            health_url: Some(self.url("/health")).filter(|_| !fail_start),
+            health_url: (!fail_start).then(|| self.url("/health")),
             start_timeout: Duration::from_secs(3),
         }
     }
