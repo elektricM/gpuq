@@ -3,7 +3,7 @@
 [![ci](https://github.com/elektricM/gpud/actions/workflows/ci.yml/badge.svg)](https://github.com/elektricM/gpud/actions/workflows/ci.yml)
 [![license](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
 
-gpud is a GPU scheduler for Linux machines with a single GPU. Programs request the GPU
+gpud is a GPU scheduler for Linux machines with one or more GPUs. Programs request the GPU
 through gpud, which grants it by priority and available VRAM. To free the card, gpud can
 signal running jobs, stop and start services, and unload models from LLM servers.
 
@@ -21,6 +21,7 @@ gpud is in early development. The configuration format may change before 1.0.
 - Service control through systemd, Docker, Podman or custom commands
 - HTTP gate in front of LLM servers and services, holding requests while the GPU is busy
 - Resident LLM model, reloaded with its KV cache after other jobs
+- Several GPUs with one queue: a job can be pinned to a card or placed on the first card with room
 - AMD and NVIDIA VRAM probes, plus a custom probe command
 
 ## Supported software
@@ -29,7 +30,8 @@ gpud is in early development. The configuration format may change before 1.0.
 - Any service managed by systemd, Docker, Podman or custom commands
 - Programs that integrate directly, through the [lease API](docs/lease-api.md)
 - LLM servers, with model unloading: llama-swap, Ollama, llama.cpp `llama-server`, vLLM, SGLang
-- ComfyUI and Immich ML, with request gating
+- ComfyUI, with request gating
+- Immich ML, by pausing its job queues until the GPU is free, or with request gating
 
 Example configurations are in [examples/](examples/).
 
@@ -62,11 +64,29 @@ gpud check-config
 sudo systemctl enable --now gpud
 ```
 
+`enable --now` starts gpud now and at every boot. The packages install the systemd unit but
+do not enable it, because the configuration has to be written first. The unit runs as the
+`gpud` user. To control `systemctl --user` services such as ComfyUI, use the user unit
+instead (`systemctl --user enable --now gpud`, with `loginctl enable-linger` so it runs without
+a login session). Logs are in `journalctl -u gpud`.
+
+When installing with `cargo install`, copy the unit and the system user from
+[packaging/systemd](packaging/systemd):
+
+```sh
+sudo install -m 755 ~/.cargo/bin/gpud /usr/bin/gpud
+sudo install -m 644 packaging/systemd/gpud.service /etc/systemd/system/
+sudo install -m 644 packaging/systemd/gpud.sysusers /usr/lib/sysusers.d/gpud.conf
+sudo systemd-sysusers && sudo systemctl daemon-reload
+```
+
 Run a job:
 
 ```sh
 gpud run --class batch --vram 8G -- blender -b scene.blend -a
 ```
+
+With several GPUs, `--card NAME` picks a card and `--card any` takes the first one with room.
 
 Other commands:
 
@@ -81,7 +101,7 @@ To run an LLM server behind gpud, see [docs/integrations.md](docs/integrations.m
 
 ## Roadmap
 
-- Multi-GPU support
+- One LLM server per GPU
 - Web UI
 - Desktop and game detection
 - Prometheus metrics
