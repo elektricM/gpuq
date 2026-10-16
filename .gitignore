@@ -1,0 +1,4 @@
+/target/
+
+# local reference copy of the deployed Python version (private)
+/reference-python/

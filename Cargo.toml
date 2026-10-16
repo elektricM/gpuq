@@ -1,0 +1,78 @@
+[package]
+name = "gpud"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.80"
+description = "GPU manager and queue: one card, many AI and GPU workloads"
+license = "GPL-3.0-or-later"
+repository = "https://github.com/elektricM/gpud"
+readme = "README.md"
+authors = ["Martin"]
+homepage = "https://github.com/elektricM/gpud"
+keywords = ["gpu", "llm", "scheduler", "vram", "queue"]
+categories = ["command-line-utilities"]
+
+[dependencies]
+anyhow = "1"
+async-trait = "0.1"
+bytes = "1"
+clap = { version = "4", features = ["derive"] }
+futures-util = { version = "0.3", default-features = false, features = ["std"] }
+http-body-util = "0.1"
+hyper = { version = "1", features = ["http1", "server", "client"] }
+hyper-util = { version = "0.1", features = ["tokio", "server", "http1", "client-legacy"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "stream"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9"
+thiserror = "2"
+tokio = { version = "1", features = ["full"] }
+toml = "0.8"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[target.'cfg(unix)'.dependencies]
+nix = { version = "0.29", features = ["signal", "process"] }
+
+[dev-dependencies]
+tempfile = "3"
+tokio = { version = "1", features = ["full", "test-util"] }
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
+
+[package.metadata.deb]
+maintainer = "Martin"
+copyright = "Martin"
+section = "utils"
+priority = "optional"
+extended-description = """\
+gpud decides who owns the GPU: an LLM server behind an HTTP gate, or leased jobs, \
+with priority classes, idle timers and leases tied to their connection."""
+maintainer-scripts = "packaging/deb/"
+conf-files = ["/etc/gpud/config.toml"]
+assets = [
+    ["target/release/gpud", "usr/bin/gpud", "755"],
+    ["packaging/systemd/gpud.service", "usr/lib/systemd/system/gpud.service", "644"],
+    ["packaging/systemd/gpud.user.service", "usr/lib/systemd/user/gpud.service", "644"],
+    ["packaging/systemd/gpud.sysusers", "usr/lib/sysusers.d/gpud.conf", "644"],
+    ["examples/gpud.toml", "etc/gpud/config.toml", "644"],
+    ["examples/*.toml", "usr/share/doc/gpud/examples/", "644"],
+    ["README.md", "usr/share/doc/gpud/README.md", "644"],
+    ["LICENSE", "usr/share/doc/gpud/LICENSE", "644"],
+]
+
+[package.metadata.generate-rpm]
+assets = [
+    { source = "target/release/gpud", dest = "/usr/bin/gpud", mode = "755" },
+    { source = "packaging/systemd/gpud.service", dest = "/usr/lib/systemd/system/gpud.service", mode = "644" },
+    { source = "packaging/systemd/gpud.user.service", dest = "/usr/lib/systemd/user/gpud.service", mode = "644" },
+    { source = "packaging/systemd/gpud.sysusers", dest = "/usr/lib/sysusers.d/gpud.conf", mode = "644" },
+    { source = "examples/gpud.toml", dest = "/etc/gpud/config.toml", mode = "644", config = "noreplace" },
+    { source = "examples/*.toml", dest = "/usr/share/doc/gpud/examples/", mode = "644", doc = true },
+    { source = "README.md", dest = "/usr/share/doc/gpud/README.md", mode = "644", doc = true },
+    { source = "LICENSE", dest = "/usr/share/doc/gpud/LICENSE", mode = "644", doc = true },
+]
+post_install_script = "command -v systemd-sysusers >/dev/null 2>&1 && systemd-sysusers gpud.conf || true"
