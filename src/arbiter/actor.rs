@@ -274,7 +274,7 @@ async fn reload(
 
 /// Run the offload hook, let the card settle, measure again.
 async fn offload(env: Env, hook: Arc<dyn OffloadHook>) -> Option<Mib> {
-    if !hook.run().await {
+    if !hook.run("gpu0").await {
         env.log.say("offload hook failed");
     }
     sleep(env.t.offload_settle).await;
@@ -419,13 +419,18 @@ struct Actor {
 }
 
 pub(super) async fn run(
-    settings: Settings,
+    mut settings: Settings,
+    cards: Vec<super::Card>,
+    _llm_card: usize,
     backend: Arc<dyn Backend>,
-    probe: Arc<dyn VramProbe>,
     offload: Option<Arc<dyn OffloadHook>>,
     tx: mpsc::UnboundedSender<Msg>,
     mut rx: mpsc::UnboundedReceiver<Msg>,
 ) {
+    let card = cards[0].clone();
+    settings.tuning.margin_mib = card.margin_mib;
+    settings.tuning.whole_card_baseline_mib = card.whole_card_baseline_mib;
+    let probe = card.probe.clone();
     // Keep only a weak sender: the loop ends once every handle is gone.
     let weak = tx.downgrade();
     drop(tx);
@@ -673,6 +678,8 @@ impl Actor {
         if reply
             .send(Granted {
                 id: id.clone(),
+                card: "gpu0".into(),
+                env: Vec::new(),
                 yield_rx,
             })
             .is_err()
@@ -1230,6 +1237,7 @@ impl Actor {
                 .iter()
                 .map(|l| LeaseStatus {
                     id: l.id.clone(),
+                    card: "gpu0".into(),
                     class: l.class.clone(),
                     name: l.name.clone(),
                     vram: l.vram,
@@ -1248,6 +1256,7 @@ impl Actor {
                     };
                     QueueStatus {
                         kind,
+                        card: "gpu0".into(),
                         class: w.class.clone(),
                         name: w.name.clone(),
                         vram,
@@ -1264,6 +1273,7 @@ impl Actor {
                     msg: msg.clone(),
                 })
                 .collect(),
+            cards: Vec::new(),
         }
     }
 }

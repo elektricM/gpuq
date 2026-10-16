@@ -42,15 +42,15 @@ async fn timeout_kills_the_command() {
 #[tokio::test]
 async fn offload_hook_is_true_only_on_rc_zero() {
     let t = Duration::from_secs(5);
-    assert!(CommandHook::new(argv(&["true"]), t).run().await);
+    assert!(CommandHook::new(argv(&["true"]), t).run("gpu0").await);
     assert!(
         !CommandHook::new(argv(&["sh", "-c", "exit 1"]), t)
-            .run()
+            .run("gpu0")
             .await
     );
     assert!(
         !CommandHook::new(argv(&["/nonexistent/hook"]), t)
-            .run()
+            .run("gpu0")
             .await
     );
 }

@@ -199,11 +199,59 @@ pub struct Settings {
     pub tuning: Tuning,
 }
 
-/// Runs once per waiting job that does not fit while no lease is active, e.g. to move a
-/// desktop session off the card. Returns whether the hook ran successfully.
+/// Runs once per waiting job that does not fit while no lease is active on `card`, e.g. to
+/// move a desktop session off it. Returns whether the hook ran successfully.
 #[async_trait::async_trait]
 pub trait OffloadHook: Send + Sync + 'static {
-    async fn run(&self) -> bool;
+    async fn run(&self, card: &str) -> bool;
+}
+
+/// One GPU as the arbiter sees it.
+#[derive(Clone)]
+pub struct Card {
+    /// Unique name used in leases and status, e.g. "gpu0" or "big".
+    pub name: String,
+    pub probe: Arc<dyn VramProbe>,
+    /// VRAM kept free on this card on top of what leases declare.
+    pub margin_mib: Mib,
+    /// A whole-card lease needs at most this much VRAM used by other processes.
+    pub whole_card_baseline_mib: Mib,
+    /// Environment that points a program at this card, e.g. `CUDA_VISIBLE_DEVICES=1`.
+    /// Handed to lease holders; a card without it cannot be picked for `CardSel::Any`
+    /// when there is more than one card.
+    pub env: Vec<(String, String)>,
+}
+
+impl fmt::Debug for Card {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Card")
+            .field("name", &self.name)
+            .field("device", &self.probe.device())
+            .field("env", &self.env)
+            .finish()
+    }
+}
+
+/// Which card a job wants.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub enum CardSel {
+    /// The first configured card. Clients that know nothing about cards get this.
+    #[default]
+    Primary,
+    Named(String),
+    /// Whichever card can take the job first. Only cards with `env` qualify, so the job can
+    /// be pointed at the card it got.
+    Any,
+}
+
+impl fmt::Display for CardSel {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            CardSel::Primary => f.write_str("primary"),
+            CardSel::Named(n) => f.write_str(n),
+            CardSel::Any => f.write_str("any"),
+        }
+    }
 }
 
 /// A job asking for the card.
@@ -216,12 +264,17 @@ pub struct LeaseRequest {
     pub pid: Option<u32>,
     /// Re-adopt a lease granted before a gpud restart instead of queueing.
     pub resume_id: Option<String>,
+    pub card: CardSel,
 }
 
 #[derive(Debug, thiserror::Error)]
 pub enum ArbiterError {
     #[error("arbiter is not running")]
     Closed,
+    #[error("unknown card '{0}'; known: {1}")]
+    UnknownCard(String, String),
+    #[error("no card can be picked for \"any\": give the cards a visible_devices setting")]
+    NoSteerableCard,
 }
 
 // ------------------------------------------------------------------------ status
@@ -229,6 +282,7 @@ pub enum ArbiterError {
 #[derive(Clone, Debug, Serialize)]
 pub struct LeaseStatus {
     pub id: String,
+    pub card: String,
     pub class: String,
     pub name: String,
     pub vram: Vram,
@@ -248,6 +302,8 @@ pub enum WaiterKind {
 #[derive(Clone, Debug, Serialize)]
 pub struct QueueStatus {
     pub kind: WaiterKind,
+    /// Card name, or "any".
+    pub card: String,
     pub class: String,
     pub name: String,
     /// Declared VRAM for jobs; None for LLM requests.
@@ -264,6 +320,22 @@ pub struct HistoryEntry {
     pub msg: String,
 }
 
+/// One card's view. The top-level `Status` fields repeat the primary card's.
+#[derive(Clone, Debug, Serialize)]
+pub struct CardStatus {
+    pub name: String,
+    pub device: String,
+    pub state: Phase,
+    /// The LLM backend lives on this card.
+    pub llm: bool,
+    pub baseline_mib: Option<Mib>,
+    pub floor_mib: Option<Mib>,
+    pub vram: Option<VramReading>,
+    pub vram_error: Option<String>,
+}
+
+/// Top-level fields describe the primary (first) card, so single-card clients keep working;
+/// `cards` has every card.
 #[derive(Clone, Debug, Serialize)]
 pub struct Status {
     pub state: Phase,
@@ -283,6 +355,7 @@ pub struct Status {
     pub queue: Vec<QueueStatus>,
     /// Most recent last; at most 40 entries.
     pub history: Vec<HistoryEntry>,
+    pub cards: Vec<CardStatus>,
 }
 
 // ------------------------------------------------------------------------ handle
@@ -315,6 +388,8 @@ enum Msg {
 #[derive(Debug)]
 struct Granted {
     id: String,
+    card: String,
+    env: Vec<(String, String)>,
     yield_rx: watch::Receiver<bool>,
 }
 
@@ -323,29 +398,80 @@ struct Granted {
 pub struct Handle {
     tx: mpsc::UnboundedSender<Msg>,
     classes: Arc<Classes>,
+    /// Card names in config order, and whether each can be picked for `CardSel::Any`.
+    cards: Arc<Vec<(String, bool)>>,
     ids: Arc<std::sync::atomic::AtomicU64>,
 }
 
-/// Start the arbiter task. It first asks the backend what is loaded, then serves messages.
+/// Start the arbiter for one card named "gpu0", using the margin and whole-card baseline from
+/// `settings.tuning`. It first asks the backend what is loaded, then serves messages.
 pub fn spawn(
     settings: Settings,
     backend: Arc<dyn Backend>,
     probe: Arc<dyn VramProbe>,
     offload: Option<Arc<dyn OffloadHook>>,
 ) -> Handle {
+    let card = Card {
+        name: "gpu0".into(),
+        probe,
+        margin_mib: settings.tuning.margin_mib,
+        whole_card_baseline_mib: settings.tuning.whole_card_baseline_mib,
+        env: Vec::new(),
+    };
+    spawn_cards(settings, vec![card], 0, backend, offload)
+}
+
+/// Start the arbiter for several cards. `cards[0]` is the primary card; the LLM backend lives
+/// on `cards[llm_card]`. Panics if `cards` is empty or `llm_card` is out of range.
+pub fn spawn_cards(
+    settings: Settings,
+    cards: Vec<Card>,
+    llm_card: usize,
+    backend: Arc<dyn Backend>,
+    offload: Option<Arc<dyn OffloadHook>>,
+) -> Handle {
+    assert!(llm_card < cards.len(), "llm_card out of range");
+    let many = cards.len() > 1;
     let (tx, rx) = mpsc::unbounded_channel();
     let handle = Handle {
         tx: tx.clone(),
         classes: Arc::new(settings.classes.clone()),
+        cards: Arc::new(
+            cards
+                .iter()
+                .map(|c| (c.name.clone(), !many || !c.env.is_empty()))
+                .collect(),
+        ),
         ids: Arc::new(std::sync::atomic::AtomicU64::new(1)),
     };
-    tokio::spawn(actor::run(settings, backend, probe, offload, tx, rx));
+    tokio::spawn(actor::run(
+        settings, cards, llm_card, backend, offload, tx, rx,
+    ));
     handle
 }
 
 impl Handle {
     pub fn classes(&self) -> &Classes {
         &self.classes
+    }
+
+    /// Card names in config order; the first is the primary card.
+    pub fn card_names(&self) -> impl Iterator<Item = &str> {
+        self.cards.iter().map(|(n, _)| n.as_str())
+    }
+
+    /// Check a card selection before queueing.
+    pub fn check_card(&self, sel: &CardSel) -> Result<(), ArbiterError> {
+        match sel {
+            CardSel::Primary => Ok(()),
+            CardSel::Named(n) if self.cards.iter().any(|(c, _)| c == n) => Ok(()),
+            CardSel::Named(n) => Err(ArbiterError::UnknownCard(
+                n.clone(),
+                self.card_names().collect::<Vec<_>>().join(", "),
+            )),
+            CardSel::Any if self.cards.iter().any(|(_, steer)| *steer) => Ok(()),
+            CardSel::Any => Err(ArbiterError::NoSteerableCard),
+        }
     }
 
     fn next_id(&self) -> u64 {
@@ -374,8 +500,10 @@ impl Handle {
         })
     }
 
-    /// Wait for a lease. The lease lasts until it is dropped.
+    /// Wait for a lease. The lease lasts until it is dropped. Fails at once for an unknown
+    /// card, or for `CardSel::Any` when no card can be picked.
     pub async fn acquire(&self, req: LeaseRequest) -> Result<Lease, ArbiterError> {
+        self.check_card(&req.card)?;
         let id = self.next_id();
         let (reply, rx) = oneshot::channel();
         let (class, vram, yieldable) = (req.class.clone(), req.vram, req.yieldable);
@@ -388,6 +516,8 @@ impl Handle {
         cancel.disarm();
         Ok(Lease {
             id: granted.id,
+            card: granted.card,
+            env: granted.env,
             class,
             vram,
             yieldable,
@@ -446,6 +576,8 @@ impl Drop for LlmGuard {
 #[must_use = "the lease is released as soon as it is dropped"]
 pub struct Lease {
     id: String,
+    card: String,
+    env: Vec<(String, String)>,
     class: String,
     vram: Vram,
     yieldable: bool,
@@ -460,6 +592,16 @@ impl Lease {
 
     pub fn class(&self) -> &str {
         &self.class
+    }
+
+    /// Name of the card this lease holds.
+    pub fn card(&self) -> &str {
+        &self.card
+    }
+
+    /// Environment that points a program at the card (empty when the card has none).
+    pub fn env(&self) -> &[(String, String)] {
+        &self.env
     }
 
     pub fn vram(&self) -> Vram {
@@ -494,6 +636,7 @@ impl fmt::Debug for Lease {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Lease")
             .field("id", &self.id)
+            .field("card", &self.card)
             .field("class", &self.class)
             .field("vram", &self.vram)
             .finish()

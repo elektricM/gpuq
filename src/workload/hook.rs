@@ -25,8 +25,9 @@ impl CommandHook {
 
 #[async_trait]
 impl OffloadHook for CommandHook {
-    async fn run(&self) -> bool {
-        run_hook(&self.argv, self.timeout).await == Some(0)
+    /// The hook sees the card it should free as `GPUD_CARD`.
+    async fn run(&self, card: &str) -> bool {
+        run_hook_env(&self.argv, self.timeout, &[("GPUD_CARD", card)]).await == Some(0)
     }
 }
 
@@ -42,6 +43,11 @@ async fn read_all<R: tokio::io::AsyncRead + Unpin>(r: Option<R>) -> Vec<u8> {
 /// by a signal, or timed out. Stdout and stderr are logged together (last 300 chars); they
 /// are captured on separate pipes, so stderr follows stdout rather than interleaving.
 pub async fn run_hook(argv: &[String], timeout: Duration) -> Option<i32> {
+    run_hook_env(argv, timeout, &[]).await
+}
+
+/// [`run_hook`] with extra environment variables.
+pub async fn run_hook_env(argv: &[String], timeout: Duration, env: &[(&str, &str)]) -> Option<i32> {
     let Some((bin, args)) = argv.split_first() else {
         warn!("offload hook: empty command");
         return None;
@@ -49,6 +55,7 @@ pub async fn run_hook(argv: &[String], timeout: Duration) -> Option<i32> {
     let mut command = Command::new(bin);
     command
         .args(args)
+        .envs(env.iter().copied())
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())

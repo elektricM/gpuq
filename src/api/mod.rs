@@ -42,7 +42,7 @@ use tokio::sync::mpsc;
 use tokio::task::{AbortHandle, JoinSet};
 use tokio::time::{interval_at, Instant, MissedTickBehavior};
 
-use crate::arbiter::{Handle, LeaseRequest, Vram};
+use crate::arbiter::{CardSel, Handle, LeaseRequest, Vram};
 
 /// Default gap between keepalive pings on a lease stream.
 pub const PING_INTERVAL: Duration = Duration::from_secs(15);
@@ -271,6 +271,7 @@ fn parse_lease_request(raw: &[u8]) -> Result<LeaseRequest, String> {
             .unwrap_or("")
             .to_owned(),
         pid,
+        card: CardSel::Primary,
         resume_id,
     })
 }

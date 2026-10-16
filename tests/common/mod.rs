@@ -12,8 +12,8 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use gpud::arbiter::{
-    self, ArbiterError, ClassTuning, Classes, Handle, Lease, LeaseRequest, OffloadHook, Settings,
-    Status, Tuning, Vram,
+    self, ArbiterError, CardSel, ClassTuning, Classes, Handle, Lease, LeaseRequest, OffloadHook,
+    Settings, Status, Tuning, Vram,
 };
 use gpud::backend::{Backend, BackendError, Capabilities};
 use gpud::probe::{ProbeError, VramProbe, VramReading};
@@ -323,7 +323,7 @@ impl FakeHook {
 
 #[async_trait]
 impl OffloadHook for FakeHook {
-    async fn run(&self) -> bool {
+    async fn run(&self, _card: &str) -> bool {
         self.runs.fetch_add(1, Ordering::SeqCst);
         if self.frees {
             self.card.set_job_vram(0);
@@ -386,6 +386,7 @@ pub fn request(class: &str, vram: Vram, yieldable: bool, name: &str) -> LeaseReq
         name: name.into(),
         pid: None,
         resume_id: None,
+        card: CardSel::Primary,
     }
 }
 

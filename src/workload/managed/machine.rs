@@ -297,6 +297,7 @@ impl Machine {
             name: self.cfg.name.clone(),
             pid: None,
             resume_id: None,
+            card: self.cfg.card.clone(),
         });
         tokio::pin!(acquire);
         loop {

@@ -39,7 +39,7 @@ use tokio::net::TcpListener;
 use tokio::sync::{mpsc, watch};
 use tokio::task::JoinSet;
 
-use crate::arbiter::{Handle, Vram};
+use crate::arbiter::{CardSel, Handle, Vram};
 use crate::config::{Flavor, Service, ServiceKind as Kind, ServiceSpec};
 use crate::gate::proxy::{
     full, is_upgrade, read_body, serve_fn, BodyError, Keepalive, Proxy, ProxyBody, MAX_BODY,
@@ -53,6 +53,7 @@ pub(crate) struct Cfg {
     class: String,
     vram: Vram,
     yieldable: bool,
+    card: CardSel,
     control: Option<ServiceControl>,
     health_url: Option<String>,
     start_timeout: Duration,
@@ -95,6 +96,7 @@ impl Cfg {
             busy_url,
             backend,
             comfy,
+            card: CardSel::Primary,
             poll: (svc.idle_release / 4).clamp(Duration::from_millis(20), Duration::from_secs(1)),
         })
     }
