@@ -7,6 +7,9 @@ gpud is a GPU scheduler for Linux machines with a single GPU. Programs request t
 through gpud, which grants it by priority and available VRAM. To free the card, gpud can
 signal running jobs, stop and start services, and unload models from LLM servers.
 
+It works with any program that uses the GPU: renders, video encodes, simulations, games,
+compute jobs, and AI tools such as LLM servers and image generators.
+
 gpud is in early development. The configuration format may change before 1.0.
 
 ## Features
@@ -22,9 +25,11 @@ gpud is in early development. The configuration format may change before 1.0.
 
 ## Supported software
 
-- LLM servers: llama-swap, Ollama, llama.cpp `llama-server`, vLLM, SGLang
-- Services: ComfyUI, Immich ML, any GPU service managed by systemd, Docker or Podman
-- Any other program through `gpud run` or the [lease API](docs/lease-api.md)
+- Any command, through `gpud run`: Blender, ffmpeg, training scripts, CUDA, ROCm or Vulkan programs
+- Any service managed by systemd, Docker, Podman or custom commands
+- Programs that integrate directly, through the [lease API](docs/lease-api.md)
+- LLM servers, with model unloading: llama-swap, Ollama, llama.cpp `llama-server`, vLLM, SGLang
+- ComfyUI and Immich ML, with request gating
 
 Example configurations are in [examples/](examples/).
 
@@ -60,7 +65,7 @@ sudo systemctl enable --now gpud
 Run a job:
 
 ```sh
-gpud run --class batch --vram 8G --yieldable -- python train.py
+gpud run --class batch --vram 8G -- blender -b scene.blend -a
 ```
 
 Other commands:
