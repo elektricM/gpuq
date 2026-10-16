@@ -192,6 +192,9 @@ realtime-class job.
   usage errors, 126/127 if the command cannot be started.
 - SIGINT, SIGTERM and SIGHUP are forwarded to the command.
 - If the connection to gpud drops, `gpud run` re-adopts the lease every 2 s.
+- On Linux, if `gpud run` itself is killed (`kill -9`, OOM killer), the kernel kills the command
+  too, so nothing keeps using the card without a lease. This reaches only the command itself:
+  in a wrapper script, start the real job with `exec` (`exec python train.py`).
 - `gpud hold [--class] [--vram] [--card] [--name]` takes a lease and holds it until Ctrl-C. Use it to
   reserve the card by hand.
 
@@ -202,7 +205,7 @@ card on its own from one queue.
 
 - **Pinning.** `gpud run --card nvidia -- cmd` waits for that card only. A `[[service]]` with
   `card = "nvidia"` is bound to it. The LLM server's card is `llm.card` (default: the first).
-  Nothing named runs on the primary card, the first one in the config.
+  Without `--card` or `card`, jobs and services use the primary card, the first one in the config.
 - **Any.** `gpud run --card any -- cmd` takes the first card with room, otherwise waits.
   Only cards with `visible_devices` qualify, since the job has to be told where it landed.
 - **visible_devices.** gpud hands the card's env to the job (`CUDA_VISIBLE_DEVICES` for NVIDIA,
