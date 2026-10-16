@@ -446,13 +446,12 @@ impl Config {
             message,
         };
         let table: toml::Table = text.parse().map_err(|e| parse_err(format!("{e}")))?;
-        for old in ["comfyui"] {
-            if table.contains_key(old) {
-                return Err(parse_err(format!(
-                    "[{old}] is no longer a built-in section; declare it as a [[service]] entry \
-                     (see examples/gpud.toml)"
-                )));
-            }
+        if table.contains_key("comfyui") {
+            return Err(parse_err(
+                "[comfyui] is no longer a built-in section; declare it as a [[service]] entry \
+                 (see examples/gpud.toml)"
+                    .to_string(),
+            ));
         }
         let cfg: Config = table.try_into().map_err(|e| parse_err(format!("{e}")))?;
         cfg.check()?;
