@@ -149,7 +149,8 @@ gpud check-config -c examples/comfyui.toml                        # check a conf
 | Planned | Until then |
 |---|---|
 | Automatic desktop and game detection, card handed back afterwards | `gpud run --class interactive --vram all -- game` |
-| Several GPUs | one card per gpud for now |
+| Multi-GPU support: one queue for several cards, leases that name a card or take any free one | one card per gpud for now |
+| Web UI: live view of the card, the queue and the leases, with buttons to hold, release or ask a job to yield | `gpud status` |
 | Prometheus metrics | `gpud status` and `GET /status` |
 | Config reload without restart | restart the service; live leases are re-adopted |
 | Intel VRAM probe | the `command` probe |

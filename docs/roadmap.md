@@ -15,9 +15,20 @@ Yieldable jobs get asked to give it up; the LLM is unloaded. Wrap a game launche
 
 ## Multi-GPU
 
-gpud arbitrates one card. The config already has a `gpu.device` field and the state carries a
+gpud arbitrates one card. The goal is one queue for several cards: a lease names a card or
+takes any card with enough free VRAM, and each LLM server or service is pinned to its card. The config already has a `gpu.device` field and the state carries a
 device, so leases can later name a card. Needed: one probe per device, per-device VRAM
 accounting, and a way to say which backend lives on which card.
+
+## Web UI
+
+A small page served by the control API: the card's VRAM, which program holds it, the queue
+with each waiting lease and its class, and the services with their state. Buttons to hold the
+card, release a lease or ask a job to yield, so day-to-day use does not need the CLI. It should
+ship inside the binary (no separate frontend build) and stay on loopback by default, like the
+API itself. `GET /status` already returns most of what it needs.
+
+Today: `gpud status`, or `GET /status` on the control API.
 
 ## Metrics
 
