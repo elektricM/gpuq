@@ -334,7 +334,7 @@ async fn sigterm_exits_zero_quickly_and_drops_open_leases() {
     let deadline = Instant::now() + Duration::from_secs(10);
     while daemon.status_json().await["leases"]
         .as_array()
-        .is_none_or(|l| l.is_empty())
+        .map_or(true, |l| l.is_empty())
     {
         assert!(Instant::now() < deadline, "lease never granted");
         sleep(Duration::from_millis(50)).await;
