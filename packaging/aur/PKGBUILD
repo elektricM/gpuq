@@ -8,9 +8,9 @@ url='https://github.com/elektricM/gpud'
 license=('GPL-3.0-or-later')
 makedepends=(cargo)
 backup=('etc/gpud/config.toml')
+options=('!lto')  # makepkg's LTO flags break ring's assembly at link time
 source=("$pkgname-$pkgver.tar.gz::https://github.com/elektricM/gpud/archive/refs/tags/v$pkgver.tar.gz")
-# Replace SKIP with the real checksum when cutting the release (updpkgsums).
-sha256sums=('SKIP')
+sha256sums=('69f329711aace56bcda190989bcf754e87b7cbe65879a962162493d33cb21820')
 
 prepare() {
   cd "$pkgname-$pkgver"
