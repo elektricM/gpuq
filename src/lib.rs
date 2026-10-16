@@ -1,5 +1,6 @@
 //! gpud: one GPU, many workloads. See README.md.
 
+pub mod api;
 pub mod arbiter;
 pub mod backend;
 pub mod cli;
