@@ -228,6 +228,28 @@ fn parse_signal(s: &str) -> Result<Signal, String> {
 }
 
 /// A path that does not exist yet, where programs can poll for a yield request.
+/// Kill the job if `gpud run` itself dies without cleaning up (kill -9, OOM killer): its lease
+/// ends with our connection, so a job left running would use the card behind gpud's back.
+/// The runtime is single-threaded, so the thread that forks lives as long as the process.
+#[cfg(target_os = "linux")]
+fn die_with_parent(cmd: &mut Command) {
+    let parent = nix::unistd::getpid();
+    // SAFETY: the closure only makes async-signal-safe system calls.
+    unsafe {
+        cmd.pre_exec(move || {
+            nix::sys::prctl::set_pdeathsig(Signal::SIGKILL)?;
+            // We may have died between fork and prctl.
+            if nix::unistd::getppid() != parent {
+                return Err(std::io::Error::from_raw_os_error(nix::libc::ESRCH));
+            }
+            Ok(())
+        });
+    }
+}
+
+#[cfg(not(target_os = "linux"))]
+fn die_with_parent(_cmd: &mut Command) {}
+
 fn yield_file_path(lease_id: &str) -> PathBuf {
     let dir = std::env::var_os("XDG_RUNTIME_DIR")
         .map(PathBuf::from)
@@ -293,6 +315,7 @@ pub async fn run(addr: &str, a: RunArgs) -> ExitCode {
     if let (Some(s), Some(f)) = (&session, &yield_file) {
         cmd.env("GPUD_LEASE_ID", &s.id).env("GPUD_YIELD_FILE", f);
     }
+    die_with_parent(&mut cmd);
     let mut child = match cmd.spawn() {
         Ok(c) => c,
         Err(e) => {

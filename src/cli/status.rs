@@ -56,7 +56,7 @@ fn render(st: &Value) -> String {
         put("device", dev.to_owned());
     }
     if let Some(v) = st.get("vram").filter(|v| v.is_object()) {
-        let gtt = match v.get("gtt_used_mib").and_then(Value::as_u64) {
+        let gtt = match v.get("gtt_mib").and_then(Value::as_u64) {
             Some(g) if g > 0 => format!("   gtt {g} MiB"),
             _ => String::new(),
         };
@@ -129,10 +129,30 @@ fn render(st: &Value) -> String {
     if !history.is_empty() {
         out.push_str("recent\n");
         for h in &history[history.len().saturating_sub(8)..] {
-            out.push_str(&format!("  {} {}\n", n(h, "t"), s(h, "msg")));
+            let t = h
+                .get("t")
+                .and_then(Value::as_u64)
+                .map_or_else(String::new, clock);
+            out.push_str(&format!("  {t} {}\n", s(h, "msg")));
         }
     }
     out
+}
+
+/// Local wall-clock time of a Unix timestamp, as HH:MM:SS.
+fn clock(t: u64) -> String {
+    #[cfg(unix)]
+    {
+        use nix::libc;
+        let secs = t as libc::time_t;
+        // SAFETY: localtime_r only writes into the struct we pass.
+        let mut tm: libc::tm = unsafe { std::mem::zeroed() };
+        if !unsafe { libc::localtime_r(&secs, &mut tm) }.is_null() {
+            return format!("{:02}:{:02}:{:02}", tm.tm_hour, tm.tm_min, tm.tm_sec);
+        }
+    }
+    let d = t % 86_400;
+    format!("{:02}:{:02}:{:02}", d / 3600, d / 60 % 60, d % 60)
 }
 
 fn arr<'a>(v: &'a Value, key: &str) -> &'a [Value] {
@@ -167,7 +187,7 @@ mod tests {
     fn renders_models_and_vram() {
         let st = json!({
             "state": "llm", "inflight_llm": 1, "llm_idle_s": 3, "device": "fake:0",
-            "vram": {"used_mib": 100, "total_mib": 200, "gtt_used_mib": 0},
+            "vram": {"used_mib": 100, "total_mib": 200, "gtt_mib": 0},
             "backend": {"models": [{"model": "big", "state": "ready"}]},
             "leases": [], "queue": [], "history": []
         });
@@ -175,6 +195,17 @@ mod tests {
         assert!(t.contains("big (ready)"), "{t}");
         assert!(t.contains("100/200 MiB\n"), "{t}");
         assert!(t.contains("device     fake:0"), "{t}");
+    }
+
+    #[test]
+    fn history_shows_clock_times() {
+        let st = json!({"state": "llm", "history": [{"t": 1_792_177_510u64, "msg": "grant x"}]});
+        let t = render(&st);
+        let line = t.lines().find(|l| l.contains("grant x")).unwrap();
+        let clock = line.split_whitespace().next().unwrap();
+        assert!(!t.contains("1792177510"), "{t}");
+        assert_eq!(clock.len(), 8, "{line}");
+        assert_eq!(clock.matches(':').count(), 2, "{line}");
     }
 
     #[test]

@@ -278,20 +278,21 @@ impl Comfy {
     }
 }
 
+/// A random UUID: ComfyUI rejects prompt ids that are not UUIDs.
 fn new_id() -> String {
-    // Unique enough for a queue id: time plus a process-wide counter.
-    use std::sync::atomic::{AtomicU64, Ordering};
-    static N: AtomicU64 = AtomicU64::new(0);
-    let n = N.fetch_add(1, Ordering::Relaxed);
-    let t = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_or(0, |d| d.as_nanos());
-    format!("gpud-{t:x}-{n:x}")
+    uuid::Uuid::new_v4().to_string()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn generated_prompt_ids_are_uuids() {
+        let a = new_id();
+        assert!(uuid::Uuid::parse_str(&a).is_ok(), "{a}");
+        assert_ne!(a, new_id());
+    }
 
     #[test]
     fn collects_weight_files_only() {

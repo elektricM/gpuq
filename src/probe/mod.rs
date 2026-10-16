@@ -30,6 +30,8 @@ pub struct VramReading {
     pub used_mib: Mib,
     pub total_mib: Mib,
     /// AMD GTT (system memory mapped for the GPU); None where the vendor has no such counter.
+    /// Named `gtt_mib` on the wire, as the Python prototype's clients expect.
+    #[serde(rename = "gtt_mib")]
     pub gtt_used_mib: Option<Mib>,
 }
 
