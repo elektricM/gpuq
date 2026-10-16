@@ -10,7 +10,7 @@ One static binary, no GPU libraries.
 
 | Kind | What | Notes |
 |---|---|---|
-| LLM backend | llama-swap | Unload/load, KV slot save and restore, aliases, CPU-only models. Tested against a fake server and on real hardware. |
+| LLM backend | llama-swap | Unload/load, KV slot save and restore, aliases, CPU-only models. Tested against a fake llama-swap. |
 | LLM backend | Ollama | Unload/load via `keep_alive`. No slots. Tested against a fake server. |
 | LLM backend | llama-server, vLLM, SGLang | Cannot unload, so gpud stops and starts the service. llama-server also has slots. Tested against fake servers and fake service control. |
 | Managed service | ComfyUI | Held prompts, queue-aware idle release, model switch, yield. Tested against a fake ComfyUI. |
