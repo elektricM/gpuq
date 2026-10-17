@@ -43,6 +43,9 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Tests pick listener ports outside the ephemeral range, so they no longer collide with
   ports in use by outgoing connections.
+- Tests no longer fail at random when a child process forked by another test inherits a
+  socket used to check that a port is free.
+- The crate builds with Rust 1.80 again, as declared in `rust-version`.
 
 ## [0.1.1] - 2026-10-17
 
