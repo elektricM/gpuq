@@ -11,7 +11,7 @@ makedepends=(cargo)
 backup=('etc/gpuq/config.toml')
 options=('!lto')  # makepkg's LTO flags break ring's assembly at link time
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('SKIP')
+sha256sums=('dcf03d7cfe3517c4c22afa1ccd8a0a0588af782c12fea66a21330e4d91190f4f')
 
 prepare() {
   cd "$pkgname-$pkgver"
