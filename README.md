@@ -7,12 +7,18 @@ gpuq is a GPU scheduler for Linux machines with one or more GPUs. Programs reque
 through gpuq, which grants it by priority and available VRAM. To free the card, gpuq can
 signal running jobs, stop and start services, and unload models from LLM servers.
 
+AI programs fight over the GPU: an LLM, ComfyUI, Whisper and your own tools each assume they
+own the card, and whichever starts second runs out of memory. gpuq gives each one the card in
+turn, by priority and free VRAM.
+
+![gpuq overview](docs/overview.svg)
+
 It works with any program that uses the GPU: renders, video encodes, simulations, games,
 compute jobs, and AI tools such as LLM servers and image generators.
 
 gpuq is in early development. The configuration format may change before 1.0.
 
-![Clients go through the gate and control API to the arbiter, which places work on gpu0 and gpu1; the LLM backend spans both cards and the integrated GPU is excluded](docs/architecture.svg)
+How the scheduler works inside, with a diagram: [docs/how-it-works.md](docs/how-it-works.md).
 
 ## Features
 
@@ -48,7 +54,7 @@ Static binaries for x86_64 and aarch64, and `.deb` and `.rpm` packages, are avai
 Building from source requires Rust 1.80 or later:
 
 ```sh
-cargo install --locked --git https://github.com/elektricM/gpuq
+cargo install gpuq
 ```
 
 Each release also has a `gpuq-<version>-vendor.tar.xz` with the dependencies, for builds
@@ -76,21 +82,8 @@ gpuq check-config
 sudo systemctl enable --now gpuq
 ```
 
-`enable --now` starts gpuq now and at every boot. The packages install the systemd unit but
-do not enable it, because the configuration has to be written first. The unit runs as the
-`gpuq` user. To control `systemctl --user` services such as ComfyUI, use the user unit
-instead (`systemctl --user enable --now gpuq`, with `loginctl enable-linger` so it runs without
-a login session). Logs are in `journalctl -u gpuq`.
-
-When installing with `cargo install`, copy the unit and the system user from
-[packaging/systemd](packaging/systemd):
-
-```sh
-sudo install -m 755 ~/.cargo/bin/gpuq /usr/bin/gpuq
-sudo install -m 644 packaging/systemd/gpuq.service /etc/systemd/system/
-sudo install -m 644 packaging/systemd/gpuq.sysusers /usr/lib/sysusers.d/gpuq.conf
-sudo systemd-sysusers && sudo systemctl daemon-reload
-```
+The packages ship a systemd unit; with `cargo install`, copy it from
+[packaging/systemd](packaging/systemd).
 
 Run a job:
 

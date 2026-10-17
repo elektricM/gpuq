@@ -1,0 +1,113 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="470" viewBox="0 0 1000 470" font-family="Inter, Helvetica, Arial, sans-serif">
+<defs>
+<marker id="m" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#4a4a4a"/></marker>
+<marker id="b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#ff4d4d"/></marker>
+<filter id="sh" x="-10%" y="-10%" width="130%" height="140%"><feOffset dx="4" dy="4" in="SourceAlpha"/><feComponentTransfer><feFuncA type="linear" slope="1"/></feComponentTransfer><feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+</defs>
+<rect width="1000" height="470" fill="#fff8ef"/>
+<g filter="url(#sh)">
+<rect x="12" y="12" width="330" height="316" rx="18" fill="#ffffff" stroke="#1f1f1f" stroke-width="1.2"/>
+<rect x="356" y="12" width="632" height="316" rx="18" fill="#ffffff" stroke="#1f1f1f" stroke-width="1.2"/>
+</g>
+<text x="177" y="44" text-anchor="middle" font-size="17" font-weight="700" fill="#1f1f1f">Without gpuq</text>
+<text x="672.0" y="44" text-anchor="middle" font-size="17" font-weight="700" fill="#1f1f1f">With gpuq</text>
+<g filter="url(#sh)"><rect x="30" y="70" width="120" height="36" rx="14" fill="#a66cff" stroke="#1f1f1f" stroke-width="3"/></g>
+<text x="90.0" y="93.0" text-anchor="middle" font-size="14" font-weight="600" fill="#ffffff">LLM server</text>
+<g filter="url(#sh)"><rect x="30" y="120" width="120" height="36" rx="14" fill="#3d8bff" stroke="#1f1f1f" stroke-width="3"/></g>
+<text x="90.0" y="143.0" text-anchor="middle" font-size="14" font-weight="600" fill="#ffffff">ComfyUI</text>
+<g filter="url(#sh)"><rect x="30" y="170" width="120" height="36" rx="14" fill="#00b37e" stroke="#1f1f1f" stroke-width="3"/></g>
+<text x="90.0" y="193.0" text-anchor="middle" font-size="14" font-weight="600" fill="#ffffff">Whisper</text>
+<g filter="url(#sh)"><rect x="30" y="220" width="120" height="36" rx="14" fill="#ffb400" stroke="#1f1f1f" stroke-width="3"/></g>
+<text x="90.0" y="243.0" text-anchor="middle" font-size="14" font-weight="600" fill="#1f2328">API request</text>
+<path d="M152,88 L192,138.75" stroke="#ff4d4d" stroke-width="1.8" marker-end="url(#b)" filter="none"/>
+<path d="M152,138 L192,156.25" stroke="#ff4d4d" stroke-width="1.8" marker-end="url(#b)" filter="none"/>
+<path d="M152,188 L192,173.75" stroke="#ff4d4d" stroke-width="1.8" marker-end="url(#b)" filter="none"/>
+<path d="M152,238 L192,191.25" stroke="#ff4d4d" stroke-width="1.8" marker-end="url(#b)" filter="none"/>
+<g filter="url(#sh)"><rect x="196" y="100" width="130" height="130" rx="16" fill="#ffffff" stroke="#ff4d4d" stroke-width="3.8"/></g>
+<text x="261.0" y="128" text-anchor="middle" font-size="16" font-weight="700" fill="#1f1f1f">GPU</text>
+<text x="261.0" y="216" text-anchor="middle" font-size="12" font-weight="600" fill="#ff4d4d">out of memory</text>
+<rect x="208" y="146" width="106" height="22" rx="3" fill="#f0e6d8"/>
+<rect x="208" y="146" width="75.08333333333333" height="22" fill="#a66cff"/>
+<rect x="283.0833333333333" y="146" width="30.916666666666686" height="22" fill="#3d8bff"/>
+<rect x="314" y="143" width="22.083333333333314" height="28" fill="none" stroke="#ff4d4d" stroke-width="1.6" stroke-dasharray="3 2"/>
+<text x="261.0" y="190" text-anchor="middle" font-size="12" fill="#ff4d4d">29 GB asked</text>
+<text x="177" y="296" text-anchor="middle" font-size="12.5" fill="#4a4a4a">Every program grabs the card.</text>
+<text x="177" y="314" text-anchor="middle" font-size="12.5" fill="#4a4a4a">One crashes, or everything crawls.</text>
+<g filter="url(#sh)"><rect x="372" y="70" width="160" height="36" rx="14" fill="#a66cff" stroke="#1f1f1f" stroke-width="3"/></g>
+<text x="384" y="93.0" font-size="14" font-weight="600" fill="#ffffff">LLM</text>
+<text x="522" y="93.0" text-anchor="end" font-size="11" fill="#ffffff" opacity="0.8">class 1</text>
+<g filter="url(#sh)"><rect x="372" y="120" width="160" height="36" rx="14" fill="#3d8bff" stroke="#1f1f1f" stroke-width="3"/></g>
+<text x="384" y="143.0" font-size="14" font-weight="600" fill="#ffffff">ComfyUI</text>
+<text x="522" y="143.0" text-anchor="end" font-size="11" fill="#ffffff" opacity="0.8">class 2</text>
+<g filter="url(#sh)"><rect x="372" y="170" width="160" height="36" rx="14" fill="#00b37e" stroke="#1f1f1f" stroke-width="3"/></g>
+<text x="384" y="193.0" font-size="14" font-weight="600" fill="#ffffff">Whisper</text>
+<text x="522" y="193.0" text-anchor="end" font-size="11" fill="#ffffff" opacity="0.8">class 0</text>
+<g filter="url(#sh)"><rect x="372" y="220" width="160" height="36" rx="14" fill="#ffb400" stroke="#1f1f1f" stroke-width="3"/></g>
+<text x="384" y="243.0" font-size="14" font-weight="600" fill="#1f2328">API request</text>
+<text x="522" y="243.0" text-anchor="end" font-size="11" fill="#1f2328" opacity="0.8">class 3</text>
+<path d="M534,88 C550,88 545,165.0 561,165.0" fill="none" stroke="#4a4a4a" stroke-width="1.5" marker-end="url(#m)" filter="none"/>
+<path d="M534,138 C550,138 545,165.0 561,165.0" fill="none" stroke="#4a4a4a" stroke-width="1.5" marker-end="url(#m)" filter="none"/>
+<path d="M534,188 C550,188 545,165.0 561,165.0" fill="none" stroke="#4a4a4a" stroke-width="1.5" marker-end="url(#m)" filter="none"/>
+<path d="M534,238 C550,238 545,165.0 561,165.0" fill="none" stroke="#4a4a4a" stroke-width="1.5" marker-end="url(#m)" filter="none"/>
+<g filter="url(#sh)"><rect x="565" y="80" width="180" height="170" rx="18" fill="#1f1f1f" stroke="#1f1f1f" stroke-width="3"/></g>
+<text x="655.0" y="112" text-anchor="middle" font-size="22" font-weight="800" fill="#ffd400">gpuq</text>
+<text x="581" y="138" font-size="11" fill="#ffffff">queue, by priority</text>
+<rect x="579" y="148" width="96" height="19" rx="5" fill="#00b37e"/>
+<text x="627" y="162" text-anchor="middle" font-size="11" font-weight="600" fill="#ffffff">0 Whisper</text>
+<text x="683" y="162" font-size="11" fill="#ffffff">▶ runs</text>
+<rect x="579" y="172" width="96" height="19" rx="5" fill="#a66cff"/>
+<text x="627" y="186" text-anchor="middle" font-size="11" font-weight="600" fill="#ffffff">1 LLM</text>
+<text x="683" y="186" font-size="11" fill="#ffffff">▶ runs</text>
+<rect x="579.5" y="196.5" width="95" height="18" rx="5" fill="none" stroke="#3d8bff" stroke-width="1.3" stroke-dasharray="4 2"/>
+<text x="627" y="210" text-anchor="middle" font-size="11" font-weight="600" fill="#3d8bff">2 ComfyUI</text>
+<text x="683" y="210" font-size="11" fill="#ffffff">· waits</text>
+<rect x="579.5" y="220.5" width="95" height="18" rx="5" fill="none" stroke="#ffb400" stroke-width="1.3" stroke-dasharray="4 2"/>
+<text x="627" y="234" text-anchor="middle" font-size="11" font-weight="600" fill="#ffb400">3 API req.</text>
+<text x="683" y="234" font-size="11" fill="#ffffff">· waits</text>
+<path d="M747,165.0 L775,165.0" stroke="#4a4a4a" stroke-width="1.8" marker-end="url(#m)"/>
+<g filter="url(#sh)"><rect x="779" y="80" width="191" height="170" rx="16" fill="#ffffff" stroke="#00b37e" stroke-width="3.8"/></g>
+<text x="874.5" y="108" text-anchor="middle" font-size="16" font-weight="700" fill="#1f1f1f">GPU · 24 GB</text>
+<text x="874.5" y="236" text-anchor="middle" font-size="12" font-weight="600" fill="#00b37e">no fights</text>
+<rect x="793" y="140" width="163" height="30" rx="4" fill="#f0e6d8"/>
+<rect x="793" y="140" width="115.45833333333333" height="30" rx="4" fill="#a66cff"/>
+<rect x="908.4583333333334" y="140" width="20.375" height="30" fill="#00b37e"/>
+<text x="850.7291666666666" y="160" text-anchor="middle" font-size="12" font-weight="600" fill="#ffffff">LLM 17G</text>
+<text x="918.6458333333334" y="160" text-anchor="middle" font-size="10" font-weight="600" fill="#ffffff">3G</text>
+<text x="874.5" y="192" text-anchor="middle" font-size="11" fill="#4a4a4a">Whisper fits beside the LLM.</text>
+<text x="874.5" y="208" text-anchor="middle" font-size="11" fill="#4a4a4a">ComfyUI is next: LLM unloads.</text>
+<text x="672.0" y="305" text-anchor="middle" font-size="12.5" fill="#4a4a4a">gpuq hands out the card by priority and free VRAM.</text>
+<g filter="url(#sh)"><rect x="12" y="342" width="976" height="116" rx="18" fill="#ffffff" stroke="#1f1f1f" stroke-width="1.2"/></g>
+<text x="32" y="372" font-size="15" font-weight="700" fill="#1f1f1f">Priority classes</text>
+<text x="32" y="392" font-size="11.5" fill="#4a4a4a">lower number goes first</text>
+<rect x="210" y="356" width="142" height="44" rx="14" fill="none" stroke="#00b37e" stroke-width="3"/>
+<rect x="210" y="356" width="26" height="44" rx="14" fill="#00b37e"/>
+<text x="223" y="384" text-anchor="middle" font-size="16" font-weight="800" fill="#ffffff">0</text>
+<text x="244" y="374" font-size="13" font-weight="700" fill="#1f1f1f">realtime</text>
+<text x="244" y="391" font-size="10" fill="#4a4a4a">live audio</text>
+<text x="357.0" y="383" text-anchor="middle" font-size="13" font-weight="700" fill="#4a4a4a">›</text>
+<rect x="362" y="356" width="142" height="44" rx="14" fill="none" stroke="#a66cff" stroke-width="3"/>
+<rect x="362" y="356" width="26" height="44" rx="14" fill="#a66cff"/>
+<text x="375" y="384" text-anchor="middle" font-size="16" font-weight="800" fill="#ffffff">1</text>
+<text x="396" y="374" font-size="13" font-weight="700" fill="#1f1f1f">llm</text>
+<text x="396" y="391" font-size="10" fill="#4a4a4a">your chat model</text>
+<text x="509.0" y="383" text-anchor="middle" font-size="13" font-weight="700" fill="#4a4a4a">›</text>
+<rect x="514" y="356" width="142" height="44" rx="14" fill="none" stroke="#3d8bff" stroke-width="3"/>
+<rect x="514" y="356" width="26" height="44" rx="14" fill="#3d8bff"/>
+<text x="527" y="384" text-anchor="middle" font-size="16" font-weight="800" fill="#ffffff">2</text>
+<text x="548" y="374" font-size="13" font-weight="700" fill="#1f1f1f">interactive</text>
+<text x="548" y="391" font-size="10" fill="#4a4a4a">ComfyUI renders</text>
+<text x="661.0" y="383" text-anchor="middle" font-size="13" font-weight="700" fill="#4a4a4a">›</text>
+<rect x="666" y="356" width="142" height="44" rx="14" fill="none" stroke="#ffb400" stroke-width="3"/>
+<rect x="666" y="356" width="26" height="44" rx="14" fill="#ffb400"/>
+<text x="679" y="384" text-anchor="middle" font-size="16" font-weight="800" fill="#1f2328">3</text>
+<text x="700" y="374" font-size="13" font-weight="700" fill="#1f1f1f">background</text>
+<text x="700" y="391" font-size="10" fill="#4a4a4a">your app, via API</text>
+<text x="813.0" y="383" text-anchor="middle" font-size="13" font-weight="700" fill="#4a4a4a">›</text>
+<rect x="818" y="356" width="142" height="44" rx="14" fill="none" stroke="#4a4a4a" stroke-width="3"/>
+<rect x="818" y="356" width="26" height="44" rx="14" fill="#4a4a4a"/>
+<text x="831" y="384" text-anchor="middle" font-size="16" font-weight="800" fill="#ffffff">4</text>
+<text x="852" y="374" font-size="13" font-weight="700" fill="#1f1f1f">batch</text>
+<text x="852" y="391" font-size="10" fill="#4a4a4a">gpuq run jobs</text>
+<text x="32" y="424" font-size="12" fill="#1f1f1f">▸ Fits in free VRAM? It runs now, next to what is already there.</text>
+<text x="32" y="442" font-size="12" fill="#1f1f1f">▸ Does not fit? It waits its turn, or gpuq asks a lower class to step aside. Nothing is killed.</text>
+</svg>
