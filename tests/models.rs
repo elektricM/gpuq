@@ -130,3 +130,41 @@ fn broken_yaml_keeps_the_old_table_until_the_next_change() {
         .unwrap();
     assert!(!m.uses_gpu("embed2"));
 }
+
+#[test]
+fn vram_is_estimated_from_the_model_files() {
+    let dir = tempfile::tempdir().unwrap();
+    let file = |name: &str, mib: u64| {
+        let f = std::fs::File::create(dir.path().join(name)).unwrap();
+        f.set_len(mib * 1024 * 1024).unwrap();
+    };
+    file("small.gguf", 1000);
+    file("big-00001-of-00002.gguf", 20_000);
+    file("big-00002-of-00002.gguf", 20_000);
+    let d = dir.path().display();
+    let yaml = format!(
+        "macros:\n  dir: {d}\nmodels:\n  small:\n    cmd: llama-server -m ${{dir}}/small.gguf\n  big:\n    cmd: llama-server --model {d}/big-00001-of-00002.gguf -ngl 99\n  gone:\n    cmd: llama-server -m {d}/missing.gguf\n"
+    );
+    let path = dir.path().join("config.yaml");
+    std::fs::write(&path, yaml).unwrap();
+    let table = gpuq::backend::models::ModelTable::new(&path);
+    // The files plus a fifth for the KV cache and buffers.
+    assert_eq!(table.vram_estimate("small"), Some(1200));
+    assert_eq!(table.vram_estimate("big"), Some(48_000));
+    assert_eq!(table.vram_estimate("gone"), None);
+    assert_eq!(table.vram_estimate("unknown"), None);
+}
+
+#[test]
+fn cpu_markers_in_the_env_list_count_too() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("config.yaml");
+    std::fs::write(
+        &path,
+        "models:\n  embed:\n    env: [\"ROCR_VISIBLE_DEVICES=-1\"]\n    cmd: llama-server -m /m/e.gguf\n  chat:\n    env: [\"ROCR_VISIBLE_DEVICES=GPU-1111aaaa2222bbbb\"]\n    cmd: llama-server -m /m/c.gguf\n",
+    )
+    .unwrap();
+    let table = ModelTable::new(&path);
+    assert!(!table.uses_gpu("embed"));
+    assert!(table.uses_gpu("chat"));
+}
