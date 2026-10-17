@@ -8,17 +8,25 @@
 //! and the effects in flight, at most one per card. After each of them it runs a bounded
 //! scheduling pass.
 //!
-//! Every card has its own phase and leases. The LLM backend lives on one card (`llm`); the
-//! others are permanently in `Jobs`. Waiters sit in one queue ordered by (priority, arrival),
-//! each aimed at one card or at any card that can be steered. A scheduling step looks at one
-//! card and only at the waiters that can use it, so a job pinned to one card never holds back
-//! another card.
+//! Every card has its own phase. The cards that are not in `Jobs` belong to the LLM backend
+//! and always share one phase: the LLM takes and gives back its cards together, and an unload
+//! or a reload is one effect for all of them. Which cards that is depends on the model (see
+//! `Actor::placement`): its home cards, or more for a model that needs more VRAM.
+//!
+//! Leases sit in one list; each names the cards it holds. Waiters sit in one queue ordered by
+//! (priority, arrival), each aimed at one card, a set of cards, or any card (or any N cards)
+//! that can be steered. A scheduling step looks at one card and only at the waiters that can
+//! use it, and only the best of them is served there. A lease for several cards is granted in
+//! one step once every card it needs fits, so it never holds one card while it waits for
+//! another. Because only the best waiter of a card is served, a waiting multi-card lease is
+//! not overtaken on its cards by later or lower-class leases: each card it needs comes to it
+//! as soon as its current holders leave.
 //!
 //! Slow backend work (unload, reload, the offload hook, waiting for VRAM to drain) runs as an
 //! effect: a boxed future that lives inside the phase it belongs to and is polled by the loop.
 //! So `Status` and every other message is answered while an unload is under way.
 
-use std::collections::{HashSet, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -31,10 +39,10 @@ use tokio::sync::{mpsc, oneshot, watch};
 use tokio::time::{sleep, sleep_until, timeout, Instant};
 
 use super::{
-    CardSel, CardStatus, Classes, Granted, HistoryEntry, LeaseRequest, LeaseStatus, Msg,
+    merge_env, CardSel, CardStatus, Classes, Granted, HistoryEntry, LeaseRequest, LeaseStatus, Msg,
     OffloadHook, QueueStatus, Settings, Status, Tuning, Vram, WaiterKind,
 };
-use crate::backend::{Backend, BackendError};
+use crate::backend::{Backend, BackendError, Placement};
 use crate::probe::{VramProbe, VramReading};
 use crate::Mib;
 
@@ -87,21 +95,22 @@ enum RestoreKind {
     Slot,
 }
 
-/// The phase, with the data that only exists in it.
+/// The phase, with the data that only exists in it. An unload or reload covers every card of
+/// the LLM; its effect lives on the first of them and the others carry `None`.
 enum State {
     /// `retry_at`: no new unload before then, the last one failed.
     Llm {
         retry_at: Option<Instant>,
     },
     Unloading {
-        fx: Fx<Unloaded>,
+        fx: Option<Fx<Unloaded>>,
     },
     /// `offload`: the hook (and its settle pause) is running.
     Jobs {
         offload: Option<Fx<Option<Mib>>>,
     },
     Restoring {
-        fx: Fx<Reloaded>,
+        fx: Option<Fx<Reloaded>>,
     },
 }
 
@@ -119,13 +128,17 @@ impl State {
     fn is_idle_jobs(&self) -> bool {
         matches!(self, State::Jobs { offload: None })
     }
+
+    fn is_llm(&self) -> bool {
+        !matches!(self, State::Jobs { .. })
+    }
 }
 
 struct Unloaded {
     /// Models whose slot was saved, even when the unload failed afterwards.
     saved: Vec<String>,
-    /// VRAM in use afterwards (None: the probe failed).
-    result: Result<Option<Mib>, String>,
+    /// VRAM in use afterwards on each card, in card order (None: the probe failed).
+    result: Result<Vec<Option<Mib>>, String>,
     elapsed: Duration,
 }
 
@@ -149,8 +162,8 @@ async fn fx_wait(cards: &mut [CardState]) -> (usize, Done) {
     std::future::poll_fn(|cx| {
         for (i, c) in cards.iter_mut().enumerate() {
             let polled = match &mut c.state {
-                State::Unloading { fx } => fx.as_mut().poll(cx).map(Done::Unloaded),
-                State::Restoring { fx } => fx.as_mut().poll(cx).map(Done::Reloaded),
+                State::Unloading { fx: Some(fx) } => fx.as_mut().poll(cx).map(Done::Unloaded),
+                State::Restoring { fx: Some(fx) } => fx.as_mut().poll(cx).map(Done::Reloaded),
                 State::Jobs { offload: Some(fx) } => fx.as_mut().poll(cx).map(Done::Offloaded),
                 _ => continue,
             };
@@ -176,26 +189,36 @@ impl Log {
     }
 }
 
-/// What effects need from the outside world.
+/// What effects need from the outside world: the backend and the cards they work on.
 #[derive(Clone)]
 struct Env {
     backend: Arc<dyn Backend>,
-    probe: Arc<dyn VramProbe>,
-    card: String,
+    probes: Vec<Arc<dyn VramProbe>>,
+    names: Vec<String>,
     t: Arc<Tuning>,
     log: Log,
 }
 
 impl Env {
-    /// VRAM in use now; None (and a history line) when the probe fails.
-    async fn used(&self) -> Option<Mib> {
-        match timed_read(self.probe.clone()).await {
+    /// VRAM in use now on the `k`th card; None (and a history line) when the probe fails.
+    async fn used_on(&self, k: usize) -> Option<Mib> {
+        match timed_read(self.probes[k].clone()).await {
             Ok(r) => Some(r.used_mib),
             Err(e) => {
-                self.log.say(format!("cannot read VRAM ({e})"));
+                if self.names.len() > 1 {
+                    self.log
+                        .say(format!("cannot read VRAM on {} ({e})", self.names[k]));
+                } else {
+                    self.log.say(format!("cannot read VRAM ({e})"));
+                }
                 None
             }
         }
+    }
+
+    /// VRAM in use now on every card, read concurrently.
+    async fn used_all(&self) -> Vec<Option<Mib>> {
+        join_all((0..self.probes.len()).map(|k| self.used_on(k))).await
     }
 }
 
@@ -219,7 +242,7 @@ async fn unload(env: Env) -> Unloaded {
     let result = match steps {
         Ok(()) => {
             sleep(env.t.driver_settle).await; // let the driver hand the memory back
-            Ok(env.used().await)
+            Ok(env.used_all().await)
         }
         Err(e) => Err(e.to_string()),
     };
@@ -252,29 +275,50 @@ async fn unload_steps(
 }
 
 /// Don't reload a card-filling model while a finished job still holds VRAM: it would spill
-/// into system RAM and run several times slower.
-async fn wait_for_floor(env: &Env, floor: Mib) {
-    let limit = floor.saturating_add(env.t.reload_slack_mib);
+/// into system RAM and run several times slower. `floors[k]` is the level of the `k`th card
+/// right after the unload; cards without one are not waited for.
+async fn wait_for_floor(env: &Env, floors: &[Option<Mib>]) {
+    let slack = env.t.reload_slack_mib;
     let deadline = Instant::now() + env.t.reload_wait;
-    let Some(mut used) = env.used().await else {
+    // (card, used, floor) of every card still above its limit; None when a probe failed.
+    let over = |used: &[Option<Mib>]| -> Option<Vec<(usize, Mib, Mib)>> {
+        let mut high = Vec::new();
+        for (k, floor) in floors.iter().enumerate() {
+            let Some(floor) = *floor else { continue };
+            let u = used.get(k).copied().flatten()?;
+            if u > floor.saturating_add(slack) {
+                high.push((k, u, floor));
+            }
+        }
+        Some(high)
+    };
+    let Some(mut high) = over(&env.used_all().await) else {
         return;
     };
-    if used <= limit {
-        return;
+    let on = |k: usize| {
+        if env.names.len() > 1 {
+            format!(" on {}", env.names[k])
+        } else {
+            String::new()
+        }
+    };
+    if let Some(&(k, used, floor)) = high.first() {
+        env.log.say(format!(
+            "waiting for VRAM to drain before reload ({used} MiB used{}, floor {floor})",
+            on(k)
+        ));
     }
-    env.log.say(format!(
-        "waiting for VRAM to drain before reload ({used} MiB used, floor {floor})"
-    ));
-    while used > limit && Instant::now() < deadline {
+    while !high.is_empty() && Instant::now() < deadline {
         sleep(env.t.driver_settle.max(MIN_POLL)).await;
-        match env.used().await {
-            Some(u) => used = u,
+        match over(&env.used_all().await) {
+            Some(h) => high = h,
             None => return,
         }
     }
-    if used > limit {
+    if let Some(&(k, used, _)) = high.first() {
         env.log.say(format!(
-            "VRAM still {used} MiB after {}s; reloading anyway",
+            "VRAM still {used} MiB{} after {}s; reloading anyway",
+            on(k),
             env.t.reload_wait.as_secs_f64()
         ));
     }
@@ -285,12 +329,12 @@ async fn reload(
     env: Env,
     resident: String,
     had_saved: bool,
-    floor: Option<Mib>,
+    floors: Vec<Option<Mib>>,
     kind: RestoreKind,
 ) -> Reloaded {
     let started = Instant::now();
-    if let Some(floor) = floor {
-        wait_for_floor(&env, floor).await;
+    if floors.iter().any(Option::is_some) {
+        wait_for_floor(&env, &floors).await;
     }
     if kind == RestoreKind::Card {
         env.log.say(format!("reloading {resident}"));
@@ -312,29 +356,52 @@ async fn reload(
 
 /// Run the offload hook, let the card settle, measure again.
 async fn offload(env: Env, hook: Arc<dyn OffloadHook>) -> Option<Mib> {
-    if !hook.run(&env.card).await {
+    if !hook.run(&env.names[0]).await {
         env.log.say("offload hook failed");
     }
     sleep(env.t.offload_settle).await;
-    env.used().await
+    env.used_on(0).await
 }
 
 // ------------------------------------------------------------------------ records
 
 /// Which card or cards a waiter can be served on.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 enum Target {
     Card(usize),
     /// Any card that can be steered (see `Actor::steer`).
     Any,
+    /// All of these cards at once (at least two).
+    Set(Vec<usize>),
+    /// Any this many cards that can be steered, at once (at least two).
+    Count(usize),
 }
 
 impl Target {
-    /// `steer[c]`: card `c` can be picked for an `Any` job.
-    fn can_use(self, card: usize, steer: &[bool]) -> bool {
+    /// `steer[c]`: card `c` can be picked for an `Any` or `Count` job.
+    fn can_use(&self, card: usize, steer: &[bool]) -> bool {
         match self {
-            Target::Card(c) => c == card,
-            Target::Any => steer.get(card).copied().unwrap_or(false),
+            Target::Card(c) => *c == card,
+            Target::Set(s) => s.contains(&card),
+            Target::Any | Target::Count(_) => steer.get(card).copied().unwrap_or(false),
+        }
+    }
+
+    /// How many cards it takes at once.
+    fn need(&self) -> usize {
+        match self {
+            Target::Card(_) | Target::Any => 1,
+            Target::Set(s) => s.len(),
+            Target::Count(n) => *n,
+        }
+    }
+
+    /// The cards of a fixed target; empty for `Any` and `Count`.
+    fn fixed(&self) -> Vec<usize> {
+        match self {
+            Target::Card(c) => vec![*c],
+            Target::Set(s) => s.clone(),
+            Target::Any | Target::Count(_) => Vec::new(),
         }
     }
 }
@@ -365,6 +432,7 @@ struct Waiter {
     note: String,
     /// When it was first held behind a batch lease.
     held_at: Option<Instant>,
+    /// For an LLM request: the cards its model runs on.
     target: Target,
     want: Want,
 }
@@ -381,6 +449,13 @@ impl Waiter {
     fn can_use(&self, card: usize, steer: &[bool]) -> bool {
         self.target.can_use(card, steer)
     }
+
+    fn vram(&self) -> Option<Vram> {
+        match self.want {
+            Want::Job { vram, .. } => Some(vram),
+            Want::Llm { .. } => None,
+        }
+    }
 }
 
 struct LeaseRec {
@@ -390,19 +465,22 @@ struct LeaseRec {
     class: String,
     prio: u32,
     name: String,
+    /// Declared per card.
     vram: Vram,
     yieldable: bool,
     yield_tx: watch::Sender<bool>,
     since: SystemTime,
     pid: Option<u32>,
+    /// The cards it holds, in grant order.
+    cards: Vec<usize>,
 }
 
-/// An LLM request is held back by any waiting job that outranks it and could take the LLM
-/// card. Jobs for other cards do not count.
-fn blocked(waiters: &[Waiter], key: (u32, u64), llm: usize, steer: &[bool]) -> bool {
+/// An LLM request is held back by any waiting job that outranks it and could take one of the
+/// cards its model needs. Jobs for other cards do not count.
+fn blocked(waiters: &[Waiter], key: (u32, u64), cards: &[usize], steer: &[bool]) -> bool {
     waiters
         .iter()
-        .any(|w| !w.is_llm() && w.key() < key && w.can_use(llm, steer))
+        .any(|w| !w.is_llm() && w.key() < key && cards.iter().any(|&c| w.can_use(c, steer)))
 }
 
 /// What a card needs to decide whether a request fits.
@@ -454,6 +532,17 @@ fn age_s(t: SystemTime) -> f64 {
     t.elapsed().map_or(0.0, |d| d.as_secs_f64())
 }
 
+/// Keep the first of each index.
+fn dedup(v: impl IntoIterator<Item = usize>) -> Vec<usize> {
+    let mut out: Vec<usize> = Vec::new();
+    for c in v {
+        if !out.contains(&c) {
+            out.push(c);
+        }
+    }
+    out
+}
+
 // ------------------------------------------------------------------------ the actor
 
 /// Everything that belongs to one card.
@@ -461,13 +550,15 @@ struct CardState {
     name: String,
     probe: Arc<dyn VramProbe>,
     env: Vec<(String, String)>,
+    vendor: String,
     limits: Limits,
     state: State,
-    leases: Vec<LeaseRec>,
     /// VRAM in use with no lease held (driver, desktop).
     baseline: Option<Mib>,
     /// VRAM in use right after the last unload.
     floor: Option<Mib>,
+    /// Size of the card, from the last good reading.
+    total: Option<Mib>,
     grace_until: Instant,
     /// None: no lease has ended yet.
     released_at: Option<Instant>,
@@ -486,12 +577,17 @@ struct Actor {
     weak: mpsc::WeakUnboundedSender<Msg>,
 
     cards: Vec<CardState>,
-    /// Index of the card the LLM backend lives on.
-    llm: usize,
     /// Per card: can it be picked for an `Any` job.
     steer: Vec<bool>,
+    leases: Vec<LeaseRec>,
 
-    // The LLM side: it lives on card `llm`.
+    // The LLM side. Its cards are the ones not in `Jobs`.
+    /// Cards a model uses when nothing more specific is known; never empty.
+    home: Vec<usize>,
+    /// Canonical model id to its cards, from the config.
+    model_cards: HashMap<String, Vec<usize>>,
+    /// Canonical model id to the VRAM it needs, from the config.
+    model_vram: HashMap<String, Mib>,
     inflight: usize,
     last_llm: Instant,
     last_llm_class: String,
@@ -540,7 +636,7 @@ impl Actor {
     fn new(
         settings: Settings,
         cards: Vec<super::Card>,
-        llm: usize,
+        llm_card: usize,
         backend: Arc<dyn Backend>,
         hook: Option<Arc<dyn OffloadHook>>,
         weak: mpsc::WeakUnboundedSender<Msg>,
@@ -548,6 +644,20 @@ impl Actor {
         let now = Instant::now();
         let many = cards.len() > 1;
         let steer = cards.iter().map(|c| !many || !c.env.is_empty()).collect();
+        let index = |n: &String| cards.iter().position(|c| &c.name == n);
+        let mut home = dedup(settings.llm.cards.iter().filter_map(index));
+        if home.is_empty() {
+            home = vec![llm_card];
+        }
+        let model_cards = settings
+            .llm
+            .model_cards
+            .iter()
+            .filter_map(|(m, names)| {
+                let v = dedup(names.iter().filter_map(index));
+                (!v.is_empty()).then(|| (m.clone(), v))
+            })
+            .collect();
         let cards = cards
             .into_iter()
             .enumerate()
@@ -555,19 +665,20 @@ impl Actor {
                 name: c.name,
                 probe: c.probe,
                 env: c.env,
+                vendor: c.vendor,
                 limits: Limits {
                     margin_mib: c.margin_mib,
                     whole_card_baseline_mib: c.whole_card_baseline_mib,
                 },
-                // Only the LLM card ever holds the LLM; the rest are job cards for good.
-                state: if i == llm {
+                // The LLM starts on its home cards; `start` corrects that from what is loaded.
+                state: if home.contains(&i) {
                     State::Llm { retry_at: None }
                 } else {
                     State::Jobs { offload: None }
                 },
-                leases: Vec::new(),
                 baseline: None,
                 floor: None,
+                total: None,
                 grace_until: now,
                 released_at: None,
                 released_class: String::new(),
@@ -583,8 +694,11 @@ impl Actor {
             hook,
             weak,
             cards,
-            llm,
             steer,
+            leases: Vec::new(),
+            home,
+            model_cards,
+            model_vram: settings.llm.model_vram,
             inflight: 0,
             last_llm: now,
             last_llm_class: "llm".into(),
@@ -600,23 +714,42 @@ impl Actor {
         }
     }
 
-    fn env(&self, card: usize) -> Env {
+    fn env(&self, cards: &[usize]) -> Env {
         Env {
             backend: self.backend.clone(),
-            probe: self.cards[card].probe.clone(),
-            card: self.cards[card].name.clone(),
+            probes: cards.iter().map(|&c| self.cards[c].probe.clone()).collect(),
+            names: cards.iter().map(|&c| self.cards[c].name.clone()).collect(),
             t: self.t.clone(),
             log: Log(self.weak.clone()),
         }
     }
 
+    fn names(&self, cards: &[usize]) -> Vec<String> {
+        cards.iter().map(|&c| self.cards[c].name.clone()).collect()
+    }
+
     /// " on gpu1" when there is more than one card, else nothing, so single-card history
     /// keeps its wording.
     fn on(&self, card: usize) -> String {
+        self.on_set(&[card])
+    }
+
+    /// " on gpu0,gpu1", or nothing with a single card.
+    fn on_set(&self, cards: &[usize]) -> String {
         if self.cards.len() > 1 {
-            format!(" on {}", self.cards[card].name)
+            format!(" on {}", self.names(cards).join(","))
         } else {
             String::new()
+        }
+    }
+
+    /// How a target reads in history and status: "gpu1", "gpu0,gpu1", "any", "any 2".
+    fn target_name(&self, t: &Target) -> String {
+        match t {
+            Target::Card(c) => self.cards[*c].name.clone(),
+            Target::Set(s) => self.names(s).join(","),
+            Target::Any => "any".to_owned(),
+            Target::Count(n) => format!("any {n}"),
         }
     }
 
@@ -658,6 +791,7 @@ impl Actor {
             match result {
                 Ok(r) => {
                     self.cards[i].probe_error = None;
+                    self.cards[i].total = Some(r.total_mib);
                     out[i] = Some(r);
                 }
                 Err(e) => {
@@ -672,29 +806,164 @@ impl Actor {
         out
     }
 
+    // -------------------------------------------------------------- cards and leases
+
+    fn index(&self, name: &str) -> Option<usize> {
+        self.cards.iter().position(|c| c.name == name)
+    }
+
+    /// The leases holding `card`.
+    fn held(&self, card: usize) -> impl Iterator<Item = &LeaseRec> + '_ {
+        self.leases.iter().filter(move |l| l.cards.contains(&card))
+    }
+
+    fn busy(&self, card: usize) -> bool {
+        self.held(card).next().is_some()
+    }
+
+    fn held_vram(&self, card: usize) -> Vec<Vram> {
+        self.held(card).map(|l| l.vram).collect()
+    }
+
+    /// The cards the LLM holds now (unloading and restoring included), in card order.
+    fn llm_set(&self) -> Vec<usize> {
+        (0..self.cards.len())
+            .filter(|&c| self.cards[c].state.is_llm())
+            .collect()
+    }
+
+    /// The phase of the LLM's cards; None when it holds none.
+    fn llm_phase(&self) -> Option<Phase> {
+        self.cards
+            .iter()
+            .find(|c| c.state.is_llm())
+            .map(|c| c.state.phase())
+    }
+
+    /// The env of several cards merged. A conflict cannot happen for leases (requests are
+    /// checked first); for the LLM it is logged and the cards' env is just concatenated.
+    fn merged_env(&self, cards: &[usize]) -> Vec<(String, String)> {
+        let parts = cards.iter().map(|&c| {
+            let k = &self.cards[c];
+            (k.name.as_str(), k.vendor.as_str(), k.env.as_slice())
+        });
+        merge_env(parts).unwrap_or_else(|e| {
+            tracing::warn!("{e}");
+            cards
+                .iter()
+                .flat_map(|&c| self.cards[c].env.iter().cloned())
+                .collect()
+        })
+    }
+
+    fn env_ok(&self, cards: &[usize]) -> bool {
+        merge_env(cards.iter().map(|&c| {
+            let k = &self.cards[c];
+            (k.name.as_str(), k.vendor.as_str(), k.env.as_slice())
+        }))
+        .is_ok()
+    }
+
+    /// VRAM a model can count on: the card's size minus its margin and what stays in use
+    /// without leases. Unknown before the first reading.
+    fn usable(&self, card: usize) -> Mib {
+        let c = &self.cards[card];
+        let used = c.floor.or(c.baseline).unwrap_or(0);
+        c.total
+            .unwrap_or(0)
+            .saturating_sub(c.limits.margin_mib)
+            .saturating_sub(used)
+    }
+
+    /// The cards a model runs on: its own list from the config, else the home cards, plus the
+    /// fewest other cards (largest first) that make room for the VRAM it needs.
+    fn placement(&self, model: &str) -> Vec<usize> {
+        let model = self.backend.resolve(model);
+        if let Some(cards) = self.model_cards.get(&model) {
+            return cards.clone();
+        }
+        let need = self
+            .model_vram
+            .get(&model)
+            .copied()
+            .or_else(|| self.backend.vram_estimate(&model));
+        let mut set = self.home.clone();
+        let Some(need) = need else {
+            return set;
+        };
+        let mut have: Mib = set.iter().map(|&c| self.usable(c)).sum();
+        let mut rest: Vec<usize> = (0..self.cards.len()).filter(|c| !set.contains(c)).collect();
+        rest.sort_by_key(|&c| std::cmp::Reverse(self.usable(c)));
+        for c in rest {
+            if have >= need {
+                break;
+            }
+            set.push(c);
+            have = have.saturating_add(self.usable(c));
+        }
+        set
+    }
+
+    /// Where the LLM goes when the cards go idle: the resident model's cards, else home.
+    fn llm_return(&self) -> Vec<usize> {
+        match &self.resident {
+            Some(r) => self.placement(r),
+            None => self.home.clone(),
+        }
+    }
+
+    /// Tell the backend which cards the next load uses, for servers gpuq starts itself.
+    fn place(&self, cards: &[usize]) {
+        let p = Placement {
+            cards: self.names(cards),
+            env: self.merged_env(cards),
+            free_mib: cards.iter().map(|&c| self.usable(c)).collect(),
+        };
+        self.backend.place(&p);
+    }
+
     /// Decide where to begin from what the backend has loaded.
     async fn start(&mut self) {
-        let l = self.llm;
+        let all: Vec<usize> = (0..self.cards.len()).collect();
+        let readings = self.read_cards(&all).await;
         match self.backend.loaded_gpu_models().await {
             Err(e) => {
-                // Backend down: assume it owns the card, it loads on demand.
+                // Backend down: assume it owns its cards, it loads on demand.
                 let kind = self.backend.kind();
                 self.warn(format!(
                     "cannot read {kind} state ({e}); starting in llm state"
                 ));
+                self.place(&self.home.clone());
             }
             Ok(loaded) if !loaded.is_empty() => {
-                self.event(format!("start: llm state, loaded {loaded:?}"));
+                let set = dedup(
+                    self.home
+                        .clone()
+                        .into_iter()
+                        .chain(loaded.iter().flat_map(|m| self.placement(m))),
+                );
+                for &c in &set {
+                    self.enter_llm_state(c, None);
+                }
+                self.place(&set);
+                let on = if set.len() > 1 {
+                    self.on_set(&set)
+                } else {
+                    String::new()
+                };
+                self.event(format!("start: llm state{on}, loaded {loaded:?}"));
             }
             Ok(_) => {
                 // Nothing loaded: maybe gpuq restarted under a running job. Give `gpu run`
                 // clients time to re-adopt their leases before reloading the LLM on top.
                 let grace = self.t.resume_grace;
-                self.cards[l].grace_until = Instant::now() + grace;
-                self.cards[l].state = State::Jobs { offload: None };
-                let used = self.read_cards(&[l]).await[l].map(|r| r.used_mib);
-                self.cards[l].baseline = used;
-                self.cards[l].floor = used;
+                for c in self.home.clone() {
+                    let card = &mut self.cards[c];
+                    card.grace_until = Instant::now() + grace;
+                    card.state = State::Jobs { offload: None };
+                    card.baseline = readings[c].map(|r| r.used_mib);
+                    card.floor = card.baseline;
+                }
                 self.event(format!(
                     "start: card empty, waiting {}s for leases to resume",
                     grace.as_secs_f64()
@@ -732,9 +1001,12 @@ impl Actor {
     fn enter_llm(&mut self, id: u64, model: String, class: String, reply: oneshot::Sender<()>) {
         let prio = self.classes.llm_prio(&class);
         let seq = self.take_seq();
-        let in_llm = matches!(self.cards[self.llm].state, State::Llm { .. });
+        let cards = self.placement(&model);
+        let in_llm = cards
+            .iter()
+            .all(|&c| matches!(self.cards[c].state, State::Llm { .. }));
         if in_llm
-            && !blocked(&self.waiters, (prio, seq), self.llm, &self.steer)
+            && !blocked(&self.waiters, (prio, seq), &cards, &self.steer)
             && !self.needs_slot_restore(&model)
         {
             if reply.send(()).is_ok() {
@@ -742,8 +1014,12 @@ impl Actor {
             }
             return;
         }
-        let phase = self.cards[self.llm].state.phase().name();
+        let phase = self.cards[cards[0]].state.phase().name();
         self.event(format!("hold {class} request for {model} (state {phase})"));
+        let target = match cards[..] {
+            [c] => Target::Card(c),
+            _ => Target::Set(cards),
+        };
         self.waiters.push(Waiter {
             id,
             seq,
@@ -753,20 +1029,26 @@ impl Actor {
             since: SystemTime::now(),
             note: String::new(),
             held_at: None,
-            target: Target::Card(self.llm),
+            target,
             want: Want::Llm { model, reply },
         });
     }
 
-    /// The card a request names. Unknown names fall back to the primary card; the handle
-    /// has already rejected them.
+    /// The cards a request names. Unknown names were refused by the handle already.
     fn resolve(&self, sel: &CardSel) -> Target {
+        let set = |v: Vec<usize>| match v[..] {
+            [] => Target::Card(0),
+            [c] => Target::Card(c),
+            _ => Target::Set(v),
+        };
         match sel {
-            CardSel::Primary => Target::Card(0),
-            CardSel::Named(n) => {
-                Target::Card(self.cards.iter().position(|c| &c.name == n).unwrap_or(0))
-            }
-            CardSel::Any => Target::Any,
+            CardSel::Default if self.steer.iter().any(|&s| s) => Target::Any,
+            CardSel::Default | CardSel::Primary => Target::Card(0),
+            CardSel::Named(n) => Target::Card(self.index(n).unwrap_or(0)),
+            CardSel::Any | CardSel::Count(0 | 1) => Target::Any,
+            CardSel::Count(n) => Target::Count(*n),
+            CardSel::Set(names) => set(dedup(names.iter().filter_map(|n| self.index(n)))),
+            CardSel::All => set((0..self.cards.len()).collect()),
         }
     }
 
@@ -774,30 +1056,41 @@ impl Actor {
         let prio = self.classes.job_prio(&req.class);
         let target = self.resolve(&req.card);
         if let Some(resume) = req.resume_id.clone().filter(|r| !r.is_empty()) {
-            let card = match target {
-                Target::Card(c) => c,
-                Target::Any => self.steer.iter().position(|&s| s).unwrap_or(0),
-            };
-            let lease = LeaseRec::new(resume.clone(), None, &req.class, prio, &req);
-            if card == self.llm && matches!(self.cards[card].state, State::Llm { .. }) {
+            let mut cards = target.fixed();
+            if cards.is_empty() {
+                cards = (0..self.cards.len())
+                    .filter(|&c| self.steer[c])
+                    .take(target.need())
+                    .collect();
+            }
+            if cards.is_empty() {
+                cards.push(0);
+            }
+            let lease = LeaseRec::new(resume.clone(), None, &req.class, prio, &req, cards);
+            let on = self.on_set(&lease.0.cards);
+            if lease
+                .0
+                .cards
+                .iter()
+                .any(|&c| matches!(self.cards[c].state, State::Llm { .. }))
+            {
                 let kind = self.backend.kind();
                 self.warn(format!(
                     "lease {resume} resumed while {kind} holds the card"
                 ));
             }
-            let on = self.on(card);
             self.event(format!(
                 "resume lease {resume} {}/{}{on}",
                 req.class, req.name
             ));
-            self.install(card, lease, reply);
+            self.install(lease, reply);
             return;
         }
         let seq = self.take_seq();
-        let on = match target {
-            Target::Card(c) => self.on(c),
-            Target::Any if self.cards.len() > 1 => " on any".to_owned(),
-            Target::Any => String::new(),
+        let on = if self.cards.len() > 1 {
+            format!(" on {}", self.target_name(&target))
+        } else {
+            String::new()
         };
         self.event(format!(
             "queue {}/{}{on} vram={}",
@@ -827,26 +1120,25 @@ impl Actor {
         self.next_seq
     }
 
-    /// Record a lease on `card` and tell its owner. If the owner is already gone, take it back.
+    /// Record a lease on its cards and tell its owner. If the owner is already gone, take it
+    /// back.
     fn install(
         &mut self,
-        card: usize,
         (lease, yield_rx): (LeaseRec, watch::Receiver<bool>),
         reply: oneshot::Sender<Granted>,
     ) {
         let id = lease.id.clone();
-        let c = &mut self.cards[card];
-        c.leases.push(lease);
         let granted = Granted {
             id: id.clone(),
-            card: c.name.clone(),
-            env: c.env.clone(),
+            cards: self.names(&lease.cards),
+            env: self.merged_env(&lease.cards),
             yield_rx,
         };
+        self.leases.push(lease);
         if reply.send(granted).is_err() {
-            if let Some(i) = self.cards[card].leases.iter().position(|l| l.id == id) {
-                let lease = self.cards[card].leases.remove(i);
-                self.log_release(card, &lease);
+            if let Some(i) = self.leases.iter().position(|l| l.id == id) {
+                let lease = self.leases.remove(i);
+                self.log_release(&lease);
             }
         }
     }
@@ -856,16 +1148,10 @@ impl Actor {
             self.waiters.remove(i);
             return;
         }
-        let held = self.cards.iter().enumerate().find_map(|(c, card)| {
-            card.leases
-                .iter()
-                .position(|l| l.handle == Some(id))
-                .map(|i| (c, i))
-        });
-        if let Some((c, i)) = held {
+        if let Some(i) = self.leases.iter().position(|l| l.handle == Some(id)) {
             // Granted in the same breath as the client went away.
-            let lease = self.cards[c].leases.remove(i);
-            self.after_release(c, lease);
+            let lease = self.leases.remove(i);
+            self.after_release(lease);
         } else if let Some(i) = self.recent_admits.iter().position(|&a| a == id) {
             self.recent_admits.remove(i);
             self.inflight = self.inflight.saturating_sub(1);
@@ -874,19 +1160,14 @@ impl Actor {
     }
 
     fn release(&mut self, id: &str) {
-        let held = self
-            .cards
-            .iter()
-            .enumerate()
-            .find_map(|(c, card)| card.leases.iter().position(|l| l.id == id).map(|i| (c, i)));
-        if let Some((c, i)) = held {
-            let lease = self.cards[c].leases.remove(i);
-            self.after_release(c, lease);
+        if let Some(i) = self.leases.iter().position(|l| l.id == id) {
+            let lease = self.leases.remove(i);
+            self.after_release(lease);
         }
     }
 
-    fn log_release(&mut self, card: usize, lease: &LeaseRec) {
-        let on = self.on(card);
+    fn log_release(&mut self, lease: &LeaseRec) {
+        let on = self.on_set(&lease.cards);
         self.event(format!(
             "release lease {} {}/{}{on} after {:.0}s",
             lease.id,
@@ -896,13 +1177,15 @@ impl Actor {
         ));
     }
 
-    fn after_release(&mut self, card: usize, lease: LeaseRec) {
-        self.log_release(card, &lease);
-        let c = &mut self.cards[card];
-        if c.leases.is_empty() {
-            c.baseline = None; // re-measured once the job's memory is gone
-            c.released_at = Some(Instant::now());
-            c.released_class = lease.class;
+    fn after_release(&mut self, lease: LeaseRec) {
+        self.log_release(&lease);
+        for &c in &lease.cards {
+            if !self.busy(c) {
+                let card = &mut self.cards[c];
+                card.baseline = None; // re-measured once the job's memory is gone
+                card.released_at = Some(Instant::now());
+                card.released_class = lease.class.clone();
+            }
         }
     }
 
@@ -921,10 +1204,10 @@ impl Actor {
     /// Whether card `i` needs a fresh reading this pass.
     fn needs_read(&self, i: usize) -> bool {
         let c = &self.cards[i];
-        if !matches!(c.state, State::Jobs { offload: None }) {
+        if !c.state.is_idle_jobs() {
             return false;
         }
-        if c.leases.is_empty() {
+        if !self.busy(i) {
             // Not before the driver has had time to hand the memory back.
             return c
                 .released_at
@@ -945,17 +1228,17 @@ impl Actor {
         self.deadline = None;
         for _ in 0..MAX_PASSES {
             let readings = self.preread().await;
-            let llm_was_home = matches!(self.cards[self.llm].state, State::Llm { .. });
+            let llm_was_home = self.llm_phase() == Some(Phase::Llm);
             let mut again = false;
             // Job cards first, so an `Any` job that fits somewhere is placed before the LLM
-            // card is asked to hand over.
+            // is asked to hand over.
             for i in 0..self.cards.len() {
                 if matches!(self.cards[i].state, State::Jobs { .. }) {
                     again |= self.step_jobs(i, &readings);
                 }
             }
-            if llm_was_home {
-                again |= self.step_llm();
+            if llm_was_home && self.llm_phase() == Some(Phase::Llm) {
+                again |= self.step_llm(&readings);
             }
             // Unloading and Restoring are driven by their effect.
             if !again {
@@ -967,8 +1250,8 @@ impl Actor {
     /// An effect finished: move to the phase it was heading for.
     fn finish(&mut self, card: usize, done: Done) {
         match done {
-            Done::Unloaded(u) => self.finish_unload(card, u),
-            Done::Reloaded(r) => self.finish_reload(card, r),
+            Done::Unloaded(u) => self.finish_unload(u),
+            Done::Reloaded(r) => self.finish_reload(r),
             Done::Offloaded(measured) => {
                 if measured.is_some() {
                     self.cards[card].baseline = measured;
@@ -978,28 +1261,47 @@ impl Actor {
         }
     }
 
-    fn finish_unload(&mut self, card: usize, u: Unloaded) {
+    fn finish_unload(&mut self, u: Unloaded) {
         self.saved.extend(u.saved);
+        let group: Vec<usize> = (0..self.cards.len())
+            .filter(|&c| matches!(self.cards[c].state, State::Unloading { .. }))
+            .collect();
         match u.result {
             Err(e) => {
                 self.event(format!("unload failed ({e}); staying in llm state"));
-                self.enter_llm_state(card, Some(Instant::now() + UNLOAD_BACKOFF));
+                let retry = Some(Instant::now() + UNLOAD_BACKOFF);
+                for c in group {
+                    self.enter_llm_state(c, retry);
+                }
             }
             Ok(used) => {
-                let c = &mut self.cards[card];
-                c.baseline = used;
-                c.floor = used;
-                c.state = State::Jobs { offload: None };
-                let used = used.map_or_else(|| "?".to_owned(), |m| m.to_string());
-                self.event(format!(
-                    "card free in {:.1}s (VRAM {used} MiB still in use)",
-                    u.elapsed.as_secs_f64()
-                ));
+                let mut levels = Vec::new();
+                for (k, &c) in group.iter().enumerate() {
+                    let u = used.get(k).copied().flatten();
+                    let card = &mut self.cards[c];
+                    card.baseline = u;
+                    card.floor = u;
+                    card.state = State::Jobs { offload: None };
+                    levels.push(u.map_or_else(|| "?".to_owned(), |m| m.to_string()));
+                }
+                let secs = u.elapsed.as_secs_f64();
+                if group.len() > 1 {
+                    let names = self.names(&group).join(",");
+                    self.event(format!(
+                        "cards {names} free in {secs:.1}s (VRAM {} MiB still in use)",
+                        levels.join(", ")
+                    ));
+                } else {
+                    self.event(format!(
+                        "card free in {secs:.1}s (VRAM {} MiB still in use)",
+                        levels.join(", ")
+                    ));
+                }
             }
         }
     }
 
-    fn finish_reload(&mut self, card: usize, r: Reloaded) {
+    fn finish_reload(&mut self, r: Reloaded) {
         if r.had_saved {
             if let Some(resident) = self.resident.clone() {
                 self.saved.remove(&resident);
@@ -1009,7 +1311,11 @@ impl Actor {
                 }
             }
         }
-        self.enter_llm_state(card, None);
+        for c in 0..self.cards.len() {
+            if matches!(self.cards[c].state, State::Restoring { .. }) {
+                self.enter_llm_state(c, None);
+            }
+        }
         if r.kind == RestoreKind::Card {
             self.last_llm = Instant::now();
             self.event(format!("llm state ({:.1}s)", r.elapsed.as_secs_f64()));
@@ -1031,13 +1337,14 @@ impl Actor {
             .map(|(i, _)| i)
     }
 
-    /// Set a waiter's `why`. An `Any` waiter also says which card it is talking about.
+    /// Set a waiter's `why`. A waiter that is not pinned to one card also says which card it
+    /// is talking about.
     fn note(&mut self, idx: usize, card: usize, text: String) {
         let w = &mut self.waiters[idx];
-        w.note = if w.target == Target::Any {
-            format!("{}: {text}", self.cards[card].name)
-        } else {
+        w.note = if matches!(w.target, Target::Card(_)) {
             text
+        } else {
+            format!("{}: {text}", self.cards[card].name)
         };
     }
 
@@ -1069,12 +1376,20 @@ impl Actor {
             .collect();
         keys.sort_unstable();
         for key in keys {
-            if blocked(&self.waiters, key, self.llm, &self.steer) {
-                continue;
-            }
             let Some(idx) = self.waiters.iter().position(|w| w.key() == key) else {
                 continue;
             };
+            let cards = self.waiters[idx].target.fixed();
+            // A model that needs a card the LLM does not hold yet waits for step_jobs.
+            if !cards
+                .iter()
+                .all(|&c| matches!(self.cards[c].state, State::Llm { .. }))
+            {
+                continue;
+            }
+            if blocked(&self.waiters, key, &cards, &self.steer) {
+                continue;
+            }
             let restore = match &self.waiters[idx].want {
                 Want::Llm { model, .. } => self.needs_slot_restore(model),
                 Want::Job { .. } => continue,
@@ -1082,7 +1397,8 @@ impl Actor {
             if restore {
                 if let Some(resident) = self.resident.clone() {
                     self.event(format!("restoring {resident} slot before serving it"));
-                    self.start_reload(resident, RestoreKind::Slot);
+                    let set = self.llm_set();
+                    self.start_reload(resident, RestoreKind::Slot, set);
                     return true;
                 }
             }
@@ -1102,17 +1418,28 @@ impl Actor {
         false
     }
 
-    /// Llm phase of the LLM card: hand the card to the top job once it may have it.
+    /// Llm phase of the LLM's cards: hand them to the top job once it may have them.
     /// True = phase changed.
-    fn step_llm(&mut self) -> bool {
-        let l = self.llm;
+    fn step_llm(&mut self, readings: &[Option<VramReading>]) -> bool {
         if self.admit_llm() {
             return true;
         }
-        let Some(idx) = self.top_for(l) else {
+        let set = self.llm_set();
+        // The best job that is first in line on one of the LLM's cards.
+        let best = set
+            .iter()
+            .filter_map(|&c| {
+                self.top_for(c)
+                    .filter(|&k| !self.waiters[k].is_llm())
+                    .map(|k| (k, c))
+            })
+            .min_by_key(|&(k, _)| self.waiters[k].key());
+        let Some((idx, l)) = best else {
             return false;
         };
-        if self.waiters[idx].is_llm() {
+        // A job for several cards only takes the LLM's cards once the rest of what it needs
+        // is free: no point unloading the LLM while it would still wait for another card.
+        if !self.ready_elsewhere(idx, &set, readings) {
             return false;
         }
         if self.inflight > 0 {
@@ -1143,22 +1470,58 @@ impl Actor {
                 return false;
             }
         }
-        let kind = self.backend.kind();
-        self.event(format!("unloading {kind}"));
-        self.cards[l].state = State::Unloading {
-            fx: Box::pin(unload(self.env(l))),
-        };
+        self.start_unload(set);
         true
     }
 
-    /// Jobs phase of card `i`: grant leases, or (LLM card) give the card back to the LLM.
+    /// Unload the backend from all of its cards.
+    fn start_unload(&mut self, set: Vec<usize>) {
+        let kind = self.backend.kind();
+        if set.len() > 1 {
+            let names = self.names(&set).join(",");
+            self.event(format!("unloading {kind} from {names}"));
+        } else {
+            self.event(format!("unloading {kind}"));
+        }
+        let fx: Fx<Unloaded> = Box::pin(unload(self.env(&set)));
+        for &c in &set[1..] {
+            self.cards[c].state = State::Unloading { fx: None };
+        }
+        self.cards[set[0]].state = State::Unloading { fx: Some(fx) };
+    }
+
+    /// Whether a job that is first in line on an LLM card has the rest of its cards ready,
+    /// so the LLM can be unloaded for it.
+    fn ready_elsewhere(&self, idx: usize, llm: &[usize], readings: &[Option<VramReading>]) -> bool {
+        let w = &self.waiters[idx];
+        let Some(vram) = w.vram() else {
+            return true;
+        };
+        let ready = |c: usize| {
+            self.cards[c].state.is_idle_jobs()
+                && self.top_for(c) == Some(idx)
+                && readings[c].is_some_and(|r| self.fits_now(c, vram, r))
+        };
+        match &w.target {
+            Target::Set(s) => s.iter().filter(|c| !llm.contains(c)).all(|&c| ready(c)),
+            Target::Count(n) => {
+                let inside = llm.iter().filter(|&&c| self.steer[c]).count();
+                let outside = (0..self.cards.len())
+                    .filter(|&c| self.steer[c] && !llm.contains(&c) && ready(c))
+                    .count();
+                inside + outside >= *n
+            }
+            Target::Card(_) | Target::Any => true,
+        }
+    }
+
+    /// Jobs phase of card `i`: grant leases, or give the card (back) to the LLM.
     /// True = go again.
     fn step_jobs(&mut self, i: usize, readings: &[Option<VramReading>]) -> bool {
         if !self.cards[i].state.is_idle_jobs() {
             return false; // the hook is running; its completion triggers the next pass
         }
-        let mut reading = None;
-        if self.cards[i].leases.is_empty() {
+        if !self.busy(i) {
             // Once the driver has had time to hand the memory back, measure what is left.
             if let Some(at) = self.cards[i].released_at {
                 let ready = at + self.t.driver_settle;
@@ -1167,8 +1530,7 @@ impl Actor {
                     return false;
                 }
             }
-            reading = readings[i];
-            if let Some(r) = reading {
+            if let Some(r) = readings[i] {
                 self.cards[i].baseline = Some(r.used_mib);
             }
         }
@@ -1178,25 +1540,35 @@ impl Actor {
         if self.waiters[idx].is_llm() {
             self.serve_llm_waiter(i, idx)
         } else {
-            self.serve_job_waiter(i, idx, reading.or(readings[i]), readings)
+            self.serve_job_waiter(i, idx, readings)
         }
     }
 
-    /// The LLM card has been left alone long enough: bring the resident model back.
-    /// Other cards have no LLM and nothing to reload.
+    /// The LLM's cards have been left alone long enough: bring the resident model back.
     fn maybe_reload_idle(&mut self, i: usize) -> bool {
-        let c = &self.cards[i];
-        if i != self.llm
-            || !c.leases.is_empty()
+        if self.llm_phase().is_some()
+            || self.busy(i)
             || !(self.t.reload_when_idle || self.resident.is_none())
         {
             return false;
         }
-        let delay = self.t.reload_delay_after(&c.released_class);
-        let not_before = match c.released_at {
-            Some(at) => c.grace_until.max(at + delay),
-            None => c.grace_until,
-        };
+        let cards = self.llm_return();
+        if !cards.contains(&i) {
+            return false;
+        }
+        let mut not_before = Instant::now();
+        for &c in &cards {
+            if !self.cards[c].state.is_idle_jobs() || self.busy(c) || self.top_for(c).is_some() {
+                return false;
+            }
+            let card = &self.cards[c];
+            let delay = self.t.reload_delay_after(&card.released_class);
+            let at = match card.released_at {
+                Some(at) => card.grace_until.max(at + delay),
+                None => card.grace_until,
+            };
+            not_before = not_before.max(at);
+        }
         if Instant::now() >= not_before {
             self.start_restore(None);
             true
@@ -1207,77 +1579,220 @@ impl Actor {
     }
 
     fn serve_llm_waiter(&mut self, i: usize, idx: usize) -> bool {
-        if self.cards[i].leases.is_empty() {
-            let model = match &self.waiters[idx].want {
-                Want::Llm { model, .. } => model.clone(),
-                Want::Job { .. } => return false,
-            };
-            self.start_restore(Some(&model));
-            return true;
-        }
-        if self.hold_for_batch(i, idx, Instant::now()) {
+        if self.busy(i) {
+            if self.hold_for_batch(i, idx, Instant::now()) {
+                return false;
+            }
+            self.request_yield(i, self.waiters[idx].prio);
+            self.waiters[idx].note = format!("waiting for GPU job(s): {}", self.lease_names(i));
             return false;
         }
-        self.request_yield(i, self.waiters[idx].prio);
-        self.waiters[idx].note = format!("waiting for GPU job(s): {}", self.lease_names(i));
-        false
+        match self.llm_phase() {
+            Some(Phase::Llm) => {
+                // The LLM is up on other cards and this model needs this one too.
+                self.enter_llm_state(i, None);
+                let name = self.cards[i].name.clone();
+                self.event(format!("llm takes {name}"));
+                self.place(&self.llm_set());
+                true
+            }
+            // An unload or a reload is under way; its end triggers the next pass.
+            Some(_) => false,
+            None => {
+                let cards = self.waiters[idx].target.fixed();
+                let free = cards.iter().all(|&c| {
+                    self.cards[c].state.is_idle_jobs()
+                        && !self.busy(c)
+                        && self.top_for(c) == Some(idx)
+                });
+                if !free {
+                    return false;
+                }
+                let model = match &self.waiters[idx].want {
+                    Want::Llm { model, .. } => model.clone(),
+                    Want::Job { .. } => return false,
+                };
+                self.start_restore(Some(&model));
+                true
+            }
+        }
     }
 
-    fn serve_job_waiter(
-        &mut self,
-        i: usize,
-        idx: usize,
-        reading: Option<VramReading>,
-        readings: &[Option<VramReading>],
-    ) -> bool {
-        let Some(reading) = reading else {
+    fn serve_job_waiter(&mut self, i: usize, idx: usize, readings: &[Option<VramReading>]) -> bool {
+        let Some(reading) = readings[i] else {
             let why = self.cards[i].probe_error.clone().unwrap_or_default();
             self.note(idx, i, format!("cannot read VRAM: {why}"));
             return false;
         };
-        let (vram, prio, target) = match &self.waiters[idx].want {
-            Want::Job { vram, .. } => (*vram, self.waiters[idx].prio, self.waiters[idx].target),
-            Want::Llm { .. } => return false,
+        let Some(vram) = self.waiters[idx].vram() else {
+            return false;
         };
-        if self.fits_now(i, vram, reading) {
-            self.grant(i, idx);
+        let prio = self.waiters[idx].prio;
+        if let Some(cards) = self.pick(idx, readings) {
+            self.grant(&cards, idx);
             return true;
         }
-        // A pinned job works on its own card. An `Any` job picks one card to push on, so the
-        // other cards are not all asked to yield for it.
-        let (acts_here, why_card) = match target {
-            Target::Card(_) => (true, i),
-            Target::Any => match self.any_target(idx, readings) {
-                Some(j) => (j == i, j),
-                None => (false, i),
-            },
-        };
-        if acts_here {
+        // A pinned job works on its own card. A job that can go to several cards picks the
+        // ones to push on, so the other cards are not all asked to yield for it.
+        if self.push_cards(idx, readings).contains(&i) && !self.fits_now(i, vram, reading) {
             self.request_yield(i, prio);
-            if self.cards[i].leases.is_empty() {
+            if !self.busy(i) {
                 self.maybe_offload(i, idx);
             }
         }
-        if why_card == i {
-            let text = self.why_not_fit(i, vram, reading);
-            self.note(idx, i, text);
-        } else if let Some(r) = readings[why_card] {
-            let text = self.why_not_fit(why_card, vram, r);
-            self.note(idx, why_card, text);
-        }
+        self.explain(idx, i, readings);
         false
+    }
+
+    /// The cards to grant a job now, all of them fitting, or None.
+    fn pick(&self, idx: usize, readings: &[Option<VramReading>]) -> Option<Vec<usize>> {
+        let w = &self.waiters[idx];
+        let vram = w.vram()?;
+        let ok = |c: usize| {
+            self.cards[c].state.is_idle_jobs()
+                && self.top_for(c) == Some(idx)
+                && readings[c].is_some_and(|r| self.fits_now(c, vram, r))
+        };
+        match &w.target {
+            Target::Card(c) => ok(*c).then(|| vec![*c]),
+            Target::Set(s) => s.iter().all(|&c| ok(c)).then(|| s.clone()),
+            Target::Any | Target::Count(_) => {
+                let need = w.target.need();
+                let mut picked: Vec<usize> = Vec::new();
+                for c in 0..self.cards.len() {
+                    if picked.len() == need {
+                        break;
+                    }
+                    if !self.steer[c] || !ok(c) {
+                        continue;
+                    }
+                    picked.push(c);
+                    if !self.env_ok(&picked) {
+                        picked.pop();
+                    }
+                }
+                (picked.len() == need).then_some(picked)
+            }
+        }
+    }
+
+    /// The cards a job that cannot be granted yet pushes on: asks their holders to yield,
+    /// runs the offload hook on them.
+    fn push_cards(&self, idx: usize, readings: &[Option<VramReading>]) -> Vec<usize> {
+        let w = &self.waiters[idx];
+        let Some(vram) = w.vram() else {
+            return Vec::new();
+        };
+        // Free now, or free once lower yieldable leases leave (or the hook ran).
+        let fits = |c: usize| readings[c].is_some_and(|r| self.fits_now(c, vram, r));
+        let room = |c: usize| readings[c].is_some_and(|r| self.could_make_room(c, idx, r));
+        let first = |c: usize| self.cards[c].state.is_idle_jobs() && self.top_for(c) == Some(idx);
+        match &w.target {
+            Target::Card(c) => vec![*c],
+            Target::Any => self.any_target(idx, readings).into_iter().collect(),
+            Target::Set(s) => {
+                // Only when every card could be had: emptying one card is no use while
+                // another stays blocked.
+                let could = |c: usize| match self.cards[c].state {
+                    State::Jobs { offload: None } => first(c) && (fits(c) || room(c)),
+                    // The hook is running there, or the LLM holds it and is unloaded once
+                    // the rest is ready.
+                    _ => true,
+                };
+                if s.iter().all(|&c| could(c)) {
+                    s.clone()
+                } else {
+                    Vec::new()
+                }
+            }
+            Target::Count(n) => {
+                let cands = (0..self.cards.len()).filter(|&c| self.steer[c]);
+                let ready = cands.clone().filter(|&c| first(c) && fits(c)).count();
+                let llm = cands
+                    .clone()
+                    .filter(|&c| self.cards[c].state.is_llm())
+                    .count();
+                let pushable: Vec<usize> =
+                    cands.filter(|&c| first(c) && !fits(c) && room(c)).collect();
+                let short = n.saturating_sub(ready + llm);
+                if ready + llm + pushable.len() >= *n {
+                    pushable.into_iter().take(short).collect()
+                } else {
+                    Vec::new()
+                }
+            }
+        }
+    }
+
+    /// Fill in a job's `why`.
+    fn explain(&mut self, idx: usize, i: usize, readings: &[Option<VramReading>]) {
+        let Some(vram) = self.waiters[idx].vram() else {
+            return;
+        };
+        match self.waiters[idx].target.clone() {
+            Target::Card(_) => {
+                if let Some(r) = readings[i] {
+                    let text = self.why_not_fit(i, vram, r);
+                    self.note(idx, i, text);
+                }
+            }
+            Target::Any => {
+                let j = self.any_target(idx, readings).unwrap_or(i);
+                if let Some(r) = readings[j] {
+                    let text = self.why_not_fit(j, vram, r);
+                    self.note(idx, j, text);
+                }
+            }
+            target => {
+                let cards: Vec<usize> = match &target {
+                    Target::Set(s) => s.clone(),
+                    _ => (0..self.cards.len()).filter(|&c| self.steer[c]).collect(),
+                };
+                let mut ready = 0;
+                let mut first_reason = None;
+                for &c in &cards {
+                    let reason = if self.cards[c].state.is_llm() {
+                        Some(format!(
+                            "held by the LLM ({})",
+                            self.cards[c].state.phase().name()
+                        ))
+                    } else if !self.cards[c].state.is_idle_jobs() {
+                        Some("offload hook running".to_owned())
+                    } else if self.top_for(c) != Some(idx) {
+                        Some("a lease ahead in the queue waits for it".to_owned())
+                    } else {
+                        match readings[c] {
+                            None => Some("cannot read VRAM".to_owned()),
+                            Some(r) if !self.fits_now(c, vram, r) => {
+                                Some(self.why_not_fit(c, vram, r))
+                            }
+                            Some(_) => None,
+                        }
+                    };
+                    match reason {
+                        None => ready += 1,
+                        Some(r) if first_reason.is_none() => {
+                            first_reason = Some(format!("{}: {r}", self.cards[c].name));
+                        }
+                        Some(_) => {}
+                    }
+                }
+                let need = target.need();
+                let reason = first_reason.unwrap_or_default();
+                self.waiters[idx].note = format!("{ready} of {need} cards ready; {reason}");
+            }
+        }
     }
 
     fn fits_now(&self, card: usize, vram: Vram, reading: VramReading) -> bool {
         let c = &self.cards[card];
-        let held: Vec<Vram> = c.leases.iter().map(|l| l.vram).collect();
-        fits(vram, &held, c.baseline, reading, c.limits)
+        fits(vram, &self.held_vram(card), c.baseline, reading, c.limits)
     }
 
     fn why_not_fit(&self, card: usize, vram: Vram, reading: VramReading) -> String {
         let c = &self.cards[card];
         match vram {
-            Vram::WholeCard if !c.leases.is_empty() => {
+            Vram::WholeCard if self.busy(card) => {
                 "needs the whole card: other leases active".into()
             }
             Vram::WholeCard => match c.baseline {
@@ -1287,11 +1802,10 @@ impl Actor {
                 None => "needs the whole card: VRAM not measured yet".into(),
             },
             Vram::Mib(m) => {
-                let held: Vec<Vram> = c.leases.iter().map(|l| l.vram).collect();
                 let free = free_mib(
                     reading,
                     c.baseline,
-                    declared_mib(&held),
+                    declared_mib(&self.held_vram(card)),
                     c.limits.margin_mib,
                 );
                 format!("needs {m} MiB, {free} MiB free")
@@ -1313,20 +1827,20 @@ impl Actor {
     /// Whether yielding (or, on an empty card, the offload hook) could make the job fit on `card`.
     fn could_make_room(&self, card: usize, idx: usize, reading: VramReading) -> bool {
         let w = &self.waiters[idx];
-        let Want::Job { vram, .. } = w.want else {
+        let Some(vram) = w.vram() else {
             return false;
         };
         let c = &self.cards[card];
-        if c.leases.is_empty() {
+        let held: Vec<&LeaseRec> = self.held(card).collect();
+        if held.is_empty() {
             return self.hook.is_some() && !c.offload_tried.contains(&w.seq);
         }
-        let stays: Vec<Vram> = c
-            .leases
+        let stays: Vec<Vram> = held
             .iter()
             .filter(|l| !(l.yieldable && l.prio > w.prio))
             .map(|l| l.vram)
             .collect();
-        if stays.len() == c.leases.len() {
+        if stays.len() == held.len() {
             return false;
         }
         // Once the yielders are gone, use falls back to about the baseline.
@@ -1338,9 +1852,8 @@ impl Actor {
     }
 
     fn lease_names(&self, card: usize) -> String {
-        let names: Vec<_> = self.cards[card]
-            .leases
-            .iter()
+        let names: Vec<_> = self
+            .held(card)
             .map(|l| format!("{}/{}", l.class, l.name))
             .collect();
         names.join(", ")
@@ -1353,11 +1866,13 @@ impl Actor {
             return false;
         }
         let batch = self.classes.batch();
-        let leases = &self.cards[card].leases;
-        if leases.iter().any(|l| Some(l.prio) != batch || !l.yieldable) {
+        if self
+            .held(card)
+            .any(|l| Some(l.prio) != batch || !l.yieldable)
+        {
             return false;
         }
-        if leases.iter().any(|l| *l.yield_tx.borrow()) {
+        if self.held(card).any(|l| *l.yield_tx.borrow()) {
             return false; // hand-over already under way
         }
         let held_at = match self.waiters[idx].held_at {
@@ -1391,11 +1906,12 @@ impl Actor {
         true
     }
 
-    /// Ask every yieldable lease on `card` that ranks below `prio` to stop at its next safe point.
+    /// Ask every yieldable lease on `card` that ranks below `prio` to stop at its next safe
+    /// point. A lease on several cards is asked as soon as one of its cards is wanted.
     fn request_yield(&mut self, card: usize, prio: u32) {
         let on = self.on(card);
         let mut asked = Vec::new();
-        for l in &self.cards[card].leases {
+        for l in self.held(card) {
             if l.yieldable && l.prio > prio && !*l.yield_tx.borrow() {
                 l.yield_tx.send_replace(true);
                 asked.push(format!(
@@ -1409,7 +1925,7 @@ impl Actor {
         }
     }
 
-    fn grant(&mut self, card: usize, idx: usize) {
+    fn grant(&mut self, cards: &[usize], idx: usize) {
         let w = self.waiters.remove(idx);
         let Want::Job {
             vram,
@@ -1434,53 +1950,63 @@ impl Actor {
             yield_tx,
             since: SystemTime::now(),
             pid,
+            cards: cards.to_vec(),
         };
-        let on = self.on(card);
+        let on = self.on_set(cards);
         self.event(format!(
             "grant {id} {}/{}{on} vram={vram} after {:.0}s",
             w.class,
             w.name,
             age_s(w.since)
         ));
-        self.install(card, (lease, yield_rx), reply);
+        self.install((lease, yield_rx), reply);
     }
 
     // -------------------------------------------------------------- card hand-over
 
     /// Back to the LLM state, reloading the resident model if that is what comes next.
     fn start_restore(&mut self, model: Option<&str>) {
-        let target = match model {
-            Some(m) => Some(self.backend.resolve(m)),
-            None => self.resident.clone(),
+        let (target, cards) = match model {
+            Some(m) => (Some(self.backend.resolve(m)), self.placement(m)),
+            None => (self.resident.clone(), self.llm_return()),
         };
         match (self.resident.clone(), target) {
             (Some(resident), Some(target)) if resident == target => {
-                self.start_reload(resident, RestoreKind::Card);
+                self.start_reload(resident, RestoreKind::Card, cards);
             }
             _ => {
                 // Any other model is loaded by the backend itself when the held request goes
                 // through.
-                self.enter_llm_state(self.llm, None);
+                for &c in &cards {
+                    self.enter_llm_state(c, None);
+                }
+                self.place(&cards);
                 self.last_llm = Instant::now();
                 self.event("llm state (0.0s)");
             }
         }
     }
 
-    fn start_reload(&mut self, resident: String, kind: RestoreKind) {
-        let l = self.llm;
+    /// Reload the resident model onto `cards`, which become the LLM's.
+    fn start_reload(&mut self, resident: String, kind: RestoreKind, cards: Vec<usize>) {
         let had_saved = self.saved.contains(&resident);
-        let floor = if kind == RestoreKind::Card {
-            self.cards[l].floor
+        let floors = if kind == RestoreKind::Card {
+            cards.iter().map(|&c| self.cards[c].floor).collect()
         } else {
-            None
+            vec![None; cards.len()]
         };
-        self.cards[l].state = State::Restoring {
-            fx: Box::pin(reload(self.env(l), resident, had_saved, floor, kind)),
-        };
+        if kind == RestoreKind::Card {
+            self.place(&cards);
+        }
+        let fx: Fx<Reloaded> =
+            Box::pin(reload(self.env(&cards), resident, had_saved, floors, kind));
+        for &c in &cards[1..] {
+            self.cards[c].state = State::Restoring { fx: None };
+        }
+        self.cards[cards[0]].state = State::Restoring { fx: Some(fx) };
     }
 
-    /// Run the offload hook once per waiting job, then re-measure the card.
+    /// Run the offload hook once per waiting job and card, then re-measure the card.
     fn maybe_offload(&mut self, card: usize, idx: usize) {
         let Some(hook) = self.hook.clone() else {
             return;
@@ -1494,7 +2020,7 @@ impl Actor {
         let on = self.on(card);
         self.event(format!("{msg}{on}"));
         self.cards[card].state = State::Jobs {
-            offload: Some(Box::pin(offload(self.env(card), hook))),
+            offload: Some(Box::pin(offload(self.env(&[card]), hook))),
         };
     }
 
@@ -1504,6 +2030,12 @@ impl Actor {
         let reads = join_all(self.cards.iter().map(|c| timed_read(c.probe.clone()))).await;
         let mut queue: Vec<&Waiter> = self.waiters.iter().collect();
         queue.sort_by_key(|w| w.key());
+        let llm_set = self.llm_set();
+        let llm_cards = if llm_set.is_empty() {
+            self.llm_return()
+        } else {
+            llm_set.clone()
+        };
         let cards: Vec<CardStatus> = self
             .cards
             .iter()
@@ -1518,7 +2050,7 @@ impl Actor {
                     name: c.name.clone(),
                     device: c.probe.device(),
                     state: c.state.phase(),
-                    llm: i == self.llm,
+                    llm: llm_cards.contains(&i),
                     baseline_mib: c.baseline,
                     floor_mib: c.floor,
                     vram,
@@ -1541,12 +2073,14 @@ impl Actor {
             vram: primary.vram,
             vram_error: primary.vram_error,
             leases: self
-                .cards
+                .leases
                 .iter()
-                .flat_map(|c| {
-                    c.leases.iter().map(|l| LeaseStatus {
+                .map(|l| {
+                    let names = self.names(&l.cards);
+                    LeaseStatus {
                         id: l.id.clone(),
-                        card: c.name.clone(),
+                        card: names.join(","),
+                        cards: names,
                         class: l.class.clone(),
                         name: l.name.clone(),
                         vram: l.vram,
@@ -1554,7 +2088,7 @@ impl Actor {
                         yield_requested: *l.yield_tx.borrow(),
                         age_s: age_s(l.since).round() as u64,
                         pid: l.pid,
-                    })
+                    }
                 })
                 .collect(),
             queue: queue
@@ -1564,13 +2098,9 @@ impl Actor {
                         Want::Job { vram, .. } => (WaiterKind::Job, Some(*vram)),
                         Want::Llm { .. } => (WaiterKind::Llm, None),
                     };
-                    let card = match w.target {
-                        Target::Card(c) => self.cards[c].name.clone(),
-                        Target::Any => "any".to_owned(),
-                    };
                     QueueStatus {
                         kind,
-                        card,
+                        card: self.target_name(&w.target),
                         class: w.class.clone(),
                         name: w.name.clone(),
                         vram,
@@ -1588,6 +2118,7 @@ impl Actor {
                 })
                 .collect(),
             cards,
+            llm_cards: self.names(&llm_set),
         }
     }
 }
@@ -1600,6 +2131,7 @@ impl LeaseRec {
         class: &str,
         prio: u32,
         req: &LeaseRequest,
+        cards: Vec<usize>,
     ) -> (Self, watch::Receiver<bool>) {
         let (yield_tx, yield_rx) = watch::channel(false);
         let lease = LeaseRec {
@@ -1613,6 +2145,7 @@ impl LeaseRec {
             yield_tx,
             since: SystemTime::now(),
             pid: req.pid,
+            cards,
         };
         (lease, yield_rx)
     }
@@ -1726,8 +2259,8 @@ mod tests {
     fn waiters_order_by_priority_then_arrival() {
         let t = Target::Card(0);
         let mut ws = [
-            waiter(3, 1, true, t),
-            waiter(1, 2, true, t),
+            waiter(3, 1, true, t.clone()),
+            waiter(1, 2, true, t.clone()),
             waiter(2, 1, false, t),
         ];
         ws.sort_by_key(Waiter::key);
@@ -1739,21 +2272,21 @@ mod tests {
     fn only_better_waiting_jobs_block_an_llm_request() {
         let t = Target::Card(0);
         let steer = [true];
-        let ws = [waiter(1, 5, true, t), waiter(2, 1, false, t)];
-        assert!(blocked(&ws, (10, 3), 0, &steer)); // job outranks it
-        assert!(blocked(&ws, (5, 2), 0, &steer)); // same priority, arrived first
-        assert!(!blocked(&ws, (5, 1), 0, &steer)); // same priority, arrived earlier than the job
-        assert!(!blocked(&ws, (1, 9), 0, &steer)); // the LLM waiter itself does not count
+        let ws = [waiter(1, 5, true, t.clone()), waiter(2, 1, false, t)];
+        assert!(blocked(&ws, (10, 3), &[0], &steer)); // job outranks it
+        assert!(blocked(&ws, (5, 2), &[0], &steer)); // same priority, arrived first
+        assert!(!blocked(&ws, (5, 1), &[0], &steer)); // same priority, arrived earlier than the job
+        assert!(!blocked(&ws, (1, 9), &[0], &steer)); // the LLM waiter itself does not count
     }
 
     #[test]
     fn a_job_for_another_card_does_not_block_the_llm() {
         let steer = [true, true];
         let ws = [waiter(1, 1, true, Target::Card(1))];
-        assert!(!blocked(&ws, (5, 2), 0, &steer));
-        assert!(blocked(&ws, (5, 2), 1, &steer));
+        assert!(!blocked(&ws, (5, 2), &[0], &steer));
+        assert!(blocked(&ws, (5, 2), &[1], &steer));
         let ws = [waiter(1, 1, true, Target::Card(0))];
-        assert!(blocked(&ws, (5, 2), 0, &steer));
+        assert!(blocked(&ws, (5, 2), &[0], &steer));
     }
 
     #[test]
@@ -1761,10 +2294,33 @@ mod tests {
         // card 0 has no env: an Any job cannot go there, so it cannot block card 0's LLM.
         let steer = [false, true];
         let ws = [waiter(1, 1, true, Target::Any)];
-        assert!(!blocked(&ws, (5, 2), 0, &steer));
+        assert!(!blocked(&ws, (5, 2), &[0], &steer));
         assert!(Target::Any.can_use(1, &steer));
         assert!(!Target::Any.can_use(0, &steer));
         assert!(!Target::Any.can_use(7, &steer));
+    }
+
+    #[test]
+    fn an_llm_on_two_cards_is_blocked_by_a_job_for_either() {
+        let steer = [true, true, true];
+        let ws = [waiter(1, 1, true, Target::Card(1))];
+        assert!(blocked(&ws, (5, 2), &[0, 1], &steer));
+        assert!(!blocked(&ws, (5, 2), &[0, 2], &steer));
+    }
+
+    #[test]
+    fn set_and_count_targets() {
+        let steer = [true, false, true];
+        let set = Target::Set(vec![0, 1]);
+        assert!(set.can_use(0, &steer) && set.can_use(1, &steer));
+        assert!(!set.can_use(2, &steer));
+        assert_eq!(set.need(), 2);
+        assert_eq!(set.fixed(), vec![0, 1]);
+        let two = Target::Count(2);
+        assert!(two.can_use(0, &steer) && two.can_use(2, &steer));
+        assert!(!two.can_use(1, &steer)); // no env: cannot be picked
+        assert_eq!(two.need(), 2);
+        assert!(two.fixed().is_empty());
     }
 
     #[test]

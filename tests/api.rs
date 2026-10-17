@@ -348,3 +348,100 @@ async fn a_lease_pinned_to_gpu1_is_granted_there_with_its_env() {
         .await;
     assert_eq!(again.until("granted").await.pop().unwrap()["card"], "gpu1");
 }
+
+// ---------------------------------------------------------------------- several cards
+
+async fn two_steerable() -> TestApi {
+    TestApi::start_two_cards(
+        &[("CUDA_VISIBLE_DEVICES", "0")],
+        &[("CUDA_VISIBLE_DEVICES", "1")],
+        PING,
+    )
+    .await
+    .0
+}
+
+#[tokio::test]
+async fn a_lease_on_two_cards_names_both_and_merges_their_env() {
+    let api = two_steerable().await;
+    for body in [
+        json!({"vram": "1G", "cards": ["gpu0", "gpu1"]}),
+        json!({"vram": "1G", "card": "gpu0,gpu1"}),
+        json!({"vram": "1G", "card": "all"}),
+        json!({"vram": "1G", "card_count": 2}),
+    ] {
+        let mut ev = api.lease_ok(body.clone()).await;
+        let g = ev.until("granted").await.pop().unwrap();
+        assert_eq!(g["card"], "gpu0,gpu1", "{body}: {g}");
+        assert_eq!(g["cards"], json!(["gpu0", "gpu1"]), "{body}: {g}");
+        assert_eq!(
+            g["env"],
+            json!({"CUDA_VISIBLE_DEVICES": "0,1"}),
+            "{body}: {g}"
+        );
+        let st = api.rig.status().await;
+        assert_eq!(st.leases[0].cards, ["gpu0", "gpu1"]);
+        ev.close();
+        assert!(
+            status_within(&api.rig, Duration::from_secs(5), |st| st.leases.is_empty()).await,
+            "{body}: lease not released"
+        );
+    }
+}
+
+#[tokio::test]
+async fn old_style_bodies_keep_working() {
+    let api = two_steerable().await;
+    // A single name: exactly that card, `cards` has just it.
+    let mut ev = api
+        .lease_ok(json!({"vram_mib": 1000, "card": "gpu1"}))
+        .await;
+    let g = ev.until("granted").await.pop().unwrap();
+    assert_eq!(g["card"], "gpu1");
+    assert_eq!(g["cards"], json!(["gpu1"]));
+    ev.close();
+    // No card at all: any card with room, here gpu1 (gpu0 holds the LLM).
+    let mut ev = api.lease_ok(json!({"vram_mib": 1000})).await;
+    let g = ev.until("granted").await.pop().unwrap();
+    assert_eq!(g["card"], "gpu1", "{g}");
+    ev.close();
+    // "primary" still means the first card.
+    let mut ev = api
+        .lease_ok(json!({"vram_mib": 1000, "card": "primary"}))
+        .await;
+    assert_eq!(ev.until("granted").await.pop().unwrap()["card"], "gpu0");
+}
+
+#[tokio::test]
+async fn bad_multi_card_bodies_are_400() {
+    let api = two_steerable().await;
+    for (body, needle) in [
+        (r#"{"card": "gpu0", "cards": ["gpu1"]}"#, "only one of"),
+        (r#"{"cards": []}"#, "non-empty list"),
+        (r#"{"cards": "gpu0"}"#, "list"),
+        (r#"{"cards": ["gpu0", 1]}"#, "list"),
+        (r#"{"card_count": 0}"#, "card_count"),
+        (r#"{"card_count": "two"}"#, "card_count"),
+        (r#"{"card_count": 3}"#, "only 2 can be picked"),
+        (r#"{"cards": ["gpu0", "gpu0"]}"#, "listed twice"),
+        (r#"{"cards": ["gpu0", "nope"]}"#, "unknown card 'nope'"),
+        (r#"{"card": "gpu0,,gpu1"}"#, "card list"),
+    ] {
+        let (status, v) = api.post_raw(body).await;
+        assert_eq!(status, 400, "{body}: {v}");
+        let e = v["error"].as_str().unwrap();
+        assert!(e.contains(needle), "{body}: {e}");
+    }
+    assert!(api.rig.status().await.queue.is_empty());
+}
+
+#[tokio::test]
+async fn a_set_needs_env_on_every_card() {
+    let (api, _) = TestApi::start_two_cards(&[("CUDA_VISIBLE_DEVICES", "0")], &[], PING).await;
+    let (status, v) = api.post_raw(r#"{"card": "all"}"#).await;
+    assert_eq!(status, 400, "{v}");
+    assert!(
+        v["error"].as_str().unwrap().contains("no visible_devices"),
+        "{v}"
+    );
+}

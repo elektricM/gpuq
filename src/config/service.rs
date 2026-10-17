@@ -9,7 +9,7 @@ use serde::{Deserialize, Deserializer};
 
 use super::secs;
 use crate::arbiter::Vram;
-use crate::config::{parse_vram, VramParseError};
+use crate::config::{parse_vram, CardList, VramParseError};
 
 /// What a service is controlled with.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -255,8 +255,8 @@ pub struct Service {
     pub idle_release: Duration,
     pub gate: Option<ServiceGate>,
     pub flavor: Flavor,
-    /// Card the service runs on; default the primary card. "any" is not allowed.
-    pub card: Option<String>,
+    /// Card or cards the service runs on; default the primary card. "any" is not allowed.
+    pub card: Option<CardList>,
 }
 
 impl Default for Service {

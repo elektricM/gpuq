@@ -18,10 +18,10 @@ use std::time::Duration;
 
 use serde::{Deserialize, Deserializer};
 
-use crate::arbiter::{ClassTuning, Classes, Settings, Tuning};
+use crate::arbiter::{ClassTuning, Classes, LlmPlan, Settings, Tuning};
 use crate::Mib;
 
-pub use card::{default_env_vars, CardSpec, GpuCard};
+pub use card::{default_env_vars, CardList, CardSpec, GpuCard};
 pub use immich::Immich;
 pub use service::{Flavor, Service, ServiceGate, ServiceKind, ServiceSpec};
 pub use vram::{parse_vram, VramParseError};
@@ -188,8 +188,8 @@ pub struct Gpu {
     /// AMD: PCI address. Empty picks the amdgpu device with the most VRAM.
     pub pci: String,
     pub sysfs_root: PathBuf,
-    /// NVIDIA: device index and the nvidia-smi binary.
-    pub nvidia_index: u32,
+    /// NVIDIA: device index and the nvidia-smi binary. Setting the index means one card.
+    pub nvidia_index: Option<u32>,
     pub nvidia_smi: String,
     /// Command probe: argv printing "used_mib total_mib".
     pub command: Vec<String>,
@@ -204,6 +204,10 @@ pub struct Gpu {
     pub whole_card_baseline_mib: Mib,
     /// `[[gpu.card]]` entries. When present they replace the single card described above.
     pub card: Vec<GpuCard>,
+    /// PCI addresses of detected GPUs to leave alone.
+    pub exclude: Vec<String>,
+    /// Leave integrated GPUs alone when detecting.
+    pub skip_integrated: bool,
 }
 
 impl Default for Gpu {
@@ -212,7 +216,7 @@ impl Default for Gpu {
             vendor: GpuVendor::Auto,
             pci: String::new(),
             sysfs_root: "/sys/bus/pci/devices".into(),
-            nvidia_index: 0,
+            nvidia_index: None,
             nvidia_smi: "nvidia-smi".into(),
             command: Vec::new(),
             device: None,
@@ -221,6 +225,8 @@ impl Default for Gpu {
             driver_settle: Duration::from_secs(2),
             whole_card_baseline_mib: 512,
             card: Vec::new(),
+            exclude: Vec::new(),
+            skip_integrated: false,
         }
     }
 }
@@ -294,12 +300,24 @@ pub struct ClassTuningCfg {
     pub reload_delay: Option<Duration>,
 }
 
+/// `[llm.models.<id>]`: where one model runs.
+#[derive(Clone, Debug, PartialEq, Default, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct LlmModel {
+    /// The cards it is split over.
+    pub cards: Vec<String>,
+    /// VRAM it needs over all its cards, e.g. "40G".
+    pub vram: Option<String>,
+}
+
 #[derive(Clone, Debug, PartialEq, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Llm {
     pub backend: LlmBackend,
-    /// The card the LLM server runs on; default the first card.
-    pub card: Option<String>,
+    /// The card or cards the LLM server runs on; default the first card.
+    pub card: Option<CardList>,
+    /// Per model: cards or VRAM, for models that need other cards than `card`.
+    pub models: BTreeMap<String, LlmModel>,
     /// Model reloaded when the card goes idle. Empty means load on demand only.
     pub resident: String,
     pub cpu_models: Vec<String>,
@@ -339,6 +357,7 @@ impl Default for Llm {
         Llm {
             backend: LlmBackend::LlamaSwap,
             card: None,
+            models: BTreeMap::new(),
             resident: String::new(),
             cpu_models: Vec::new(),
             slot_save_models: Vec::new(),
@@ -497,10 +516,23 @@ impl Config {
         }
 
         p.extend(self.card_problems());
+        for (id, m) in &self.llm.models {
+            match m.vram.as_deref().map(parse_vram) {
+                Some(Err(e)) => p.push(format!("llm.models.{id}: vram: {e}")),
+                Some(Ok(crate::arbiter::Vram::WholeCard)) => p.push(format!(
+                    "llm.models.{id}: vram must be a size such as \"40G\", not \"all\""
+                )),
+                _ => {}
+            }
+            if m.vram.is_some() && !m.cards.is_empty() {
+                p.push(format!(
+                    "llm.models.{id}: set cards or vram, not both (cards wins over vram)"
+                ));
+            }
+        }
         if let Some(im) = &self.immich {
             let classes: Vec<&str> = classes.keys().map(String::as_str).collect();
-            let cards: Vec<String> = self.cards().into_iter().map(|c| c.name).collect();
-            p.extend(im.problems(&classes, &cards));
+            p.extend(im.problems(&classes));
         }
         if self.gate.port == 0 {
             p.push("gate.port must be non-zero".into());
@@ -627,15 +659,41 @@ impl Config {
             whole_card_baseline_mib: self.gpu.whole_card_baseline_mib,
             offload_settle: self.hooks.offload_settle,
         };
+        let llm = LlmPlan {
+            cards: l.card.as_ref().map(CardList::names).unwrap_or_default(),
+            model_cards: l
+                .models
+                .iter()
+                .filter(|(_, m)| !m.cards.is_empty())
+                .map(|(id, m)| (id.clone(), m.cards.clone()))
+                .collect(),
+            model_vram: l
+                .models
+                .iter()
+                .filter_map(|(id, m)| {
+                    let v = parse_vram(m.vram.as_deref()?).ok()?;
+                    match v {
+                        crate::arbiter::Vram::Mib(mib) => Some((id.clone(), mib)),
+                        crate::arbiter::Vram::WholeCard => None,
+                    }
+                })
+                .collect(),
+        };
         Settings {
             classes,
             resident: Some(l.resident.clone()).filter(|r| !r.is_empty()),
             tuning,
+            llm,
         }
     }
 
-    /// Short human summary for `gpuq check-config`.
+    /// Short human summary for `gpuq check-config`, detecting the cards if the config says so.
     pub fn describe(&self) -> String {
+        self.describe_with(&self.detect())
+    }
+
+    /// Short human summary, given what detection found.
+    pub fn describe_with(&self, found: &[crate::probe::scan::Found]) -> String {
         let mut s = String::new();
         let _ = writeln!(s, "backend: {}", self.llm.backend.as_str());
         if let Some(spec) = &self.llm.service {
@@ -653,7 +711,7 @@ impl Config {
             self.gate.host, self.gate.port, self.gate.backend
         );
         let _ = writeln!(s, "api: {}:{}", self.api.host, self.api.port);
-        self.describe_cards(&mut s);
+        self.describe_cards(&mut s, found);
         let mut ordered: Vec<_> = self.classes.iter().collect();
         ordered.sort_by_key(|(n, p)| (**p, n.as_str()));
         let list: Vec<String> = ordered.iter().map(|(n, p)| format!("{n}={p}")).collect();

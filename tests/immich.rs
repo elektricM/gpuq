@@ -558,7 +558,9 @@ fn bad_values_are_reported() {
     let with = |line: &str| format!("{base}{line}\n");
     let e = parse(&with("vram = \"lots\"")).unwrap_err();
     assert!(e.contains("immich.vram"), "{e}");
-    let e = parse(&with("card = \"gpu9\"")).unwrap_err();
+    // Detected cards are only known at run time; a [gpu] table pinned to one card is not.
+    let pinned = format!("[gpu]\npci = \"0000:03:00.0\"\n{}", with("card = \"gpu9\""));
+    let e = parse(&pinned).unwrap_err();
     assert!(e.contains("immich.card") && e.contains("gpu9"), "{e}");
     let e = parse(&with("url = \"nope\"").replace("url = \"http://127.0.0.1:2283\"\n", ""))
         .unwrap_err();

@@ -639,3 +639,55 @@ async fn daemon_names_the_card_whose_probe_cannot_be_built() {
     assert_eq!(d.rc, 1);
     assert!(d.err.contains("card right"), "{}", d.err);
 }
+
+#[tokio::test]
+async fn check_config_lists_detected_cards_and_exclusions() {
+    let dir = tempfile::tempdir().unwrap();
+    let sys = dir.path().join("sys");
+    for (pci, total, discrete) in [
+        ("0000:03:00.0", 24560u64, true),
+        ("0000:15:00.0", 2048, false),
+    ] {
+        let dev = sys.join(pci);
+        std::fs::create_dir_all(&dev).unwrap();
+        let mib = 1024 * 1024;
+        std::fs::write(dev.join("mem_info_vram_total"), (total * mib).to_string()).unwrap();
+        std::fs::write(dev.join("mem_info_vram_used"), (100 * mib).to_string()).unwrap();
+        if discrete {
+            std::fs::write(dev.join("mem_info_vram_vendor"), "samsung").unwrap();
+            std::fs::write(dev.join("unique_id"), "abcd").unwrap();
+        }
+    }
+    let cfg = dir.path().join("config.toml");
+    let write = |extra: &str| {
+        std::fs::write(
+            &cfg,
+            format!(
+                "[llm]\nbackend = \"none\"\n[gpu]\nsysfs_root = {:?}\nnvidia_smi = \"/nonexistent/nvidia-smi\"\n{extra}",
+                sys.to_str().unwrap()
+            ),
+        )
+        .unwrap();
+    };
+    write("skip_integrated = true\n");
+    let d = run_cli(&["check-config", "-c", cfg.to_str().unwrap(), "--strict"]).await;
+    assert_eq!(d.rc, 0, "{}", d.err);
+    assert!(d.out.contains("gpus: 2 detected, 1 in use"), "{}", d.out);
+    assert!(
+        d.out
+            .contains("gpu0: amd pci=0000:03:00.0 24560 MiB, ROCR_VISIBLE_DEVICES=GPU-abcd"),
+        "{}",
+        d.out
+    );
+    assert!(d.out.contains("excluded: amd 0000:15:00.0"), "{}", d.out);
+    assert!(
+        d.out.contains("probe: amd:0000:03:00.0, 100 / 24560 MiB"),
+        "{}",
+        d.out
+    );
+    // A card name that does not exist among the detected ones fails the check.
+    write("skip_integrated = true\n[[service]]\nname = \"s\"\nvram = \"1G\"\ncard = \"gpu1\"\n");
+    let d = run_cli(&["check-config", "-c", cfg.to_str().unwrap()]).await;
+    assert_eq!(d.rc, 1, "{}", d.out);
+    assert!(d.err.contains("unknown card \"gpu1\""), "{}", d.err);
+}

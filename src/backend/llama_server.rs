@@ -10,7 +10,7 @@ use serde_json::{json, Value};
 use tokio::sync::Mutex;
 
 use super::stopstart::Managed;
-use super::{Backend, BackendError, Capabilities};
+use super::{Backend, BackendError, Capabilities, Placement};
 use crate::workload::service::{http_client, ServiceControl};
 
 #[derive(Debug)]
@@ -160,5 +160,17 @@ impl Backend for LlamaServer {
                 false
             }
         }
+    }
+
+    /// llama-server reads its options from `LLAMA_ARG_*` variables too, and a flag on its
+    /// command line wins over them. With several cards it gets the split by free VRAM, which
+    /// is also what llama.cpp does on its own.
+    fn place(&self, p: &Placement) {
+        let mut env = Managed::placement_env(p);
+        if let Some(split) = p.tensor_split() {
+            env.push(("LLAMA_ARG_SPLIT_MODE".into(), "layer".into()));
+            env.push(("LLAMA_ARG_TENSOR_SPLIT".into(), split));
+        }
+        self.inner.set_env(env);
     }
 }

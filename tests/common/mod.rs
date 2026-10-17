@@ -362,6 +362,7 @@ pub fn base_settings() -> Settings {
         },
     );
     Settings {
+        llm: Default::default(),
         classes: Classes::new(prio).unwrap(),
         resident: Some("big".into()),
         tuning: Tuning {

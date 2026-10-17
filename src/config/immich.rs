@@ -138,7 +138,7 @@ impl Immich {
     }
 
     /// Problems with this section; `cards` are the configured card names.
-    pub(super) fn problems(&self, classes: &[&str], cards: &[String]) -> Vec<String> {
+    pub(super) fn problems(&self, classes: &[&str]) -> Vec<String> {
         let mut p = Vec::new();
         let mut bad = |m: String| p.push(format!("immich.{m}"));
         if !super::is_http_url(&self.url) {
@@ -170,14 +170,6 @@ impl Immich {
         }
         if let Err(e) = super::parse_vram(&self.vram) {
             bad(format!("vram: {e}"));
-        }
-        if let Some(c) = &self.card {
-            if !cards.contains(c) {
-                bad(format!(
-                    "card {c:?} is not a configured card; known: {}",
-                    cards.join(", ")
-                ));
-            }
         }
         if self.queues.is_empty() {
             bad("queues must not be empty".into());

@@ -40,7 +40,7 @@ use tokio::sync::{mpsc, watch};
 use tokio::task::JoinSet;
 
 use crate::arbiter::{CardSel, Handle, Vram};
-use crate::config::{Flavor, Service, ServiceKind as Kind, ServiceSpec};
+use crate::config::{CardList, Flavor, Service, ServiceKind as Kind, ServiceSpec};
 use crate::gate::proxy::{
     full, is_upgrade, read_body, serve_fn, BodyError, Keepalive, Proxy, ProxyBody, MAX_BODY,
 };
@@ -96,7 +96,11 @@ impl Cfg {
             busy_url,
             backend,
             comfy,
-            card: svc.card.clone().map_or(CardSel::Primary, CardSel::Named),
+            card: match &svc.card {
+                None => CardSel::Primary,
+                Some(CardList::One(n)) => CardSel::Named(n.clone()),
+                Some(CardList::Many(v)) => CardSel::Set(v.clone()),
+            },
             poll: (svc.idle_release / 4).clamp(Duration::from_millis(20), Duration::from_secs(1)),
         })
     }

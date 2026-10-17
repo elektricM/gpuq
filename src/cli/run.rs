@@ -38,10 +38,13 @@ pub struct RunArgs {
     /// `[run] yield_signal`, else SIGUSR1.
     #[arg(long, value_name = "SIGNAL")]
     yield_signal: Option<String>,
-    /// Card to run on: a name from `gpuq status`, or `any` for the first card with room.
-    /// Default: the primary card.
-    #[arg(long, value_name = "NAME|any")]
+    /// Card to run on: a name from `gpuq status`, a comma list such as gpu0,gpu1 for several
+    /// cards at once, `all` for every card, or `any`. Default: any card with room.
+    #[arg(long, value_name = "NAME|LIST|all|any")]
     card: Option<String>,
+    /// Run on this many cards at once, any that have room. --vram applies to each card.
+    #[arg(long, value_name = "N", conflicts_with = "card")]
+    cards: Option<usize>,
     /// If gpuq is not running, run the command anyway.
     #[arg(long)]
     fallback: bool,
@@ -61,9 +64,13 @@ pub struct HoldArgs {
     /// Lease name shown in `gpuq status`.
     #[arg(long, default_value = "manual")]
     name: String,
-    /// Card to hold: a name from `gpuq status`, or `any`. Default: the primary card.
-    #[arg(long, value_name = "NAME|any")]
+    /// Card to hold: a name from `gpuq status`, a comma list, `all` or `any`. Default: any
+    /// card with room.
+    #[arg(long, value_name = "NAME|LIST|all|any")]
     card: Option<String>,
+    /// Hold this many cards at once, any that have room.
+    #[arg(long, value_name = "N", conflicts_with = "card")]
+    cards: Option<usize>,
 }
 
 /// SIGINT, SIGTERM and SIGHUP, which `run` forwards and `hold` treats as "release now".
@@ -125,8 +132,9 @@ struct Session {
     id: String,
     /// The yield signal gpuq announced with the grant.
     yield_signal: Option<String>,
-    /// The card the lease is on, and the environment that points a program at it.
+    /// The cards the lease is on, and the environment that points a program at them.
     card: Option<String>,
+    cards: Vec<String>,
     env: Vec<(String, String)>,
     stream: Option<LeaseStream>,
 }
@@ -145,7 +153,7 @@ impl Session {
         loop {
             tokio::select! {
                 ev = stream.next() => match ev {
-                    Ok(Some(Event::Granted(Grant { id, yield_signal, card, env }))) => {
+                    Ok(Some(Event::Granted(Grant { id, yield_signal, card, cards, env }))) => {
                         if told {
                             say(&format!("granted {id} after {:.0}s", t0.elapsed().as_secs_f64()));
                         }
@@ -155,6 +163,7 @@ impl Session {
                             id,
                             yield_signal,
                             card,
+                            cards,
                             env,
                             stream: Some(stream),
                         });
@@ -194,9 +203,16 @@ impl Session {
     async fn readopt(&self) -> LeaseStream {
         let mut body = self.body.clone();
         body["resume_id"] = json!(self.id);
-        // Adopt on the card that was granted, not on "any".
-        if let Some(card) = &self.card {
-            body["card"] = json!(card);
+        // Adopt on the cards that were granted, not on "any".
+        if let Some(obj) = body.as_object_mut() {
+            if self.cards.len() > 1 {
+                obj.remove("card");
+                obj.remove("card_count");
+                obj.insert("cards".into(), json!(self.cards));
+            } else if let Some(card) = &self.card {
+                obj.remove("card_count");
+                obj.insert("card".into(), json!(card));
+            }
         }
         loop {
             if let Ok(mut stream) = LeaseStream::open(&self.addr, &body).await {
@@ -230,8 +246,12 @@ fn lease_body(
     name: &str,
     yieldable: bool,
     card: Option<&str>,
+    count: Option<usize>,
 ) -> Result<Value, String> {
     let vram = parse_vram(vram)?;
+    if let Some(card) = card {
+        crate::arbiter::CardSel::parse(card).map_err(|e| format!("--card: {e}"))?;
+    }
     let mut body = json!({
         "class": class,
         "vram_mib": vram_mib_json(vram),
@@ -241,6 +261,11 @@ fn lease_body(
     });
     if let Some(card) = card {
         body["card"] = json!(card);
+    }
+    match count {
+        Some(0) => return Err("--cards needs at least 1".into()),
+        Some(n) => body["card_count"] = json!(n),
+        None => {}
     }
     Ok(body)
 }
@@ -302,7 +327,14 @@ pub async fn run(addr: &str, a: RunArgs) -> ExitCode {
             .file_name()
             .map_or_else(|| program.clone(), |n| n.to_string_lossy().into_owned())
     });
-    let body = match lease_body(&a.class, &a.vram, &name, a.yieldable, a.card.as_deref()) {
+    let body = match lease_body(
+        &a.class,
+        &a.vram,
+        &name,
+        a.yieldable,
+        a.card.as_deref(),
+        a.cards,
+    ) {
         Ok(b) => b,
         Err(e) => {
             say(&e);
@@ -344,7 +376,9 @@ pub async fn run(addr: &str, a: RunArgs) -> ExitCode {
     if let (Some(s), Some(f)) = (&session, &yield_file) {
         cmd.env("GPUQ_LEASE_ID", &s.id).env("GPUQ_YIELD_FILE", f);
         cmd.envs(s.env.iter().map(|(k, v)| (k, v)));
-        if let Some(card) = &s.card {
+        if !s.cards.is_empty() {
+            cmd.env("GPUQ_CARD", s.cards.join(","));
+        } else if let Some(card) = &s.card {
             cmd.env("GPUQ_CARD", card);
         }
     }
@@ -404,7 +438,14 @@ pub async fn run(addr: &str, a: RunArgs) -> ExitCode {
 }
 
 pub async fn hold(addr: &str, a: HoldArgs) -> ExitCode {
-    let body = match lease_body(&a.class, &a.vram, &a.name, false, a.card.as_deref()) {
+    let body = match lease_body(
+        &a.class,
+        &a.vram,
+        &a.name,
+        false,
+        a.card.as_deref(),
+        a.cards,
+    ) {
         Ok(b) => b,
         Err(e) => {
             say(&e);
@@ -423,8 +464,8 @@ pub async fn hold(addr: &str, a: HoldArgs) -> ExitCode {
         Err(Fail::Signal(_)) => return ExitCode::SUCCESS,
         Err(f) => return f.exit(addr),
     };
-    let on = match (&a.card, &session.card) {
-        (Some(_), Some(card)) => format!(" on {card}"),
+    let on = match (a.card.is_some() || a.cards.is_some(), &session.card) {
+        (true, Some(card)) => format!(" on {card}"),
         _ => String::new(),
     };
     say(&format!(

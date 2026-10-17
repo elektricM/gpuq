@@ -261,13 +261,7 @@ fn parse_lease_request(raw: &[u8]) -> Result<LeaseRequest, String> {
         Some(Value::String(_)) => None,
         Some(v) => return Err(format!("bad resume_id {v}")),
     };
-    let card = match obj.get("card") {
-        None | Some(Value::Null) => CardSel::Primary,
-        Some(Value::String(s)) if s == "any" => CardSel::Any,
-        Some(Value::String(s)) if s == "primary" => CardSel::Primary,
-        Some(Value::String(s)) if !s.is_empty() => CardSel::Named(s.clone()),
-        Some(v) => return Err(format!("card must be a card name or \"any\", not {v}")),
-    };
+    let card = parse_cards(obj)?;
     Ok(LeaseRequest {
         class,
         vram,
@@ -284,6 +278,48 @@ fn parse_lease_request(raw: &[u8]) -> Result<LeaseRequest, String> {
         card,
         resume_id,
     })
+}
+
+/// `card` (a name, "any", "all", "primary" or a comma list), `cards` (a list of names) or
+/// `card_count` (a number of cards). At most one of them; none means the default placement.
+fn parse_cards(obj: &serde_json::Map<String, Value>) -> Result<CardSel, String> {
+    let given = |k: &str| obj.get(k).is_some_and(|v| !v.is_null());
+    if [given("card"), given("cards"), given("card_count")]
+        .iter()
+        .filter(|g| **g)
+        .count()
+        > 1
+    {
+        return Err("use only one of card, cards and card_count".into());
+    }
+    if let Some(v) = obj.get("cards").filter(|v| !v.is_null()) {
+        let names: Option<Vec<String>> = v
+            .as_array()
+            .map(|a| a.iter().map(|n| n.as_str().map(str::to_owned)).collect())
+            .unwrap_or(None);
+        return match names {
+            Some(names) if names.len() == 1 => CardSel::parse(&names[0]),
+            Some(names) if !names.is_empty() => CardSel::parse(&names.join(",")),
+            _ => Err(format!(
+                "cards must be a non-empty list of card names, not {v}"
+            )),
+        };
+    }
+    if let Some(v) = obj.get("card_count").filter(|v| !v.is_null()) {
+        return match v.as_u64() {
+            Some(n) if n >= 1 => Ok(CardSel::Count(usize::try_from(n).unwrap_or(usize::MAX))),
+            _ => Err(format!(
+                "card_count must be a number of cards (1 or more), not {v}"
+            )),
+        };
+    }
+    match obj.get("card") {
+        None | Some(Value::Null) => Ok(CardSel::Default),
+        Some(Value::String(s)) if !s.is_empty() => CardSel::parse(s),
+        Some(v) => Err(format!(
+            "card must be a card name, \"any\", \"all\" or a comma list, not {v}"
+        )),
+    }
 }
 
 fn json_resp(status: StatusCode, v: Value) -> Response<RespBody> {
@@ -354,6 +390,7 @@ async fn lease_stream(
         "event": "granted",
         "id": lease.id(),
         "card": lease.card(),
+        "cards": lease.cards(),
         "env": env,
     });
     if let Some(sig) = &yield_signal {

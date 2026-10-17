@@ -69,9 +69,9 @@ fn probe_options(c: &CardSpec) -> ProbeOptions {
     }
 }
 
-/// One probe per configured card. A card whose probe cannot be built is an error naming it.
-fn build_cards(cfg: &Config) -> Result<Vec<arbiter::Card>, String> {
-    cfg.cards()
+/// One probe per card. A card whose probe cannot be built is an error naming it.
+fn build_cards(specs: Vec<CardSpec>) -> Result<Vec<arbiter::Card>, String> {
+    specs
         .into_iter()
         .map(|c| {
             let probe = make_probe(&probe_options(&c))
@@ -86,6 +86,7 @@ fn build_cards(cfg: &Config) -> Result<Vec<arbiter::Card>, String> {
                 margin_mib: c.margin_mib,
                 whole_card_baseline_mib: c.whole_card_baseline_mib,
                 env: c.env,
+                vendor: c.vendor.as_str().to_owned(),
             })
         })
         .collect()
@@ -104,9 +105,17 @@ pub fn check_config(path: Option<PathBuf>, strict: bool) -> ExitCode {
         Ok(Some(p)) => println!("config: {}", p.display()),
         _ => println!("config: built-in defaults"),
     }
-    print!("{}", cfg.describe());
+    let found = cfg.detect();
+    let specs = cfg.cards_with(&found);
+    print!("{}", cfg.describe_with(&found));
+    let problems = cfg.reference_problems(&specs);
+    if !problems.is_empty() {
+        report_config_error(&ConfigError::Invalid(problems));
+        return ExitCode::FAILURE;
+    }
+    let multi = specs.len() > 1;
     let mut failed = false;
-    for c in cfg.cards() {
+    for c in specs {
         let reading = match make_probe(&probe_options(&c)) {
             Ok(probe) => block_on_value(async move {
                 let device = probe.device();
@@ -116,7 +125,6 @@ pub fn check_config(path: Option<PathBuf>, strict: bool) -> ExitCode {
             .and_then(|(device, r)| r.map(|r| (device, r))),
             Err(e) => Err(e.to_string()),
         };
-        let multi = cfg.has_card_list();
         match reading {
             Ok((device, r)) if multi => println!(
                 "probe {}: {device}, {} / {} MiB used",
@@ -333,7 +341,12 @@ async fn serve(cfg: Config, path: Option<&Path>) -> Result<(), String> {
         cfg.llm.backend.as_str()
     );
 
-    let cards = build_cards(&cfg)?;
+    let specs = cfg.cards_with(&cfg.detect());
+    let problems = cfg.reference_problems(&specs);
+    if !problems.is_empty() {
+        return Err(ConfigError::Invalid(problems).to_string());
+    }
+    let cards = build_cards(specs)?;
     let Built { backend, swap } = build_backend(&cfg)?;
     let hook: Option<Arc<dyn OffloadHook>> = (!cfg.hooks.offload.is_empty()).then(|| {
         Arc::new(CommandHook::new(
@@ -348,13 +361,7 @@ async fn serve(cfg: Config, path: Option<&Path>) -> Result<(), String> {
     };
     let api_listener = bind("api", &cfg.api.host, cfg.api.port).await?;
 
-    let handle = arbiter::spawn_cards(
-        cfg.arbiter_settings(),
-        cards,
-        cfg.llm_card_index(),
-        backend.clone(),
-        hook,
-    );
+    let handle = arbiter::spawn_cards(cfg.arbiter_settings(), cards, 0, backend.clone(), hook);
     let (stop_tx, stop_rx) = watch::channel(false);
     let mut tasks = JoinSet::new();
 

@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use gpuq::arbiter::Vram;
-use gpuq::config::{parse_vram, Config, ConfigError, GpuVendor, LlmBackend, ServiceKind};
+use gpuq::config::{parse_vram, CardList, Config, ConfigError, GpuVendor, LlmBackend, ServiceKind};
 
 fn example_path() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("examples/gpuq.toml")
@@ -344,7 +344,7 @@ fn empty_resident_means_none() {
 
 #[test]
 fn describe_mentions_the_essentials() {
-    let text = Config::from_toml_str(SERVICES).unwrap().describe();
+    let text = Config::from_toml_str(SERVICES).unwrap().describe_with(&[]);
     for needle in [
         "llama-swap",
         "127.0.0.1:8080",
@@ -393,7 +393,8 @@ fn kv(k: &str, v: &str) -> (String, String) {
 
 #[test]
 fn legacy_gpu_table_is_one_card_without_env() {
-    let cards = Config::default().cards();
+    // Nothing detected: the [gpu] table is the one card.
+    let cards = Config::default().cards_with(&[]);
     assert_eq!(cards.len(), 1);
     assert_eq!(cards[0].name, "gpu0");
     assert!(cards[0].env.is_empty());
@@ -405,8 +406,9 @@ fn legacy_gpu_table_is_one_card_without_env() {
     assert_eq!(cards[0].name, "main");
     assert_eq!(cards[0].margin_mib, 400);
     assert_eq!(cards[0].nvidia_index, 2);
-    assert_eq!(cfg.llm_card_index(), 0);
-    assert!(!cfg.any_card_unavailable());
+    assert_eq!(cfg.llm_card_names(&cards), ["main"]);
+    assert!(!cfg.any_card_unavailable(&cards));
+    assert!(!cfg.detects());
 }
 
 #[test]
@@ -424,8 +426,8 @@ fn two_cards_parse_with_defaults_from_gpu() {
     assert_eq!(cards[1].nvidia_index, 1);
     assert_eq!(cards[1].margin_mib, 100);
     assert_eq!(cards[1].whole_card_baseline_mib, 900);
-    assert_eq!(cfg.llm_card_index(), 0);
-    assert!(!cfg.any_card_unavailable());
+    assert_eq!(cfg.llm_card_names(&cards), ["big"]);
+    assert!(!cfg.any_card_unavailable(&cards));
 }
 
 #[test]
@@ -518,13 +520,14 @@ fn bad_card_lists_are_rejected() {
 #[test]
 fn llm_card_must_name_a_card() {
     let cfg = parse(&format!("{TWO_CARDS}\n[llm]\ncard = \"small\"\n")).unwrap();
-    assert_eq!(cfg.llm_card_index(), 1);
+    assert_eq!(cfg.llm_card_names(&cfg.cards()), ["small"]);
     let e = err_text(&format!("{TWO_CARDS}\n[llm]\ncard = \"nope\"\n"));
     assert!(e.contains("llm.card"), "{e}");
     assert!(e.contains("known: big, small"), "{e}");
     // The legacy card is named gpu0 unless gpu.device says otherwise.
-    assert!(parse("[llm]\ncard = \"gpu0\"\n").is_ok());
-    assert!(parse("[llm]\ncard = \"gpu1\"\n").is_err());
+    let legacy = "[gpu]\npci = \"0000:03:00.0\"\n[llm]\ncard = ";
+    assert!(parse(&format!("{legacy}\"gpu0\"\n")).is_ok());
+    assert!(parse(&format!("{legacy}\"gpu1\"\n")).is_err());
 }
 
 #[test]
@@ -533,7 +536,7 @@ fn service_card_must_name_a_card_and_cannot_be_any() {
         format!("{TWO_CARDS}\n[[service]]\nname = \"tts\"\nvram = \"2G\"\ncard = \"{card}\"\n")
     };
     let cfg = parse(&svc("small")).unwrap();
-    assert_eq!(cfg.service[0].card.as_deref(), Some("small"));
+    assert_eq!(cfg.service[0].card, Some(CardList::One("small".into())));
     let e = err_text(&svc("nope"));
     assert!(
         e.contains("service \"tts\"") && e.contains("unknown card"),
@@ -549,7 +552,7 @@ fn service_card_must_name_a_card_and_cannot_be_any() {
 fn describe_lists_the_cards_and_notes_a_missing_any() {
     let text = parse(&format!("{TWO_CARDS}\n[llm]\ncard = \"small\"\n"))
         .unwrap()
-        .describe();
+        .describe_with(&[]);
     assert!(text.contains("big: amd"), "{text}");
     assert!(
         text.contains("small: nvidia index=1, CUDA_VISIBLE_DEVICES=1"),
@@ -575,4 +578,70 @@ fn multi_gpu_example_is_valid() {
     let cfg = Config::load(Some(&path)).unwrap();
     assert!(cfg.cards().len() >= 2);
     assert!(cfg.cards().iter().all(|c| !c.env.is_empty()));
+}
+
+#[test]
+fn llm_cards_and_models_parse_and_are_checked() {
+    let cfg = parse(&format!(
+        "{TWO_CARDS}\n[llm]\ncard = [\"big\", \"small\"]\n[llm.models.huge]\nvram = \"40G\"\n[llm.models.tiny]\ncards = [\"small\"]\n"
+    ))
+    .unwrap();
+    assert_eq!(cfg.llm_card_names(&cfg.cards()), ["big", "small"]);
+    let s = cfg.arbiter_settings();
+    assert_eq!(s.llm.cards, ["big", "small"]);
+    assert_eq!(s.llm.model_vram["huge"], 40 * 1024);
+    assert_eq!(s.llm.model_cards["tiny"], ["small"]);
+
+    let bad = |llm: &str| err_text(&format!("{TWO_CARDS}\n{llm}"));
+    let e = bad("[llm]\ncard = [\"big\", \"big\"]\n");
+    assert!(e.contains("listed twice"), "{e}");
+    let e = bad("[llm]\ncard = []\n");
+    assert!(e.contains("empty"), "{e}");
+    let e = bad("[llm.models.m]\ncards = [\"nope\"]\n");
+    assert!(
+        e.contains("llm.models.m.cards") && e.contains("nope"),
+        "{e}"
+    );
+    let e = bad("[llm.models.m]\nvram = \"lots\"\n");
+    assert!(e.contains("llm.models.m: vram"), "{e}");
+    let e = bad("[llm.models.m]\nvram = \"all\"\n");
+    assert!(e.contains("not \"all\""), "{e}");
+    let e = bad("[llm.models.m]\nvram = \"8G\"\ncards = [\"big\"]\n");
+    assert!(e.contains("not both"), "{e}");
+    let e = bad("[llm.models.m]\nsize = \"8G\"\n");
+    assert!(e.contains("unknown field"), "{e}");
+}
+
+#[test]
+fn services_can_name_several_cards() {
+    let cfg = parse(&format!(
+        "{TWO_CARDS}\n[[service]]\nname = \"big-model\"\nvram = \"20G\"\ncard = [\"big\", \"small\"]\n"
+    ))
+    .unwrap();
+    assert_eq!(
+        cfg.service[0].card,
+        Some(CardList::Many(vec!["big".into(), "small".into()]))
+    );
+    let e = err_text(&format!(
+        "{TWO_CARDS}\n[[service]]\nname = \"s\"\nvram = \"2G\"\ncard = [\"big\", \"any\"]\n"
+    ));
+    assert!(e.contains("not allowed for services"), "{e}");
+}
+
+#[test]
+fn exclusions_are_checked() {
+    let e = err_text("[gpu]\nexclude = [\"gpu1\"]\n");
+    assert!(e.contains("not a PCI address"), "{e}");
+    let e = err_text(&TWO_CARDS.replace(
+        "margin_mib = 300\n",
+        "margin_mib = 300\nexclude = [\"0000:03:00.0\"]\n",
+    ));
+    assert!(e.contains("only apply to detected cards"), "{e}");
+    let e = err_text(
+        "[gpu]\nskip_integrated = true\n[[gpu.card]]\nname = \"a\"\nvendor = \"nvidia\"\n",
+    );
+    assert!(e.contains("only apply to detected cards"), "{e}");
+    let card = |name: &str| format!("[[gpu.card]]\nname = \"{name}\"\nvendor = \"nvidia\"\n");
+    assert!(err_text(&card("all")).contains("reserved"));
+    assert!(err_text("[gpu]\ndevice = \"all\"\n").contains("gpu.device"));
 }

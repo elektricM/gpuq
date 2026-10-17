@@ -7,8 +7,8 @@
 //! gpuq daemon [-c config] [-v]
 //! gpuq check-config [-c config] [--strict]
 //! gpuq status [--json]
-//! gpuq run [--class C] [--vram 8G|all] [--card NAME|any] [--yieldable] [--fallback] [--name N] -- cmd ...
-//! gpuq hold [--class C] [--vram all] [--card NAME|any] [--name N]
+//! gpuq run [--class C] [--vram 8G|all] [--card NAME|LIST|all|any | --cards N] [--yieldable] [--fallback] [--name N] -- cmd ...
+//! gpuq hold [--class C] [--vram all] [--card NAME|LIST|all|any | --cards N] [--name N]
 //! ```
 //!
 //! Clients find the daemon through `GPUQ_API` (default `127.0.0.1:9390`) and exit with 69

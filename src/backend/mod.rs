@@ -17,6 +17,8 @@ pub mod stopstart;
 use async_trait::async_trait;
 use serde::Serialize;
 
+use crate::Mib;
+
 /// What a backend can do. The arbiter skips steps a backend does not support.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize)]
 pub struct Capabilities {
@@ -26,6 +28,33 @@ pub struct Capabilities {
     pub slots: bool,
     /// A health endpoint tells when a model is ready.
     pub health: bool,
+}
+
+/// The cards the next load goes to, for servers that gpuq starts itself.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Placement {
+    /// Card names, in device order.
+    pub cards: Vec<String>,
+    /// The cards' env merged, e.g. `CUDA_VISIBLE_DEVICES=0,1`.
+    pub env: Vec<(String, String)>,
+    /// VRAM each card offers, same order as `cards`.
+    pub free_mib: Vec<Mib>,
+}
+
+impl Placement {
+    /// `--tensor-split` proportions for llama.cpp: free VRAM per card in GiB, at least 1.
+    /// None for a single card.
+    pub fn tensor_split(&self) -> Option<String> {
+        if self.cards.len() < 2 || self.free_mib.len() != self.cards.len() {
+            return None;
+        }
+        let parts: Vec<String> = self
+            .free_mib
+            .iter()
+            .map(|m| (m / 1024).max(1).to_string())
+            .collect();
+        Some(parts.join(","))
+    }
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -63,4 +92,13 @@ pub trait Backend: Send + Sync + 'static {
 
     /// Load `model` (or start the service) and wait until it serves. False on failure.
     async fn load(&self, model: &str) -> bool;
+
+    /// VRAM `model` needs over all its cards, if the backend can tell.
+    fn vram_estimate(&self, _model: &str) -> Option<Mib> {
+        None
+    }
+
+    /// The cards the next load goes to. Called before every reload and whenever the LLM
+    /// takes another card. Only servers that gpuq starts itself can act on it.
+    fn place(&self, _placement: &Placement) {}
 }

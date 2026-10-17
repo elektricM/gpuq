@@ -38,8 +38,11 @@ pub struct Grant {
     pub id: String,
     /// The yield signal gpuq is configured with (if it says).
     pub yield_signal: Option<String>,
-    /// The card the lease is on; None from a gpuq that predates cards.
+    /// The card the lease is on (several joined with commas); None from a gpuq that predates
+    /// cards.
     pub card: Option<String>,
+    /// Every card of the lease; empty from a gpuq that predates multi-card leases.
+    pub cards: Vec<String>,
     pub env: Vec<(String, String)>,
 }
 
@@ -187,6 +190,15 @@ fn parse_event(raw: &[u8]) -> Event {
                     .and_then(Value::as_str)
                     .map(str::to_owned),
                 card: v.get("card").and_then(Value::as_str).map(str::to_owned),
+                cards: v
+                    .get("cards")
+                    .and_then(Value::as_array)
+                    .map(|a| {
+                        a.iter()
+                            .filter_map(|n| n.as_str().map(str::to_owned))
+                            .collect()
+                    })
+                    .unwrap_or_default(),
                 env: v
                     .get("env")
                     .and_then(Value::as_object)

@@ -343,6 +343,40 @@ mod service_backed {
     }
 
     #[tokio::test]
+    async fn llama_server_started_by_gpuq_gets_its_cards_and_the_split() {
+        use gpuq::backend::Placement;
+        let dir = tempfile::tempdir().unwrap();
+        write_state(dir.path(), "down");
+        let server = health_server(dir.path(), "up").await;
+        let d = dir.path().display().to_string();
+        let sh = |s: String| vec!["sh".to_string(), "-c".to_string(), s];
+        let start = format!(
+            "echo \"$GPUQ_CARD $ROCR_VISIBLE_DEVICES $LLAMA_ARG_SPLIT_MODE $LLAMA_ARG_TENSOR_SPLIT\" > {d}/env; echo up > {d}/state"
+        );
+        let ctl = ServiceControl::commands(sh(start), sh(format!("echo down > {d}/state")), None)
+            .with_poll_interval(FAST);
+        let llama = LlamaServer::new(&server.url(), "big", ctl, false);
+        llama.place(&Placement {
+            cards: vec!["gpu0".into(), "gpu1".into()],
+            env: vec![("ROCR_VISIBLE_DEVICES".into(), "GPU-a,GPU-b".into())],
+            free_mib: vec![24_000, 16_000],
+        });
+        assert!(llama.load("big").await);
+        let env = std::fs::read_to_string(dir.path().join("env")).unwrap();
+        assert_eq!(env.trim(), "gpu0,gpu1 GPU-a,GPU-b layer 23,15");
+        // One card: no split, just the card.
+        llama.unload_all().await.unwrap();
+        llama.place(&Placement {
+            cards: vec!["gpu1".into()],
+            env: vec![("ROCR_VISIBLE_DEVICES".into(), "GPU-b".into())],
+            free_mib: vec![16_000],
+        });
+        assert!(llama.load("big").await);
+        let env = std::fs::read_to_string(dir.path().join("env")).unwrap();
+        assert_eq!(env.trim(), "gpu1 GPU-b");
+    }
+
+    #[tokio::test]
     async fn stopstart_load_times_out_when_server_never_becomes_healthy() {
         let dir = tempfile::tempdir().unwrap();
         write_state(dir.path(), "stopped");

@@ -511,3 +511,56 @@ async fn a_job_on_gpu1_gets_that_cards_env() {
     assert_eq!(d.rc, 0, "{}", d.err);
     assert_eq!(std::fs::read_to_string(&out).unwrap().trim(), "gpu1 1");
 }
+
+#[tokio::test]
+async fn a_job_on_two_cards_sees_both() {
+    let (api, _gpu1) = TestApi::start_two_cards(
+        &[("CUDA_VISIBLE_DEVICES", "0")],
+        &[("CUDA_VISIBLE_DEVICES", "1")],
+        PING,
+    )
+    .await;
+    let dir = tempfile::tempdir().unwrap();
+    for flags in [
+        &["--card", "gpu0,gpu1"][..],
+        &["--cards", "2"],
+        &["--card", "all"],
+    ] {
+        let out = dir.path().join("out");
+        let mut args = vec!["run"];
+        args.extend_from_slice(flags);
+        args.extend_from_slice(&[
+            "--vram",
+            "1G",
+            "--",
+            "sh",
+            "-c",
+            r#"echo "$GPUQ_CARD $CUDA_VISIBLE_DEVICES" > "$OUT""#,
+        ]);
+        let mut cmd = gpuq(api.addr, &args);
+        cmd.env("OUT", &out);
+        let d = finish(cmd.spawn().unwrap()).await;
+        assert_eq!(d.rc, 0, "{flags:?}: {}", d.err);
+        assert_eq!(
+            std::fs::read_to_string(&out).unwrap().trim(),
+            "gpu0,gpu1 0,1",
+            "{flags:?}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn card_and_cards_cannot_be_combined() {
+    let api = api().await;
+    let d = run(
+        api.addr,
+        &["run", "--card", "gpu0", "--cards", "2", "--", "true"],
+    )
+    .await;
+    assert_eq!(d.rc, 2, "{}", d.err);
+    let d = run(api.addr, &["run", "--cards", "0", "--", "true"]).await;
+    assert_eq!(d.rc, 2, "{}", d.err);
+    let d = run(api.addr, &["run", "--card", "gpu0,", "--", "true"]).await;
+    assert_eq!(d.rc, 2, "{}", d.err);
+    assert!(d.err.contains("--card"), "{}", d.err);
+}

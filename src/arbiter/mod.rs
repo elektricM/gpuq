@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Martin Dolez
 
-//! The arbiter: one owner of the card at a time, a priority queue for everyone else.
+//! The arbiter: one owner of each card at a time, a priority queue for everyone else.
 //!
 //! ```text
 //!   llm ──(top job may run)──> unloading ──(card free)──> jobs
@@ -19,6 +19,10 @@
 //! Nothing is killed. LLM requests wait for running jobs; a yieldable job is asked to stop at
 //! its next safe point when something more important waits. Priority comes from the class
 //! table (lower number = more important).
+//!
+//! A lease can hold several cards. It is granted all at once or not at all, so nothing ever
+//! holds one card while it waits for another. The LLM can also span several cards; it then
+//! gives all of them back together.
 //!
 //! One task owns all state ([`actor`]); everyone else talks to it through a [`Handle`].
 //! Leases and in-flight LLM requests are guards: dropping one tells the arbiter, so a client
@@ -190,6 +194,19 @@ impl Default for Tuning {
     }
 }
 
+/// Which cards the LLM uses. Names refer to [`Card::name`]; unknown names are ignored.
+#[derive(Clone, Debug, Default)]
+pub struct LlmPlan {
+    /// Cards a model uses when nothing more specific is known. Empty: the `llm_card` given to
+    /// [`spawn_cards`].
+    pub cards: Vec<String>,
+    /// Canonical model id to the cards it is split over.
+    pub model_cards: HashMap<String, Vec<String>>,
+    /// Canonical model id to the VRAM it needs over all its cards. A model that needs more
+    /// than `cards` offer gets the fewest extra cards that fit it.
+    pub model_vram: HashMap<String, Mib>,
+}
+
 /// Everything the arbiter needs to know at start.
 #[derive(Clone, Debug)]
 pub struct Settings {
@@ -197,6 +214,7 @@ pub struct Settings {
     /// Model reloaded when the card goes idle; None = load models on demand only.
     pub resident: Option<String>,
     pub tuning: Tuning,
+    pub llm: LlmPlan,
 }
 
 /// Runs once per waiting job that does not fit while no lease is active on `card`, e.g. to
@@ -220,6 +238,9 @@ pub struct Card {
     /// Handed to lease holders; a card without it cannot be picked for `CardSel::Any`
     /// when there is more than one card.
     pub env: Vec<(String, String)>,
+    /// Vendor, e.g. "amd" or "nvidia". Two cards of different vendors may share a lease only
+    /// when their env uses different variables, see [`merge_env`].
+    pub vendor: String,
 }
 
 impl fmt::Debug for Card {
@@ -228,30 +249,100 @@ impl fmt::Debug for Card {
             .field("name", &self.name)
             .field("device", &self.probe.device())
             .field("env", &self.env)
+            .field("vendor", &self.vendor)
             .finish()
     }
 }
 
-/// Which card a job wants.
+/// Which card or cards a job wants.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub enum CardSel {
-    /// The first configured card. Clients that know nothing about cards get this.
+    /// Nothing said: any card that can be steered, or the primary card when none can.
     #[default]
+    Default,
+    /// The first configured card.
     Primary,
     Named(String),
     /// Whichever card can take the job first. Only cards with `env` qualify, so the job can
     /// be pointed at the card it got.
     Any,
+    /// All of these cards at once.
+    Set(Vec<String>),
+    /// Every configured card at once.
+    All,
+    /// Any `n` cards at once, picked like `Any`.
+    Count(usize),
+}
+
+impl CardSel {
+    /// `gpu1`, `any`, `all`, `primary` or a comma list such as `gpu0,gpu1`.
+    pub fn parse(s: &str) -> Result<CardSel, String> {
+        let s = s.trim();
+        if s.contains(',') {
+            let names: Vec<String> = s.split(',').map(|n| n.trim().to_owned()).collect();
+            if names.iter().any(|n| n.is_empty()) {
+                return Err(format!("bad card list {s:?}"));
+            }
+            if let Some(n) = names
+                .iter()
+                .find(|n| matches!(n.as_str(), "any" | "all" | "primary"))
+            {
+                return Err(format!("\"{n}\" cannot be part of a card list"));
+            }
+            return Ok(CardSel::Set(names));
+        }
+        Ok(match s {
+            "" => return Err("empty card name".into()),
+            "any" => CardSel::Any,
+            "all" => CardSel::All,
+            "primary" => CardSel::Primary,
+            name => CardSel::Named(name.to_owned()),
+        })
+    }
 }
 
 impl fmt::Display for CardSel {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            CardSel::Default => f.write_str("default"),
             CardSel::Primary => f.write_str("primary"),
             CardSel::Named(n) => f.write_str(n),
             CardSel::Any => f.write_str("any"),
+            CardSel::Set(names) => f.write_str(&names.join(",")),
+            CardSel::All => f.write_str("all"),
+            CardSel::Count(n) => write!(f, "any {n}"),
         }
     }
+}
+
+/// The env of several cards as one list, in the order given. A variable set by several
+/// cards gets their values joined with commas (`CUDA_VISIBLE_DEVICES=0,1`). Fails when two
+/// cards of different vendors set the same variable: their device numbers do not mean the
+/// same thing.
+pub fn merge_env<'a>(
+    cards: impl IntoIterator<Item = (&'a str, &'a str, &'a [(String, String)])>,
+) -> Result<Vec<(String, String)>, String> {
+    // variable -> (value, first card, its vendor)
+    let mut out: Vec<(String, String, &str, &str)> = Vec::new();
+    for (name, vendor, env) in cards {
+        for (k, v) in env {
+            match out.iter_mut().find(|e| e.0 == *k) {
+                Some(e) if e.3 != vendor => {
+                    return Err(format!(
+                        "cards {} ({}) and {name} ({vendor}) both set {k}; cards of different \
+                         vendors can share a lease only when they use different variables",
+                        e.2, e.3
+                    ));
+                }
+                Some(e) => {
+                    e.1.push(',');
+                    e.1.push_str(v);
+                }
+                None => out.push((k.clone(), v.clone(), name, vendor)),
+            }
+        }
+    }
+    Ok(out.into_iter().map(|(k, v, _, _)| (k, v)).collect())
 }
 
 /// A job asking for the card.
@@ -275,6 +366,14 @@ pub enum ArbiterError {
     UnknownCard(String, String),
     #[error("no card can be picked for \"any\": give the cards a visible_devices setting")]
     NoSteerableCard,
+    #[error("card '{0}' is listed twice")]
+    DuplicateCard(String),
+    #[error("asked for {0} cards, but only {1} can be picked (cards need visible_devices)")]
+    NotEnoughCards(usize, usize),
+    #[error("card '{0}' has no visible_devices; a lease on several cards needs it on every card")]
+    NoEnv(String),
+    #[error("{0}")]
+    MixedVendors(String),
 }
 
 // ------------------------------------------------------------------------ status
@@ -282,7 +381,10 @@ pub enum ArbiterError {
 #[derive(Clone, Debug, Serialize)]
 pub struct LeaseStatus {
     pub id: String,
+    /// Card names joined with commas.
     pub card: String,
+    /// Every card the lease holds, in grant order.
+    pub cards: Vec<String>,
     pub class: String,
     pub name: String,
     pub vram: Vram,
@@ -302,7 +404,7 @@ pub enum WaiterKind {
 #[derive(Clone, Debug, Serialize)]
 pub struct QueueStatus {
     pub kind: WaiterKind,
-    /// Card name, or "any".
+    /// Card name, a comma list of names, "any", or "any N" for N cards.
     pub card: String,
     pub class: String,
     pub name: String,
@@ -326,7 +428,7 @@ pub struct CardStatus {
     pub name: String,
     pub device: String,
     pub state: Phase,
-    /// The LLM backend lives on this card.
+    /// The LLM backend lives on this card (or comes back to it).
     pub llm: bool,
     pub baseline_mib: Option<Mib>,
     pub floor_mib: Option<Mib>,
@@ -356,6 +458,8 @@ pub struct Status {
     /// Most recent last; at most 40 entries.
     pub history: Vec<HistoryEntry>,
     pub cards: Vec<CardStatus>,
+    /// The cards the LLM backend holds now; empty while it is unloaded.
+    pub llm_cards: Vec<String>,
 }
 
 // ------------------------------------------------------------------------ handle
@@ -388,9 +492,18 @@ enum Msg {
 #[derive(Debug)]
 struct Granted {
     id: String,
-    card: String,
+    cards: Vec<String>,
     env: Vec<(String, String)>,
     yield_rx: watch::Receiver<bool>,
+}
+
+/// What the handle knows about a card, to check requests before they queue.
+struct CardInfo {
+    name: String,
+    /// Can be picked for `CardSel::Any` and `CardSel::Count`.
+    steer: bool,
+    vendor: String,
+    env: Vec<(String, String)>,
 }
 
 /// Cheap to clone; every clone talks to the same arbiter task.
@@ -398,8 +511,8 @@ struct Granted {
 pub struct Handle {
     tx: mpsc::UnboundedSender<Msg>,
     classes: Arc<Classes>,
-    /// Card names in config order, and whether each can be picked for `CardSel::Any`.
-    cards: Arc<Vec<(String, bool)>>,
+    /// Cards in config order.
+    cards: Arc<Vec<CardInfo>>,
     ids: Arc<std::sync::atomic::AtomicU64>,
 }
 
@@ -417,12 +530,14 @@ pub fn spawn(
         margin_mib: settings.tuning.margin_mib,
         whole_card_baseline_mib: settings.tuning.whole_card_baseline_mib,
         env: Vec::new(),
+        vendor: String::new(),
     };
     spawn_cards(settings, vec![card], 0, backend, offload)
 }
 
 /// Start the arbiter for several cards. `cards[0]` is the primary card; the LLM backend lives
-/// on `cards[llm_card]`. Panics if `cards` is empty or `llm_card` is out of range.
+/// on `cards[llm_card]` unless `settings.llm` names its cards. Panics if `cards` is empty or
+/// `llm_card` is out of range.
 pub fn spawn_cards(
     settings: Settings,
     cards: Vec<Card>,
@@ -439,7 +554,12 @@ pub fn spawn_cards(
         cards: Arc::new(
             cards
                 .iter()
-                .map(|c| (c.name.clone(), !many || !c.env.is_empty()))
+                .map(|c| CardInfo {
+                    name: c.name.clone(),
+                    steer: !many || !c.env.is_empty(),
+                    vendor: c.vendor.clone(),
+                    env: c.env.clone(),
+                })
                 .collect(),
         ),
         ids: Arc::new(std::sync::atomic::AtomicU64::new(1)),
@@ -457,21 +577,61 @@ impl Handle {
 
     /// Card names in config order; the first is the primary card.
     pub fn card_names(&self) -> impl Iterator<Item = &str> {
-        self.cards.iter().map(|(n, _)| n.as_str())
+        self.cards.iter().map(|c| c.name.as_str())
+    }
+
+    fn known(&self) -> String {
+        self.card_names().collect::<Vec<_>>().join(", ")
     }
 
     /// Check a card selection before queueing.
     pub fn check_card(&self, sel: &CardSel) -> Result<(), ArbiterError> {
+        let find = |n: &str| {
+            self.cards
+                .iter()
+                .find(|c| c.name == n)
+                .ok_or_else(|| ArbiterError::UnknownCard(n.to_owned(), self.known()))
+        };
+        let steerable = self.cards.iter().filter(|c| c.steer).count();
         match sel {
-            CardSel::Primary => Ok(()),
-            CardSel::Named(n) if self.cards.iter().any(|(c, _)| c == n) => Ok(()),
-            CardSel::Named(n) => Err(ArbiterError::UnknownCard(
-                n.clone(),
-                self.card_names().collect::<Vec<_>>().join(", "),
-            )),
-            CardSel::Any if self.cards.iter().any(|(_, steer)| *steer) => Ok(()),
+            CardSel::Default | CardSel::Primary => Ok(()),
+            CardSel::Named(n) => find(n).map(|_| ()),
+            CardSel::Any if steerable > 0 => Ok(()),
             CardSel::Any => Err(ArbiterError::NoSteerableCard),
+            CardSel::Count(0) => Err(ArbiterError::NotEnoughCards(0, steerable)),
+            CardSel::Count(1) if steerable == 0 => Err(ArbiterError::NoSteerableCard),
+            CardSel::Count(n) if *n > steerable => Err(ArbiterError::NotEnoughCards(*n, steerable)),
+            CardSel::Count(_) => Ok(()),
+            CardSel::Set(names) => {
+                let mut picked: Vec<&CardInfo> = Vec::new();
+                for n in names {
+                    let c = find(n)?;
+                    if picked.iter().any(|p| p.name == c.name) {
+                        return Err(ArbiterError::DuplicateCard(n.clone()));
+                    }
+                    picked.push(c);
+                }
+                self.check_set(&picked)
+            }
+            CardSel::All => self.check_set(&self.cards.iter().collect::<Vec<_>>()),
         }
+    }
+
+    /// Several cards in one lease: each needs env, and the env must merge.
+    fn check_set(&self, cards: &[&CardInfo]) -> Result<(), ArbiterError> {
+        if cards.len() < 2 {
+            return Ok(());
+        }
+        if let Some(c) = cards.iter().find(|c| c.env.is_empty()) {
+            return Err(ArbiterError::NoEnv(c.name.clone()));
+        }
+        merge_env(
+            cards
+                .iter()
+                .map(|c| (c.name.as_str(), c.vendor.as_str(), c.env.as_slice())),
+        )
+        .map(|_| ())
+        .map_err(ArbiterError::MixedVendors)
     }
 
     fn next_id(&self) -> u64 {
@@ -500,8 +660,8 @@ impl Handle {
         })
     }
 
-    /// Wait for a lease. The lease lasts until it is dropped. Fails at once for an unknown
-    /// card, or for `CardSel::Any` when no card can be picked.
+    /// Wait for a lease. The lease lasts until it is dropped. Fails at once when
+    /// [`Handle::check_card`] refuses the card selection.
     pub async fn acquire(&self, req: LeaseRequest) -> Result<Lease, ArbiterError> {
         self.check_card(&req.card)?;
         let id = self.next_id();
@@ -516,7 +676,8 @@ impl Handle {
         cancel.disarm();
         Ok(Lease {
             id: granted.id,
-            card: granted.card,
+            card: granted.cards.join(","),
+            cards: granted.cards,
             env: granted.env,
             class,
             vram,
@@ -577,6 +738,7 @@ impl Drop for LlmGuard {
 pub struct Lease {
     id: String,
     card: String,
+    cards: Vec<String>,
     env: Vec<(String, String)>,
     class: String,
     vram: Vram,
@@ -594,12 +756,17 @@ impl Lease {
         &self.class
     }
 
-    /// Name of the card this lease holds.
+    /// Name of the card this lease holds; several names joined with commas.
     pub fn card(&self) -> &str {
         &self.card
     }
 
-    /// Environment that points a program at the card (empty when the card has none).
+    /// Every card this lease holds, in grant order.
+    pub fn cards(&self) -> &[String] {
+        &self.cards
+    }
+
+    /// Environment that points a program at its cards (empty when the cards have none).
     pub fn env(&self) -> &[(String, String)] {
         &self.env
     }

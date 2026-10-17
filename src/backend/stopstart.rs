@@ -4,11 +4,12 @@
 //! Servers that cannot unload a model at runtime (vLLM, SGLang): unloading stops the service,
 //! loading starts it again.
 
+use std::sync::Mutex;
 use std::time::Duration;
 
 use async_trait::async_trait;
 
-use super::{Backend, BackendError, Capabilities};
+use super::{Backend, BackendError, Capabilities, Placement};
 use crate::workload::service::{http_client, http_ok, wait_down, ServiceControl};
 
 const DEFAULT_START_TIMEOUT: Duration = Duration::from_secs(300);
@@ -23,6 +24,8 @@ pub(crate) struct Managed {
     client: reqwest::Client,
     pub start_timeout: Duration,
     pub stop_timeout: Duration,
+    /// Env for the next start (cards from the arbiter); used by `kind = "command"` only.
+    env: Mutex<Vec<(String, String)>>,
 }
 
 impl Managed {
@@ -38,7 +41,22 @@ impl Managed {
             client: http_client(),
             start_timeout: DEFAULT_START_TIMEOUT,
             stop_timeout: DEFAULT_STOP_TIMEOUT,
+            env: Mutex::new(Vec::new()),
         }
+    }
+
+    /// Env the next start passes to a command service.
+    pub fn set_env(&self, env: Vec<(String, String)>) {
+        *self.env.lock().unwrap_or_else(|e| e.into_inner()) = env;
+    }
+
+    /// The cards' env plus `GPUQ_CARD`, as `gpuq run` gives a job.
+    pub fn placement_env(p: &Placement) -> Vec<(String, String)> {
+        let mut env = p.env.clone();
+        if !p.cards.is_empty() {
+            env.push(("GPUQ_CARD".into(), p.cards.join(",")));
+        }
+        env
     }
 
     pub async fn healthy(&self) -> bool {
@@ -60,7 +78,10 @@ impl Managed {
     }
 
     pub async fn start(&self) -> Result<(), BackendError> {
+        let env = self.env.lock().unwrap_or_else(|e| e.into_inner()).clone();
         self.control
+            .clone()
+            .with_env(env)
             .start()
             .await
             .map_err(|e| BackendError::Failed(e.to_string()))?;
@@ -163,5 +184,9 @@ impl Backend for StopStart {
                 false
             }
         }
+    }
+
+    fn place(&self, p: &Placement) {
+        self.inner.set_env(Managed::placement_env(p));
     }
 }

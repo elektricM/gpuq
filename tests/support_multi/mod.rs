@@ -9,18 +9,20 @@
 mod common;
 
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use async_trait::async_trait;
 use gpuq::arbiter::{
-    self, ArbiterError, Card, CardSel, Handle, Lease, LeaseRequest, Settings, Status, Vram,
+    self, ArbiterError, Card, CardSel, Handle, Lease, LeaseRequest, OffloadHook, Settings, Status,
+    Vram,
 };
 use gpuq::backend::Backend;
 use gpuq::probe::{ProbeError, VramProbe, VramReading};
 use tokio::task::JoinHandle;
 use tokio::time::{sleep, timeout, Instant};
 
+#[allow(unused_imports)]
 pub use common::{base_settings, done, ms, secs, FakeBackend, FakeCard};
 
 /// A fake probe that can be told to fail.
@@ -44,6 +46,29 @@ impl VramProbe for SwitchProbe {
     }
 }
 
+/// An offload hook that frees the card it is run for and remembers the names.
+pub struct CardHook {
+    cards: Vec<FakeCard>,
+    pub runs: Mutex<Vec<String>>,
+}
+
+#[async_trait]
+impl OffloadHook for CardHook {
+    async fn run(&self, card: &str) -> bool {
+        self.runs.lock().unwrap().push(card.to_owned());
+        if let Some(i) = card
+            .strip_prefix("gpu")
+            .and_then(|n| n.parse::<usize>().ok())
+        {
+            self.cards[i].set_job_vram(0);
+        }
+        true
+    }
+}
+
+/// A card's env and vendor.
+pub type EnvVendor = (Vec<(String, String)>, String);
+
 /// How to lay out the cards.
 #[derive(Clone)]
 pub struct Opts {
@@ -51,6 +76,9 @@ pub struct Opts {
     pub llm_card: usize,
     /// Whether card `i` gets `CUDA_VISIBLE_DEVICES=i`.
     pub env: Vec<bool>,
+    /// Card `i`'s env and vendor, instead of the default above.
+    pub custom: Vec<Option<EnvVendor>>,
+    pub hook: bool,
 }
 
 impl Opts {
@@ -59,7 +87,25 @@ impl Opts {
             cards,
             llm_card: 0,
             env: vec![true; cards],
+            custom: vec![None; cards],
+            hook: false,
         }
+    }
+
+    /// Give card `i` this env (`K=V` pairs) and vendor.
+    pub fn card(mut self, i: usize, env: &[(&str, &str)], vendor: &str) -> Opts {
+        let env = env
+            .iter()
+            .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
+            .collect();
+        self.custom[i] = Some((env, vendor.to_owned()));
+        self
+    }
+
+    /// Run an offload hook that frees the card it is called for.
+    pub fn hook(mut self) -> Opts {
+        self.hook = true;
+        self
     }
 
     pub fn llm(mut self, card: usize) -> Opts {
@@ -86,6 +132,7 @@ pub struct MultiRig {
     pub fail: Vec<Arc<AtomicBool>>,
     pub llm_card: usize,
     pub backend: Arc<FakeBackend>,
+    pub hook: Option<Arc<CardHook>>,
 }
 
 pub fn card_name(i: usize) -> String {
@@ -94,6 +141,11 @@ pub fn card_name(i: usize) -> String {
 
 pub fn named(i: usize) -> CardSel {
     CardSel::Named(card_name(i))
+}
+
+/// These cards at once.
+pub fn set(cards: &[usize]) -> CardSel {
+    CardSel::Set(cards.iter().map(|&i| card_name(i)).collect())
 }
 
 pub fn request_on(
@@ -136,22 +188,41 @@ impl MultiRig {
                     }),
                     margin_mib: settings.tuning.margin_mib,
                     whole_card_baseline_mib: settings.tuning.whole_card_baseline_mib,
-                    env: if opts.env[i] {
-                        vec![("CUDA_VISIBLE_DEVICES".into(), i.to_string())]
-                    } else {
-                        Vec::new()
+                    env: match &opts.custom[i] {
+                        Some((env, _)) => env.clone(),
+                        None if opts.env[i] => {
+                            vec![("CUDA_VISIBLE_DEVICES".into(), i.to_string())]
+                        }
+                        None => Vec::new(),
+                    },
+                    vendor: match &opts.custom[i] {
+                        Some((_, vendor)) => vendor.clone(),
+                        None => "nvidia".into(),
                     },
                 }
             })
             .collect();
         let backend = Arc::new(FakeBackend::new(fakes[opts.llm_card].clone()));
-        let handle = arbiter::spawn_cards(settings, cards, opts.llm_card, backend.clone(), None);
+        let hook = opts.hook.then(|| {
+            Arc::new(CardHook {
+                cards: fakes.clone(),
+                runs: Mutex::new(Vec::new()),
+            })
+        });
+        let handle = arbiter::spawn_cards(
+            settings,
+            cards,
+            opts.llm_card,
+            backend.clone(),
+            hook.clone().map(|h| h as Arc<dyn OffloadHook>),
+        );
         MultiRig {
             handle,
             cards: fakes,
             fail,
             llm_card: opts.llm_card,
             backend,
+            hook,
         }
     }
 
@@ -222,6 +293,22 @@ impl MultiRig {
         name: &str,
     ) -> Lease {
         let req = request_on(card, class, Vram::Mib(mib), yieldable, name);
+        timeout(secs(5.0), self.handle.acquire(req))
+            .await
+            .expect("timed out waiting for a lease")
+            .expect("acquire failed")
+    }
+
+    /// Wait up to 5 s for a lease of `vram` on each of `cards`.
+    pub async fn lease_cards(
+        &self,
+        card: CardSel,
+        class: &str,
+        vram: Vram,
+        yieldable: bool,
+        name: &str,
+    ) -> Lease {
+        let req = request_on(card, class, vram, yieldable, name);
         timeout(secs(5.0), self.handle.acquire(req))
             .await
             .expect("timed out waiting for a lease")

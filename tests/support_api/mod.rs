@@ -86,6 +86,7 @@ impl TestApi {
             margin_mib: 256,
             whole_card_baseline_mib: 512,
             env: e,
+            vendor: "nvidia".into(),
         };
         let cards = vec![mk("gpu0", &card0, env(env0)), mk("gpu1", &card1, env(env1))];
         let handle = arbiter::spawn_cards(base_settings(), cards, 0, backend.clone(), None);

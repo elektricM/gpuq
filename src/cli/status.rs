@@ -109,10 +109,15 @@ fn render(st: &Value) -> String {
         } else {
             String::new()
         };
+        let each = if arr(l, "cards").len() > 1 {
+            " each"
+        } else {
+            ""
+        };
         put(
             "lease",
             format!(
-                "{} {}/{}{on} vram={} {}s pid={pid}{y}",
+                "{} {}/{}{on} vram={}{each} {}s pid={pid}{y}",
                 s(l, "id"),
                 s(l, "class"),
                 s(l, "name"),
@@ -292,6 +297,31 @@ mod tests {
         assert!(t.contains("job on gpu1 vram=all"), "{t}");
         assert!(t.contains("w on any vram=512MiB"), "{t}");
         assert!(!t.contains("device "), "{t}");
+    }
+
+    #[test]
+    fn renders_a_lease_on_two_cards() {
+        let st = json!({
+            "state": "jobs",
+            "cards": [
+                {"name": "gpu0", "device": "amd:0000:03:00.0", "state": "jobs", "llm": true,
+                 "vram": {"used_mib": 9000, "total_mib": 24560}},
+                {"name": "gpu1", "device": "amd:0000:04:00.0", "state": "jobs", "llm": false,
+                 "vram": {"used_mib": 9000, "total_mib": 16368}}
+            ],
+            "leases": [{"id": "L1-1", "card": "gpu0,gpu1", "cards": ["gpu0", "gpu1"],
+                        "class": "batch", "name": "train", "vram": "8192MiB", "age_s": 5,
+                        "pid": 9}],
+            "queue": [{"kind": "job", "card": "any 2", "class": "batch", "name": "next",
+                       "vram": "all", "wait_s": 1, "why": "0 of 2 cards ready"}],
+            "history": []
+        });
+        let t = render(&st);
+        assert!(
+            t.contains("L1-1 batch/train on gpu0,gpu1 vram=8192MiB each 5s pid=9"),
+            "{t}"
+        );
+        assert!(t.contains("next on any 2 vram=all"), "{t}");
     }
 
     #[test]

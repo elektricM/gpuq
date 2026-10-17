@@ -169,6 +169,10 @@ impl Backend for LlamaSwap {
         self.models.resolve(model)
     }
 
+    fn vram_estimate(&self, model: &str) -> Option<crate::Mib> {
+        self.models.vram_estimate(model)
+    }
+
     fn uses_gpu(&self, model: &str) -> bool {
         self.models.uses_gpu(model)
     }

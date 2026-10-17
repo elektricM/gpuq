@@ -339,3 +339,217 @@ mod tools {
         assert_eq!(p.read().await.unwrap().gtt_used_mib, Some(1));
     }
 }
+
+// ---------------------------------------------------------------------- detection
+
+mod detection {
+    use super::*;
+    use gpuq::config::{CardList, Config, GpuVendor};
+    use gpuq::probe::scan::{kfd_indices, scan_amd, FoundVendor};
+
+    /// A discrete card has its own memory chips (mem_info_vram_vendor) and a unique_id.
+    fn dgpu(root: &Path, pci: &str, total_mib: u64, uid: &str) {
+        fake_card(root, pci, total_mib, 100, None);
+        fs::write(root.join(pci).join("mem_info_vram_vendor"), "samsung\n").unwrap();
+        fs::write(root.join(pci).join("unique_id"), format!("{uid}\n")).unwrap();
+    }
+
+    /// An APU's GPU: a small carve-out, no vendor file, no unique_id.
+    fn igpu(root: &Path, pci: &str) {
+        fake_card(root, pci, 2048, 300, None);
+    }
+
+    /// Two discrete cards and an iGPU; PCI order is not size order.
+    fn machine() -> tempfile::TempDir {
+        let dir = tempfile::tempdir().unwrap();
+        dgpu(dir.path(), "0000:03:00.0", 16368, "aaaa");
+        dgpu(dir.path(), "0000:0c:00.0", 24560, "bbbb");
+        igpu(dir.path(), "0000:15:00.0");
+        fs::create_dir_all(dir.path().join("0000:00:01.0")).unwrap(); // not a GPU
+        dir
+    }
+
+    fn config(root: &Path, extra: &str) -> Config {
+        Config::from_toml_str(&format!(
+            "[gpu]\nsysfs_root = {:?}\nnvidia_smi = \"/nonexistent/nvidia-smi\"\n{extra}",
+            root.to_str().unwrap()
+        ))
+        .unwrap()
+    }
+
+    #[test]
+    fn every_gpu_is_found_by_pci_address() {
+        let m = machine();
+        let found = scan_amd(m.path(), None);
+        let pcis: Vec<&str> = found.iter().map(|f| f.pci.as_str()).collect();
+        assert_eq!(pcis, ["0000:03:00.0", "0000:0c:00.0", "0000:15:00.0"]);
+        assert!(found.iter().all(|f| f.vendor == FoundVendor::Amd));
+        assert_eq!(
+            found.iter().map(|f| f.integrated).collect::<Vec<_>>(),
+            [false, false, true]
+        );
+        assert_eq!(found[1].total_mib, 24560);
+        assert_eq!(
+            found[0].visible,
+            Some(("ROCR_VISIBLE_DEVICES".into(), "GPU-aaaa".into()))
+        );
+        // No unique_id and no topology: nothing can point a program at the iGPU.
+        assert_eq!(found[2].visible, None);
+    }
+
+    #[test]
+    fn detected_cards_are_named_largest_first_with_the_igpu_last() {
+        let m = machine();
+        let cfg = config(m.path(), "");
+        assert!(cfg.detects());
+        let cards = cfg.cards();
+        let names: Vec<(&str, &str)> = cards
+            .iter()
+            .map(|c| (c.name.as_str(), c.pci.as_str()))
+            .collect();
+        assert_eq!(
+            names,
+            [
+                ("gpu0", "0000:0c:00.0"),
+                ("gpu1", "0000:03:00.0"),
+                ("gpu2", "0000:15:00.0")
+            ]
+        );
+        assert_eq!(cards[0].vendor, GpuVendor::Amd);
+        assert_eq!(
+            cards[0].env,
+            [("ROCR_VISIBLE_DEVICES".to_owned(), "GPU-bbbb".to_owned())]
+        );
+        assert!(cards[2].integrated && cards[2].env.is_empty());
+        // The LLM goes to the primary card, the largest.
+        assert_eq!(cfg.llm_card_names(&cards), ["gpu0"]);
+        let text = cfg.describe();
+        assert!(text.contains("gpus: 3 detected, 3 in use"), "{text}");
+        assert!(
+            text.contains("gpu2: amd pci=0000:15:00.0 2048 MiB integrated"),
+            "{text}"
+        );
+    }
+
+    #[test]
+    fn integrated_gpus_and_listed_addresses_can_be_left_out() {
+        let m = machine();
+        for extra in [
+            "skip_integrated = true",
+            "exclude = [\"0000:15:00.0\"]",
+            "exclude = [\"15:00.0\"]",
+        ] {
+            let cfg = config(m.path(), extra);
+            let cards = cfg.cards();
+            assert_eq!(cards.len(), 2, "{extra}");
+            assert!(cards.iter().all(|c| !c.integrated), "{extra}");
+            let text = cfg.describe();
+            assert!(
+                text.contains("excluded: amd 0000:15:00.0"),
+                "{extra}: {text}"
+            );
+        }
+        let cfg = config(
+            m.path(),
+            "exclude = [\"0000:0c:00.0\"]\nskip_integrated = true",
+        );
+        let cards = cfg.cards();
+        assert_eq!(cards.len(), 1);
+        assert_eq!(cards[0].pci, "0000:03:00.0");
+        assert_eq!(cards[0].name, "gpu0");
+        // A single card takes gpu.device.
+        let cfg = config(
+            m.path(),
+            "device = \"main\"\nexclude = [\"0000:0c:00.0\", \"0000:15:00.0\"]",
+        );
+        assert_eq!(cfg.cards()[0].name, "main");
+        // Nothing left at all is an error.
+        let cfg = config(
+            m.path(),
+            "exclude = [\"0000:03:00.0\", \"0000:0c:00.0\"]\nskip_integrated = true",
+        );
+        let cards = cfg.cards();
+        assert!(cards.is_empty());
+        let p = cfg.reference_problems(&cards);
+        assert!(p[0].contains("every detected GPU is excluded"), "{p:?}");
+        // An address that matches nothing is pointed out.
+        let text = config(m.path(), "exclude = [\"0000:99:00.0\"]").describe();
+        assert!(text.contains("matches no detected GPU"), "{text}");
+    }
+
+    #[test]
+    fn card_names_are_checked_against_the_detected_cards() {
+        let m = machine();
+        let cfg = config(m.path(), "[llm]\ncard = [\"gpu0\", \"gpu1\"]\n");
+        assert_eq!(
+            cfg.llm.card,
+            Some(CardList::Many(vec!["gpu0".into(), "gpu1".into()]))
+        );
+        assert!(cfg.reference_problems(&cfg.cards()).is_empty());
+        let cfg = config(m.path(), "[llm]\ncard = [\"gpu0\", \"gpu7\"]\n");
+        let p = cfg.reference_problems(&cfg.cards());
+        assert!(
+            p.iter()
+                .any(|e| e.contains("llm.card") && e.contains("gpu7")),
+            "{p:?}"
+        );
+    }
+
+    #[test]
+    fn pinning_one_device_in_gpu_turns_detection_off() {
+        let m = machine();
+        for extra in [
+            "pci = \"0000:03:00.0\"",
+            "nvidia_index = 0",
+            "vendor = \"command\"\ncommand = [\"true\"]",
+        ] {
+            let cfg = config(m.path(), extra);
+            assert!(!cfg.detects(), "{extra}");
+            assert_eq!(cfg.cards().len(), 1, "{extra}");
+        }
+        // With no GPU found, [gpu] is the one card, as before.
+        let empty = tempfile::tempdir().unwrap();
+        let cfg = config(empty.path(), "");
+        assert!(cfg.detects());
+        let cards = cfg.cards();
+        assert_eq!(cards.len(), 1);
+        assert!(!cards[0].detected && cards[0].env.is_empty());
+    }
+
+    /// A KFD node directory: `simd_count` 0 is a CPU.
+    fn node(root: &Path, n: u32, simd: u32, domain: u32, location: u32) {
+        let dir = root.join(n.to_string());
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(
+            dir.join("properties"),
+            format!(
+                "cpu_cores_count 0\nsimd_count {simd}\nlocation_id {location}\ndomain {domain}\n"
+            ),
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn rocm_numbers_come_from_the_kfd_topology_by_pci_address() {
+        let kfd = tempfile::tempdir().unwrap();
+        node(kfd.path(), 0, 0, 0, 0); // the CPU
+        node(kfd.path(), 1, 4, 0, 0x15 << 8); // 0000:15:00.0, the iGPU, is ROCm device 0
+        node(kfd.path(), 2, 192, 0, 0x0c << 8);
+        node(kfd.path(), 3, 128, 0, 0x03 << 8);
+        assert_eq!(
+            kfd_indices(kfd.path()),
+            ["0000:15:00.0", "0000:0c:00.0", "0000:03:00.0"]
+        );
+        let m = machine();
+        let found = scan_amd(m.path(), Some(kfd.path()));
+        let igpu = found.iter().find(|f| f.integrated).unwrap();
+        assert_eq!(
+            igpu.visible,
+            Some(("ROCR_VISIBLE_DEVICES".into(), "0".into()))
+        );
+        // A node that cannot be read would shift every number after it: use none.
+        fs::write(kfd.path().join("1/properties"), "").unwrap();
+        fs::remove_file(kfd.path().join("1/properties")).unwrap();
+        assert!(kfd_indices(kfd.path()).is_empty());
+    }
+}
