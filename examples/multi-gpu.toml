@@ -1,14 +1,20 @@
-# Two cards: an AMD card for the LLM and an NVIDIA card for ComfyUI.
+# Two cards listed by hand: an AMD card for the LLM and an NVIDIA card for ComfyUI.
 # Copy to /etc/gpuq/config.toml and adjust the PCI address and device numbers.
 #
+# Without [[gpu.card]] gpuq detects every GPU itself and works out the device ids from the
+# PCI addresses (see docs/config.md). List the cards yourself only to pick their names, their
+# order or their env.
+#
 # gpuq schedules the cards from one queue. A job asks for a card by name (`--card nvidia`),
-# or for whichever has room (`--card any`). Leases on different cards run side by side;
-# the LLM only waits for jobs on its own card.
+# for several at once (`--card amd,nvidia`, `--card all`, `--cards 2`), or for whichever has
+# room (the default, or `--card any`). Leases on different cards run side by side; the LLM
+# only waits for jobs on its own cards.
 #
 # `visible_devices` is what gpuq hands to a lease holder so the program lands on the card it
 # was granted: HIP_VISIBLE_DEVICES and ROCR_VISIBLE_DEVICES for AMD, CUDA_VISIBLE_DEVICES for
 # NVIDIA. Cards without it can still be named, but `--card any` skips them. Set
-# CUDA_DEVICE_ORDER=PCI_BUS_ID wherever CUDA programs start so the numbers match nvidia-smi.
+# CUDA_DEVICE_ORDER=PCI_BUS_ID wherever CUDA programs start so the numbers match nvidia-smi,
+# or write the GPU UUID.
 
 [gate]
 port = 8080
@@ -17,7 +23,8 @@ backend = "http://127.0.0.1:8081"    # llama-swap, moved here from 8080
 [llm]
 backend = "llama-swap"
 llama_swap_config = "/etc/llama-swap/config.yaml"
-card = "amd"                         # the LLM server runs on this card (default: the first)
+card = "amd"                         # the LLM server runs on this card (default: the first);
+                                     # a list such as ["amd", "nvidia"] splits it over both
 
 [[gpu.card]]
 name = "amd"                         # a-z, 0-9, _ and -; not "any" or "primary"
@@ -60,7 +67,8 @@ busy_url = "http://127.0.0.1:8189/queue"
 
 # Examples:
 #   gpuq run --card nvidia --vram 8G -- python train.py      # exactly this card
-#   gpuq run --card any --vram 8G -- python train.py         # the first card with room;
+#   gpuq run --vram 8G -- python train.py                    # the first card with room;
 #                                                            # CUDA/HIP_VISIBLE_DEVICES and
 #                                                            # GPUQ_CARD tell the job where
+#   gpuq run --card all --vram 8G -- python train.py         # both cards at once, 8G on each
 #   gpuq status                                              # one line per card

@@ -38,33 +38,93 @@ loopback: anyone who can reach it can take the card.
 
 ## [gpu]
 
-How VRAM is read and how much room to leave.
+Which cards gpuq manages, how VRAM is read and how much room to leave.
+
+By default gpuq detects every GPU on the machine and manages all of them (see
+[Detected cards](#detected-cards)). You only write something to leave a card out, usually the
+CPU's integrated GPU. Pinning one device in this table (`pci`, `nvidia_index`, or `vendor =
+"command"` or `"intel"`) turns detection off and describes a single card, as before 0.3.0.
+`[[gpu.card]]` tables, when present, define the set of cards exactly.
 
 | Key | Default | Meaning |
 |---|---|---|
-| `vendor` | `"auto"` | `auto`, `amd`, `nvidia`, `intel` or `command`. `auto` tries AMD sysfs, then `nvidia-smi` on PATH, then `command` if `gpu.command` is set. `intel` is not supported yet; use `command`. |
-| `pci` | `""` | AMD: PCI address such as `0000:03:00.0`. Empty picks the amdgpu device with the most VRAM. |
+| `exclude` | `[]` | PCI addresses of detected GPUs to leave alone, such as `["0000:15:00.0"]`. The short form `"15:00.0"` works too. `gpuq check-config` lists the addresses. |
+| `skip_integrated` | `false` | Leave every integrated GPU alone. |
+| `vendor` | `"auto"` | `auto`, `amd`, `nvidia`, `intel` or `command`. With detection, `auto` finds AMD and NVIDIA cards, `amd` or `nvidia` only that vendor. Without it, `auto` tries AMD sysfs, then `nvidia-smi` on PATH, then `command` if `gpu.command` is set. `intel` is not supported yet; use `command`. |
+| `pci` | `""` | AMD: manage only the card at this PCI address, such as `0000:03:00.0`. |
 | `sysfs_root` | `"/sys/bus/pci/devices"` | AMD: where to look for devices. |
-| `nvidia_index` | `0` | NVIDIA: GPU index passed to `nvidia-smi -i`. |
+| `nvidia_index` | unset | NVIDIA: manage only the card with this `nvidia-smi -i` index. |
 | `nvidia_smi` | `"nvidia-smi"` | NVIDIA: the binary to run. |
 | `command` | `[]` | Argv of a program that prints `used_mib total_mib` (an optional third number is GTT in MiB). Required for `vendor = "command"`. |
-| `device` | unset | Name of the card in status and leases when there is no `[[gpu.card]]`. Default `gpu0`. |
+| `device` | unset | Name of the card when there is only one. Default `gpu0`. |
 | `margin_mib` | `256` | VRAM kept free on top of what leases declare. |
 | `settle_timeout_s` | `60` | How long to wait for the backend to report its models unloaded. |
 | `driver_settle_s` | `2` | Pause after an unload so the driver releases VRAM. |
 | `whole_card_baseline_mib` | `512` | `--vram all` needs at most this much used by other processes. |
 
+### Detected cards
+
+With no `[[gpu.card]]` and no single device pinned in `[gpu]`, gpuq looks for:
+
+- AMD cards: every PCI device under `sysfs_root` with amdgpu's `mem_info_vram_total`.
+- NVIDIA cards: every line of `nvidia-smi --query-gpu=index,pci.bus_id,uuid,memory.total`.
+
+Cards are ordered discrete first, then by VRAM (largest first), then by PCI address, and named
+`gpu0`, `gpu1`, ... in that order after exclusions. A single card is named `gpu.device` if set.
+`gpu0` is the primary card, so the LLM goes to the largest card unless `llm.card` says
+otherwise. If nothing is detected, the `[gpu]` probe settings describe one card as before.
+
+Each card is identified by its PCI address, never by an assumed device number. HIP, CUDA and
+Vulkan each number devices their own way, and the numbers can change after a driver update
+(an integrated GPU can become device 0). gpuq works out the env that points a program at each
+card:
+
+| Vendor | Variable | Value |
+|---|---|---|
+| NVIDIA | `CUDA_VISIBLE_DEVICES` | The GPU UUID, `GPU-...`. CUDA accepts it in place of an index, whatever `CUDA_DEVICE_ORDER` says. |
+| AMD | `ROCR_VISIBLE_DEVICES` | `GPU-<unique_id>` from sysfs, the UUID `rocminfo` shows. Cards without a `unique_id` (integrated GPUs) get their ROCm index, read from the KFD topology (`/sys/class/kfd/kfd/topology/nodes`) by PCI address. |
+
+Only `ROCR_VISIBLE_DEVICES` is set for detected AMD cards. HIP numbers the cards it is given
+from 0 again, so setting `HIP_VISIBLE_DEVICES` to the same value as well would point at the
+wrong device. Vulkan programs (for example llama.cpp built with Vulkan) ignore both variables;
+pin them by hand.
+
+An AMD GPU counts as integrated when sysfs has no `mem_info_vram_vendor` for it: amdgpu creates
+that file only for cards with their own memory chips, which an APU's GPU does not have.
+`gpuq check-config` shows `integrated` next to such a card. If your hardware is reported
+wrongly, exclude the card by PCI address instead of relying on `skip_integrated`.
+
+A detected card without a device string (an integrated GPU whose KFD topology gpuq cannot
+read) can still be named with `--card`, but `--card any` skips it.
+
+```toml
+[gpu]
+exclude = ["0000:15:00.0"]   # the CPU's integrated GPU
+```
+
+`gpuq check-config` prints every detected card, its PCI address, size and env, and the
+excluded ones:
+
+```
+gpus: 3 detected, 2 in use
+  gpu0: amd pci=0000:03:00.0 24560 MiB, ROCR_VISIBLE_DEVICES=GPU-1111aaaa2222bbbb, margin 256 MiB (primary) (llm)
+  gpu1: amd pci=0000:0c:00.0 16368 MiB, ROCR_VISIBLE_DEVICES=GPU-3333cccc4444dddd, margin 256 MiB
+  excluded: amd 0000:15:00.0 2048 MiB (gpu.exclude)
+```
+
+Card names used elsewhere (`llm.card`, `[llm.models]`, `[[service]]`, `[immich]`) are checked
+against the detected cards when gpuq starts and by `gpuq check-config`.
+
 ### [[gpu.card]]
 
-Several cards: write one `[[gpu.card]]` table per GPU. When present they replace the single
-card described by the keys above (`margin_mib`, `settle_timeout_s`, `driver_settle_s` and
-`whole_card_baseline_mib` stay the defaults for all cards). Without any `[[gpu.card]]`, the
-`[gpu]` table is one card named `gpu.device`, else `gpu0`, with no env, exactly as before.
-The first card is the primary card: jobs and services that name no card go there.
+To list the cards yourself, write one `[[gpu.card]]` table per GPU. They define the set
+exactly: nothing is detected, and `gpu.exclude` and `gpu.skip_integrated` do not apply.
+`margin_mib`, `settle_timeout_s`, `driver_settle_s` and `whole_card_baseline_mib` in `[gpu]`
+stay the defaults for all cards. The first card is the primary card.
 
 | Key | Default | Meaning |
 |---|---|---|
-| `name` | required | Unique; `a-z`, `0-9`, `_` and `-`; not `any` or `primary`. Used in `--card`, status and the API. |
+| `name` | required | Unique; `a-z`, `0-9`, `_` and `-`; not `any`, `all` or `primary`. Used in `--card`, status and the API. |
 | `vendor` | `"auto"` | `amd`, `nvidia`, `intel` or `command`. `auto` is accepted only when there is a single card. |
 | `pci`, `nvidia_index`, `command` | as in `[gpu]` | The probe options of this card. |
 | `sysfs_root`, `nvidia_smi` | the `[gpu]` value | Probe options that default to the `[gpu]` table. |
@@ -81,11 +141,15 @@ The first card is the primary card: jobs and services that name no card go there
 | `amd` | `HIP_VISIBLE_DEVICES` and `ROCR_VISIBLE_DEVICES` |
 | `command`, `intel` | `CUDA_VISIBLE_DEVICES` |
 
+For AMD with an index other than 0, set `visible_devices_env = ["ROCR_VISIBLE_DEVICES"]`, or
+use the card's UUID: when both variables carry the same index, HIP applies it a second time to
+the cards ROCm already filtered.
+
 The env is sent in the `granted` event, exported by `gpuq run`, and passed to the start
 command of a managed service of `kind = "command"`. A card without `visible_devices` can be
-named (`--card gpu1`) but is skipped by `--card any`, because gpuq could not tell the job where
-it landed. If no card has `visible_devices`, `--card any` is refused and `gpuq check-config`
-says so.
+named (`--card gpu1`) but is skipped by `--card any` and by jobs that name no card, because
+gpuq could not tell the job where it landed. If no card has `visible_devices`, `--card any` is
+refused, jobs that name no card go to the primary card, and `gpuq check-config` says so.
 
 ```toml
 [[gpu.card]]
@@ -104,11 +168,23 @@ visible_devices = "0"
 A full file is in `examples/multi-gpu.toml`. `gpu.device` cannot be combined with
 `[[gpu.card]]`.
 
+### Leases on several cards
+
+A lease can hold several cards at once: `--card gpu0,gpu1`, `--card all` or `--cards N`
+(`"cards"`, `"card": "all"` or `"card_count"` in the lease API). Its env is the env of its
+cards merged in grant order: a variable set by several cards gets their values joined with
+commas, for example `CUDA_VISIBLE_DEVICES=GPU-a,GPU-b`. `GPUQ_CARD` is `gpu0,gpu1`.
+
+Cards of different vendors can share a lease only when their env uses different variables
+(detected AMD and NVIDIA cards do: `ROCR_VISIBLE_DEVICES` and `CUDA_VISIBLE_DEVICES`). Two
+cards of different vendors that set the same variable are refused, because the same number
+means a different device to each stack. Every card of a multi-card lease needs an env.
+
 ## [hooks]
 
 | Key | Default | Meaning |
 |---|---|---|
-| `offload` | `[]` | Argv run once per waiting job that does not fit while no lease is active, for example to move a desktop session off the card. Run directly, not through a shell. Empty disables it. |
+| `offload` | `[]` | Argv run once per waiting job and card when the job does not fit on an otherwise idle card, for example to move a desktop session off the card. Run directly, not through a shell, with `GPUQ_CARD` set to the card name. Empty disables it. |
 | `offload_timeout_s` | `180` | Kill the hook after this long. |
 | `offload_settle_s` | `3` | Wait this long after the hook before measuring VRAM again. |
 
@@ -120,7 +196,7 @@ The LLM server behind the gate and when it gives up the card.
 |---|---|---|
 | `backend` | `"llama-swap"` | `llama-swap`, `ollama`, `llama-server`, `vllm`, `sglang` or `none`. `none` means no LLM gate: gpuq only arbitrates leases and managed services. `llama-server`, `vllm` and `sglang` need `[llm.service]`. |
 | `llama_swap_config` | `"/etc/llama-swap/config.yaml"` | llama-swap's own YAML, read for aliases and CPU-only models. The old name `config` still works. |
-| `card` | first card | With several cards, the card the LLM server runs on. Must be a `[[gpu.card]]` name. |
+| `card` | the primary card | The card the LLM server runs on, or a list such as `["gpu0", "gpu1"]` for a server split over several cards. The LLM then holds all of them: their VRAM is counted as its, a job that needs any of them unloads it from all of them, and it reloads on all of them. |
 | `resident` | `""` | Model reloaded when the card goes idle. Empty = load on demand only. |
 | `cpu_models` | `[]` | Models that never use the GPU, for when the YAML cannot be read. |
 | `slot_save_models` | `[]` | Models started with `--slot-save-path`, for when the YAML cannot be read. gpuq saves and restores slot 0 around an unload. |
@@ -136,6 +212,35 @@ The LLM server behind the gate and when it gives up the card.
 | `resume_grace_s` | `30` | After a gpuq restart, time for `gpuq run` clients to re-adopt their leases. |
 | `batch_hold_s` | `0` | Hold LLM requests this long behind yieldable batch jobs. `0` = off. |
 | `batch_hold_count` | `0` | Hand over earlier once this many LLM requests are queued. `0` = timer only. |
+
+### [llm.models.MODEL]
+
+Where one model runs, for models that need other cards than `llm.card`. The key is the
+model id as in llama-swap's config (aliases resolve to it).
+
+| Key | Default | Meaning |
+|---|---|---|
+| `cards` | `[]` | The cards the model is split over. |
+| `vram` | unset | VRAM the model needs over all its cards, such as `"48G"`. When it is more than `llm.card` offers, gpuq adds the fewest other cards (largest first) that fit it. |
+
+Use one of the two. Without either, gpuq estimates the VRAM of llama-swap models from the size
+of the GGUF files in their `cmd` (`-m`/`--model` and `--mmproj`, all shards of a split model)
+plus a fifth for the KV cache and buffers. A model that fits on `llm.card` stays there.
+
+```toml
+[llm]
+card = "gpu0"              # small models
+
+[llm.models."llama-70b"]
+cards = ["gpu0", "gpu1"]   # this one is split over both cards
+```
+
+The split itself is set in llama-swap's command line, which gpuq does not rewrite; see
+[integrations.md](integrations.md#several-gpus). For `llm.backend = "llama-server"` with
+`[llm.service] kind = "command"`, gpuq starts the server with the cards' env merged, `GPUQ_CARD`,
+and, with several cards, `LLAMA_ARG_SPLIT_MODE=layer` and `LLAMA_ARG_TENSOR_SPLIT` set to the
+free VRAM of each card in GiB. llama-server reads these variables; flags on its command line
+win over them. vLLM and SGLang started by a command get the env and `GPUQ_CARD`.
 
 ### [llm.model_classes]
 
@@ -216,7 +321,7 @@ for the setup and `examples/immich.toml`.
 | `docker` | `["docker"]` | argv prefix for docker, e.g. `["sudo", "docker"]`. |
 | `class` | `"immich"` | Priority class of the lease; it must exist in `[classes]`, so add `immich = 3` or set another class. |
 | `vram` | `"6G"` | VRAM the lease declares. |
-| `card` | primary card | A `[[gpu.card]]` name. |
+| `card` | primary card | A card name. |
 | `poll_s` | `30` | Time between backlog checks. |
 | `min_backlog` | `200` | Backlog that makes gpuq pause the queues and ask for the card. |
 | `cpu_ok_backlog` | `50` | After a release, a backlog this small is resumed for the CPU container; a larger one stays paused. |
@@ -243,12 +348,12 @@ A managed GPU service. Repeat the table for each one. See `integrations.md` for 
 | `stop_on_release` | `true` | Stop the service when its lease ends. With a gate, also stops it once at gpuq start. |
 | `idle_release_s` | `120` | No in-flight GPU request and `busy_url` idle for this long: release the card. |
 | `flavor` | `"generic"` | `generic` or `comfyui`. `comfyui` needs a gate. |
-| `card` | primary card | The card the service runs on; a `[[gpu.card]]` name. `"any"` is not allowed: a service is bound to its device. |
+| `card` | primary card | The card the service runs on, or a list such as `["gpu0", "gpu1"]` for a service that uses several cards at once. `"any"` is not allowed: a service is bound to its devices. `vram` applies to each card. |
 
-For `control.kind = "command"` gpuq starts the process itself and gives it the card's env
-(`CUDA_VISIBLE_DEVICES` and so on). For systemd, Docker and Podman pin the device in the
-unit or container (`Environment=CUDA_VISIBLE_DEVICES=1`, `--gpus device=1`); `card` then only
-tells gpuq which card's VRAM the lease counts against.
+For `control.kind = "command"` gpuq starts the process itself and gives it the cards' env
+(`CUDA_VISIBLE_DEVICES` and so on, merged for several cards). For systemd, Docker and Podman
+pin the devices in the unit or container (`Environment=CUDA_VISIBLE_DEVICES=1`,
+`--gpus device=1`); `card` then only tells gpuq which cards' VRAM the lease counts against.
 
 A service with no `[service.gate]` is "always wanted": gpuq takes its lease at startup and
 holds it. It never idle-releases. When asked to yield it stops (if it has control), releases

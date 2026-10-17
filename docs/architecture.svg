@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Copyright (C) 2026 Martin Dolez -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 520" role="img" aria-labelledby="title desc">
+  <title id="title">gpuq architecture</title>
+  <desc id="desc">Clients send jobs and requests to the gate and control API, which hands them to the arbiter. The arbiter places work on gpu0 and gpu1; the iGPU is excluded. One LLM backend is split over gpu0 and gpu1.</desc>
+  <defs>
+    <style>
+      text { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; text-anchor: middle; }
+      .t { font-size: 14px; font-weight: 600; fill: #1f2328; }
+      .s { font-size: 12px; fill: #59636e; }
+      .h { font-size: 15px; font-weight: 600; fill: #1f2328; }
+      rect { stroke-width: 1.5; }
+      .client { fill: #ddf4ff; stroke: #0969da; }
+      .gate { fill: #fff8c5; stroke: #9a6700; }
+      .arb { fill: #fbefff; stroke: #8250df; }
+      .item { fill: #ffffff; stroke: #8250df; }
+      .card { fill: #dafbe1; stroke: #1a7f37; }
+      .llm { fill: #fff1e5; stroke: #bc4c00; }
+      .off { fill: #f6f8fa; stroke: #6e7781; stroke-dasharray: 6 4; }
+      .offg { opacity: 0.5; }
+      .arrow { stroke: #8c959f; stroke-width: 1.6; fill: none; }
+      .dash { stroke-dasharray: 5 4; }
+      .head { fill: #8c959f; }
+      @media (prefers-color-scheme: dark) {
+        .t, .h { fill: #e6edf3; }
+        .s { fill: #9198a1; }
+        .client { fill: #121d2f; stroke: #4493f8; }
+        .gate { fill: #272115; stroke: #d29922; }
+        .arb { fill: #1e1530; stroke: #a371f7; }
+        .item { fill: #0d1117; stroke: #a371f7; }
+        .card { fill: #0f2417; stroke: #3fb950; }
+        .llm { fill: #2a1a0e; stroke: #db6d28; }
+        .off { fill: #161b22; stroke: #8b949e; }
+      }
+    </style>
+    <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path class="head" d="M0,0 L10,5 L0,10 z"/>
+    </marker>
+  </defs>
+
+  <!-- clients -->
+  <rect class="client" x="20" y="16" width="260" height="60" rx="7"/>
+  <text class="t" x="150" y="41">gpuq run</text>
+  <text class="s" x="150" y="61">jobs, leases</text>
+
+  <rect class="client" x="320" y="16" width="260" height="60" rx="7"/>
+  <text class="t" x="450" y="41">HTTP clients</text>
+  <text class="s" x="450" y="61">chat, API calls through the gate</text>
+
+  <rect class="client" x="620" y="16" width="260" height="60" rx="7"/>
+  <text class="t" x="750" y="41">managed services</text>
+  <text class="s" x="750" y="61">ComfyUI, Immich ML</text>
+
+  <!-- client arrows -->
+  <path class="arrow" d="M150,76 L330,108" marker-end="url(#ah)"/>
+  <path class="arrow" d="M450,76 L450,108" marker-end="url(#ah)"/>
+  <path class="arrow" d="M750,76 L570,108" marker-end="url(#ah)"/>
+
+  <!-- gate -->
+  <rect class="gate" x="250" y="110" width="400" height="56" rx="7"/>
+  <text class="t" x="450" y="134">gate and control API</text>
+  <text class="s" x="450" y="154">holds requests, streams leases, port 8080 and 9390</text>
+
+  <path class="arrow" d="M450,166 L450,198" marker-end="url(#ah)"/>
+
+  <!-- arbiter -->
+  <rect class="arb" x="20" y="200" width="860" height="130" rx="8"/>
+  <text class="h" x="450" y="224">arbiter</text>
+
+  <rect class="item" x="32" y="236" width="200" height="82" rx="6"/>
+  <text class="t" x="132" y="266">queue</text>
+  <text class="s" x="132" y="286">priority, arrival</text>
+
+  <rect class="item" x="244" y="236" width="200" height="82" rx="6"/>
+  <text class="t" x="344" y="266">classes</text>
+  <text class="s" x="344" y="286">realtime ... batch</text>
+
+  <rect class="item" x="456" y="236" width="200" height="82" rx="6"/>
+  <text class="t" x="556" y="266">VRAM accounting</text>
+  <text class="s" x="556" y="286">per card</text>
+
+  <rect class="item" x="668" y="236" width="200" height="82" rx="6"/>
+  <text class="t" x="768" y="262">yield / unload</text>
+  <text class="s" x="768" y="282">ask jobs to step aside,</text>
+  <text class="s" x="768" y="298">unload the LLM</text>
+
+  <!-- arbiter to cards -->
+  <path class="arrow" d="M185,330 L185,364" marker-end="url(#ah)"/>
+  <path class="arrow" d="M535,330 L535,364" marker-end="url(#ah)"/>
+  <path class="arrow dash offg" d="M805,330 L805,366"/>
+
+  <!-- cards -->
+  <rect class="card" x="20" y="366" width="330" height="140" rx="8"/>
+  <text class="t" x="185" y="389">gpu0</text>
+  <text class="s" x="185" y="407">24 GiB</text>
+
+  <rect class="card" x="370" y="366" width="330" height="140" rx="8"/>
+  <text class="t" x="535" y="389">gpu1</text>
+  <text class="s" x="535" y="407">16 GiB</text>
+
+  <g class="offg">
+    <rect class="off" x="730" y="366" width="150" height="140" rx="8"/>
+    <text class="t" x="805" y="389">iGPU</text>
+    <text class="s" x="805" y="407">excluded</text>
+  </g>
+
+  <!-- LLM backend spanning gpu0 and gpu1 -->
+  <rect class="llm" x="36" y="420" width="648" height="46" rx="7"/>
+  <text class="t" x="360" y="439">LLM backend</text>
+  <text class="s" x="360" y="457">llama-swap or llama-server, one model split over two cards</text>
+
+</svg>

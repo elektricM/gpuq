@@ -7,6 +7,47 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Leases on several cards at once: `gpuq run --card gpu0,gpu1`, `--card all` and `--cards N`
+  (any N cards with room); in the lease API `"cards": [...]`, `"card": "all"` or a comma list,
+  and `"card_count": N`. `--vram` applies to each card. A multi-card lease is granted all at
+  once or not at all and holds nothing while it waits. Later leases of its class or below do
+  not overtake it on its cards. A yieldable multi-card lease is asked to yield when something
+  more important needs any one of its cards.
+- The env of a multi-card lease is the cards' env merged in grant order
+  (`CUDA_VISIBLE_DEVICES=GPU-a,GPU-b`), and `GPUQ_CARD` is a comma list. Cards of different
+  vendors can share a lease only when their env uses different variables.
+- The LLM can span several cards: `llm.card` takes a list, and `[llm.models.<id>]` gives a
+  model its own `cards` or its `vram`. A model that does not fit on the LLM's card gets the
+  fewest extra cards that fit it; for llama-swap models the size is estimated from their GGUF
+  files. The LLM is unloaded from all its cards when a job needs any of them, and reloaded on
+  all of them.
+- `llama-server` and other servers started by gpuq with `[llm.service] kind = "command"` get
+  the cards' env and `GPUQ_CARD`; llama-server with several cards also gets
+  `LLAMA_ARG_SPLIT_MODE` and `LLAMA_ARG_TENSOR_SPLIT` from the free VRAM of each card.
+- A `[[service]]` can name several cards: `card = ["gpu0", "gpu1"]`.
+- `gpuq status` and `GET /status` show multi-card leases, a `cards` list per lease and
+  `llm_cards`. The `granted` event has `cards`.
+- `docs/architecture.svg`, a diagram of the parts of gpuq, in the README and in
+  `how-it-works.md`.
+
+### Changed
+
+- gpuq detects every AMD and NVIDIA GPU and manages all of them when the config has no
+  `[[gpu.card]]` and does not pin a single device in `[gpu]` (`pci`, `nvidia_index`,
+  `vendor = "command"` or `"intel"`). Cards are named gpu0, gpu1, ... (discrete first, largest
+  first). Each card gets its device id from its PCI address: `CUDA_VISIBLE_DEVICES=<UUID>` on
+  NVIDIA, `ROCR_VISIBLE_DEVICES=GPU-<unique_id>` (or the ROCm index from the KFD topology) on
+  AMD. Leave cards out with `gpu.exclude = ["<pci address>"]` or `gpu.skip_integrated = true`.
+  A single detected card now hands its device id to jobs too.
+- A job that names no card goes to any card with room instead of the primary card. Send
+  `"card": "primary"` (or `--card primary`) for the old behaviour. Services and the Immich
+  adapter still default to the primary card.
+- `gpu.nvidia_index` has no default any more; setting it means one NVIDIA card.
+- `all` is a reserved card name.
+- CPU markers (`llm.cpu_markers`) are also looked for in the `env` list of a llama-swap model.
+
 ## [0.2.0] - 2026-10-17
 
 ### Changed

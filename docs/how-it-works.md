@@ -1,5 +1,7 @@
 # How gpuq works
 
+![Clients go through the gate and control API to the arbiter, which places work on gpu0 and gpu1; the LLM backend spans both cards and the integrated GPU is excluded](architecture.svg)
+
 gpuq rests on four ideas.
 
 - **Lease.** A program holds the card through a lease that names its class and how much VRAM it
@@ -26,17 +28,50 @@ All the timings are settings.
 
 ## Several cards
 
-With more than one card, every card has its own state, its own VRAM accounting and its own
-yields, but there is still one queue.
+gpuq finds every GPU on the machine and manages all of them from one queue, unless you leave
+some out (`gpu.exclude`, `gpu.skip_integrated`) or list the cards yourself. Every card has its
+own state, its own VRAM accounting and its own yields.
 
+- A job that names no card goes to any card with room. `--card NAME` pins it to one card.
 - A waiter only blocks on the cards it can use. A job pinned to one card never holds up a
   job for another.
-- Yields are per card: when the LLM needs its card back, only the yieldable jobs on that card
+- Yields are per card: when the LLM needs a card back, only the yieldable jobs on that card
   are asked to step aside.
-- `--card any` takes the first card with enough room. If none has, it waits under the rules of
-  the LLM's card.
+- If no card has room, a job waits under the rules of the cards it can use, including the
+  LLM's idle timers on the LLM's cards.
 
-Details are in [integrations.md](integrations.md#several-gpus).
+### One job on several cards
+
+`gpuq run --card gpu0,gpu1`, `--card all` or `--cards 2` holds several cards at once, the way
+llama.cpp or PyTorch split one model over GPUs. The job gets the env of all its cards in one
+list, for example `CUDA_VISIBLE_DEVICES=GPU-a,GPU-b`, and `GPUQ_CARD=gpu0,gpu1`.
+
+- **All or nothing.** The lease is granted once every card it needs fits, in one step. It never
+  holds one card while it waits for another, so two such leases cannot block each other.
+- **No starvation.** A waiting multi-card lease is first in line on each of its cards for
+  everything of its class or below that came later. A stream of single-card jobs cannot keep
+  it waiting forever: each card it needs is kept for it as soon as its holders leave. More
+  important classes still go first, as everywhere.
+- **No pointless yields.** Yieldable jobs on its cards are only asked to step aside once all
+  of its cards could be had. While one card stays blocked by a job that cannot yield, the
+  others keep running, and the LLM is not unloaded for it.
+- **Yield.** A yieldable multi-card lease is asked to yield when something more important
+  needs any one of its cards.
+
+### The LLM on several cards
+
+`llm.card = ["gpu0", "gpu1"]` puts the LLM server on two cards, and `[llm.models]` can give one
+model its own cards. A model whose VRAM need is known (from `[llm.models]`, or estimated from
+its GGUF files with llama-swap) and does not fit on the LLM's card gets the fewest extra cards
+that fit it, like llama.cpp spreading layers over every visible GPU. A model that fits on one
+card stays on one card.
+
+The LLM takes its cards together and gives them back together: their VRAM is counted as the
+LLM's, a job that needs any one of them unloads the server from all of them, and the reload
+waits until all of them are free again.
+
+Details are in [integrations.md](integrations.md#several-gpus) and
+[config.md](config.md#detected-cards).
 
 ## Priorities
 

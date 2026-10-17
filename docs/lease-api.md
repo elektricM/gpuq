@@ -20,13 +20,25 @@ Body: a JSON object (at most 64 KiB). Every field is optional.
 | `yieldable` | `false` | If true, gpuq may ask you to give the card back. |
 | `name` | none | Shown in `gpuq status`. |
 | `pid` | none | Your process id, shown in status. |
-| `card` | primary card | A card name from `gpuq status`, or `"any"` for the first card with room. Missing or `null` means the primary (first) card. With `resume_id`, the lease is re-adopted on that card. |
+| `card` | any card with room | A card name from `gpuq status`; `"any"` for the first card with room; `"all"` for every card at once; a comma list such as `"gpu0,gpu1"` for those cards at once; `"primary"` for the first card. Missing or `null`: any card with room, or the primary card when no card has `visible_devices`. With `resume_id`, the lease is re-adopted on the cards named. |
+| `cards` | none | A list of card names, all held at once: `["gpu0", "gpu1"]`. Same as a comma list in `card`. |
+| `card_count` | none | A number of cards, all held at once, any that have room (like `"any"`, for several). |
 | `resume_id` | none | Re-adopt a lease you held before (for example across a gpuq restart) under the same id, without queueing. |
+
+Use at most one of `card`, `cards` and `card_count`. `vram` applies to each card of the lease.
+
+A lease on several cards is granted all at once or not at all. While it waits it holds
+nothing, so two leases can never wait for each other. Leases of a lower class, and later
+leases of the same class, are not served on its cards before it: each card it needs is kept
+for it as soon as its current holders leave. More important leases still go first. If something more important needs any one of its cards,
+a yieldable multi-card lease is asked to yield, as a single-card one would be.
 
 Errors come back as plain HTTP 400 with a JSON body, for example
 `{"error": "unknown class 'x'; known: realtime, llm, interactive, background, batch"}`. An
-unknown card is `{"error": "unknown card 'x'; known: gpu0, gpu1"}`; `"any"` is refused when no
-card can be steered, that is, with several cards and none has `visible_devices`.
+unknown card is `{"error": "unknown card 'x'; known: gpu0, gpu1"}`. `"any"` and `card_count`
+are refused when not enough cards can be steered, that is, have an env (with several cards).
+A lease on several cards is refused when one of them has no env, when a card is listed twice,
+and when two cards of different vendors set the same variable (see `config.md`).
 
 On success the answer is `200` with `Content-Type: application/x-ndjson`, chunked, one JSON
 object per line:
@@ -35,7 +47,7 @@ object per line:
 |---|---|
 | `{"event":"queued"}` | Immediately. |
 | `{"event":"ping"}` | Every 15 s while queued and while holding. Ignore it. |
-| `{"event":"granted","id":"...","card":"gpu0","env":{},"yield_signal":"SIGUSR1"}` | Once, when the card is yours. `card` is the card you got (never `any`). `env` is an object of variables that point your program at it, for example `{"CUDA_VISIBLE_DEVICES":"1"}`; empty when the card has none. `yield_signal` is gpuq's configured `[run] yield_signal`, for clients that pass yields on as a signal. |
+| `{"event":"granted","id":"...","card":"gpu0","cards":["gpu0"],"env":{},"yield_signal":"SIGUSR1"}` | Once, when the cards are yours. `cards` lists the cards you got, in grant order; `card` is the same names joined with commas (just the name for one card, never `any`). `env` is an object of variables that point your program at them, for example `{"CUDA_VISIBLE_DEVICES":"1"}` or, for two cards, `{"CUDA_VISIBLE_DEVICES":"GPU-a,GPU-b"}`; empty when the cards have none. `yield_signal` is gpuq's configured `[run] yield_signal`, for clients that pass yields on as a signal. |
 | `{"event":"yield"}` | At most once, only for yieldable leases, when something more important is waiting. |
 
 There is no terminal event. The stream just stays open.
@@ -53,7 +65,7 @@ There is no terminal event. The stream just stays open.
 
 | Route | Answer |
 |---|---|
-| `GET /status` | JSON: arbiter state, leases, queue, `cards` (one entry per card: `name`, `device`, `state`, `llm`, `vram`) and `backend` (`kind`, `models` with `state`). The top-level `state`, `device` and `vram` are the primary card's. Each lease and queue entry has a `card`. |
+| `GET /status` | JSON: arbiter state, leases, queue, `cards` (one entry per card: `name`, `device`, `state`, `llm`, `vram`), `llm_cards` (the cards the LLM holds now) and `backend` (`kind`, `models` with `state`). The top-level `state`, `device` and `vram` are the primary card's. Each lease has `card` (names joined with commas) and `cards`; each queue entry has a `card`: a name, a comma list, `any`, or `any N` for N cards. |
 | `GET /healthz` | `ok` |
 
 Unknown path: 404. Wrong method: 405. Arbiter stopped: 503.
@@ -65,9 +77,15 @@ Unknown path: 404. Wrong method: 405. Arbiter stopped: 503.
 curl -N -X POST http://127.0.0.1:9390/lease \
   -d '{"class":"batch","vram":"8G","yieldable":true,"name":"my-job"}'
 # {"event":"queued"}
-# {"event":"granted","id":"L3f2a1-3","card":"gpu0","env":{},"yield_signal":"SIGUSR1"}
+# {"event":"granted","id":"L3f2a1-3","card":"gpu0","cards":["gpu0"],"env":{},"yield_signal":"SIGUSR1"}
 # {"event":"ping"}
 # {"event":"yield"}        <- something more important wants the card
+
+# Two cards at once, 12 GiB on each
+curl -N -X POST http://127.0.0.1:9390/lease \
+  -d '{"class":"batch","vram":"12G","cards":["gpu0","gpu1"],"name":"train"}'
+# {"event":"granted","id":"L3f2a1-4","card":"gpu0,gpu1","cards":["gpu0","gpu1"],
+#  "env":{"CUDA_VISIBLE_DEVICES":"GPU-a,GPU-b"},"yield_signal":"SIGUSR1"}
 
 curl -s http://127.0.0.1:9390/status
 ```

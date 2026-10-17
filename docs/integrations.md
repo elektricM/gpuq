@@ -237,12 +237,12 @@ gpuq run --class batch --vram all --yieldable --name train -- python train.py
 `examples/batch-job.sh` has these and a resumable training loop; `examples/whisper.sh` is a
 realtime-class job.
 
-`gpuq run [--class batch] [--vram all] [--card NAME|any] [--name N] [--yieldable]
-[--yield-signal SIGUSR1] [--fallback] -- cmd...`
+`gpuq run [--class batch] [--vram all] [--card NAME|LIST|all|any | --cards N] [--name N]
+[--yieldable] [--yield-signal SIGUSR1] [--fallback] -- cmd...`
 
 - Waits in the queue, then runs the command with `GPUQ_LEASE_ID`, `GPUQ_YIELD_FILE` and
-  `GPUQ_CARD` (the card it got) in its environment, plus the card's
-  `CUDA_VISIBLE_DEVICES` or similar when the config sets `visible_devices`.
+  `GPUQ_CARD` (the card it got, or `gpu0,gpu1` for several) in its environment, plus the
+  cards' `CUDA_VISIBLE_DEVICES` or `ROCR_VISIBLE_DEVICES`.
 - Exit code is the command's (128 + signal if it died of one). 69 if gpuq is not running,
   unless `--fallback` (run without a lease, with a warning). 1 for an unknown class, 2 for
   usage errors, 126/127 if the command cannot be started.
@@ -251,31 +251,174 @@ realtime-class job.
 - On Linux, if `gpuq run` itself is killed (`kill -9`, OOM killer), the kernel kills the command
   too, so nothing keeps using the card without a lease. This reaches only the command itself:
   in a wrapper script, start the real job with `exec` (`exec python train.py`).
-- `gpuq hold [--class] [--vram] [--card] [--name]` takes a lease and holds it until Ctrl-C. Use it to
-  reserve the card by hand.
+- `gpuq hold [--class] [--vram] [--card | --cards] [--name]` takes a lease and holds it until
+  Ctrl-C. Use it to reserve cards by hand.
 
 ## Several GPUs
 
-With `[[gpu.card]]` entries (see `examples/multi-gpu.toml` and `config.md`) gpuq schedules each
-card on its own from one queue.
+gpuq detects every AMD and NVIDIA GPU and schedules all of them from one queue (see
+[config.md](config.md#detected-cards); leave the integrated GPU out with `gpu.exclude` or
+`gpu.skip_integrated`). `gpuq check-config` lists the cards, their PCI addresses and the env
+each one hands to jobs.
 
-- **Pinning.** `gpuq run --card nvidia -- cmd` waits for that card only. A `[[service]]` with
-  `card = "nvidia"` is bound to it. The LLM server's card is `llm.card` (default: the first).
-  Without `--card` or `card`, jobs and services use the primary card, the first one in the config.
-- **Any.** `gpuq run --card any -- cmd` takes the first card with room, otherwise waits.
-  Only cards with `visible_devices` qualify, since the job has to be told where it landed.
-- **visible_devices.** gpuq hands the card's env to the job (`CUDA_VISIBLE_DEVICES` for NVIDIA,
-  `HIP_VISIBLE_DEVICES` and `ROCR_VISIBLE_DEVICES` for AMD), and the job's `GPUQ_CARD` names
-  the card. Native clients read `card` and `env` from the `granted` event. A `kind = "command"`
-  service is started with the env too; for systemd and containers, pin the device in the unit
-  or container, for example `Environment=CUDA_VISIBLE_DEVICES=1` or `--gpus device=1`.
-- **Why you set it yourself.** CUDA numbers devices fastest-first by default, which is not the
-  order of `nvidia-smi` or of `nvidia_index`. gpuq cannot guess what the number means to your
-  stack, so you write it. Put `CUDA_DEVICE_ORDER=PCI_BUS_ID` in the environment of the
-  programs (and of gpuq's services) so CUDA and `nvidia-smi` agree. A GPU UUID in
-  `visible_devices` avoids ordering altogether.
-- One LLM server runs on one card. Running a server per card, each with its own gate, is on the
+- **Default.** A job that names no card goes to any card with room.
+- **Pinning.** `gpuq run --card gpu1 -- cmd` waits for that card only. A `[[service]]` with
+  `card = "gpu1"` is bound to it. Services and the Immich adapter that name no card use the
+  primary card, `gpu0`.
+- **Several cards at once.** `--card gpu0,gpu1`, `--card all`, or `--cards 2` for any two cards
+  with room. `--vram` applies to each card. The lease is granted all at once or not at all; see
+  [how-it-works.md](how-it-works.md#one-job-on-several-cards).
+- **Env.** gpuq hands the cards' env to the job, merged for several cards, and `GPUQ_CARD`
+  names them. Native clients read `cards` and `env` from the `granted` event. A
+  `kind = "command"` service is started with the env too; for systemd and containers, pin the
+  devices in the unit or container, for example `Environment=CUDA_VISIBLE_DEVICES=1` or
+  `--gpus device=1`.
+- **Device numbers.** Detected cards are pointed at by UUID where the stack accepts one
+  (`CUDA_VISIBLE_DEVICES=GPU-...`, `ROCR_VISIBLE_DEVICES=GPU-...`), so the order CUDA, HIP or a
+  driver update gives the devices does not matter. With `[[gpu.card]]` you write
+  `visible_devices` yourself: prefer the UUID, or set `CUDA_DEVICE_ORDER=PCI_BUS_ID` wherever
+  CUDA programs start so indices match `nvidia-smi`.
+- **The LLM.** `llm.card` is one card (default `gpu0`) or a list. `[llm.models]` gives a model
+  its own cards or its size. One LLM backend runs at a time; a server per card is on the
   roadmap.
+
+### llama.cpp and llama-swap on two cards
+
+A 24 GiB and a 16 GiB card: small models run on gpu0, a 70B model is split over both. gpuq
+cannot rewrite llama-swap's command lines, so each model is pinned in llama-swap's config, and
+gpuq is told which cards each model holds so its accounting matches.
+
+Take the device strings from `gpuq check-config` (the values below are placeholders):
+
+```
+gpus: 3 detected, 2 in use
+  gpu0: amd pci=0000:03:00.0 24560 MiB, ROCR_VISIBLE_DEVICES=GPU-1111aaaa2222bbbb, margin 256 MiB (primary) (llm)
+  gpu1: amd pci=0000:0c:00.0 16368 MiB, ROCR_VISIBLE_DEVICES=GPU-3333cccc4444dddd, margin 256 MiB
+  excluded: amd 0000:15:00.0 2048 MiB (gpu.exclude)
+```
+
+llama-swap's `config.yaml`:
+
+```yaml
+models:
+  # Fits on gpu0: only that card is visible to it.
+  "chat":
+    env: ["ROCR_VISIBLE_DEVICES=GPU-1111aaaa2222bbbb"]
+    cmd: |
+      llama-server --port ${PORT} -m /models/chat-14b-q6.gguf -ngl 99 --ctx-size 32768
+      --slot-save-path /var/cache/llama-swap/slots
+
+  # About 40 GB: both cards, layers split 24:16 like their VRAM.
+  "llama-70b":
+    env: ["ROCR_VISIBLE_DEVICES=GPU-1111aaaa2222bbbb,GPU-3333cccc4444dddd"]
+    cmd: |
+      llama-server --port ${PORT} -m /models/llama-70b-q4_k_m.gguf -ngl 99
+      --split-mode layer --tensor-split 24,16 --ctx-size 16384
+```
+
+gpuq's `config.toml`:
+
+```toml
+[gpu]
+exclude = ["0000:15:00.0"]          # the integrated GPU
+
+[llm]
+backend = "llama-swap"
+llama_swap_config = "/etc/llama-swap/config.yaml"
+card = "gpu0"                       # where models run unless said otherwise
+resident = "chat"
+
+[llm.models."llama-70b"]
+cards = ["gpu0", "gpu1"]            # matches its ROCR_VISIBLE_DEVICES above
+```
+
+What happens:
+
+- A request for `chat` needs gpu0 only. A job can run on gpu1 at the same time.
+- A request for `llama-70b` needs both cards. If a job holds gpu1, it is asked to yield (if
+  yieldable) and the request waits for it; then the LLM takes gpu1 too.
+- From then on the LLM holds both cards. A job that needs either card unloads it from both,
+  and the resident `chat` model reloads on gpu0 once gpu0 is free.
+
+Without `[llm.models]`, gpuq estimates each model from its GGUF files (plus a fifth for the KV
+cache) and gives a model that does not fit on gpu0 the fewest extra cards that fit it. Name the
+cards when the llama-swap config pins them, so both agree.
+
+Notes for the command line:
+
+- On NVIDIA, use `CUDA_VISIBLE_DEVICES` with the UUIDs instead of `ROCR_VISIBLE_DEVICES`.
+- llama.cpp numbers the cards it can see from 0 (`ROCm0`, `ROCm1` or `CUDA0`, `CUDA1` in
+  `--list-devices`), so `-dev ROCm0,ROCm1` and `--main-gpu` refer to the visible cards, in
+  the order of the list.
+- Without any of these options, llama.cpp uses every visible GPU and splits layers by free
+  VRAM. That includes small models, which then hold memory on every card while gpuq counts
+  them on one. Pin every model.
+- On AMD, prefer `ROCR_VISIBLE_DEVICES`. Setting `HIP_VISIBLE_DEVICES` to the same list as
+  well applies it twice.
+- Vulkan builds ignore these variables; use `GGML_VK_VISIBLE_DEVICES` and check the numbers
+  with `--list-devices`.
+
+### llama-server started by gpuq
+
+With `llm.backend = "llama-server"` and `[llm.service] kind = "command"`, gpuq starts the server
+itself and gives it the cards:
+
+```toml
+[llm]
+backend = "llama-server"
+card = ["gpu0", "gpu1"]
+resident = "llama-70b"
+
+[llm.service]
+kind = "command"
+start = ["/usr/local/bin/llama-70b", "start"]
+stop = ["/usr/local/bin/llama-70b", "stop"]
+health_url = "http://127.0.0.1:8081/health"
+```
+
+The start command runs with `ROCR_VISIBLE_DEVICES=GPU-1111aaaa2222bbbb,GPU-3333cccc4444dddd`,
+`GPUQ_CARD=gpu0,gpu1`, `LLAMA_ARG_SPLIT_MODE=layer` and `LLAMA_ARG_TENSOR_SPLIT=23,15` (free
+VRAM per card in GiB when it starts). llama-server reads the `LLAMA_ARG_*` variables, and a
+flag on its command line wins over them. With systemd, Docker or Podman, gpuq cannot pass
+variables: put them in the unit or container.
+
+### ComfyUI and PyTorch
+
+A training run on any two cards with room, 12 GiB on each:
+
+```sh
+gpuq run --class batch --cards 2 --vram 12G --yieldable -- \
+  torchrun --nproc-per-node 2 train.py
+```
+
+PyTorch sees the two cards as `cuda:0` and `cuda:1`, whichever ones gpuq granted (ROCm builds
+of PyTorch use the same names). `GPUQ_CARD` says which they are. When something more important
+needs either card, the job gets `SIGUSR1` and `$GPUQ_YIELD_FILE` appears.
+
+ComfyUI on gpu1 only, so gpu0 stays free for the LLM:
+
+```toml
+[[service]]
+name = "comfyui"
+flavor = "comfyui"
+card = "gpu1"
+vram = "14G"
+
+[service.control]
+kind = "command"
+start = ["/usr/local/bin/comfyui-start"]
+stop = ["/usr/local/bin/comfyui-stop"]
+health_url = "http://127.0.0.1:8189/system_stats"
+
+[service.gate]
+listen = "127.0.0.1:8188"
+backend = "http://127.0.0.1:8189"
+gpu_paths = ["/prompt"]
+```
+
+ComfyUI itself works on one device. With a multi-GPU node pack that places models on several
+devices, give the service both cards: `card = ["gpu0", "gpu1"]`. Its start command then sees
+both in its env, and its `vram` is held on each card while it runs.
 
 ## The yield contract
 

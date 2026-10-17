@@ -15,15 +15,19 @@ Yieldable jobs get asked to give it up; the LLM is unloaded. Wrap a game launche
 
 ## Multi-GPU leftovers
 
-Several cards work: one queue, a probe and an env per card, leases that name a card or take
-`any` (see `integrations.md`). Still to do:
+Several cards work: every GPU is detected, one queue, leases on one card, on any card or on
+several cards at once, and an LLM split over several cards (see `integrations.md`). Still to
+do:
 
-- Several LLM servers, one per card, each behind its own gate. Today the LLM lives on one card
-  (`llm.card`).
-- Automatic `visible_devices`. You write the device number or UUID per card; gpuq could work
-  out the mapping from PCI addresses.
-- Multi-card `auto`. `vendor = "auto"` only works with a single card, so each card names its
-  vendor.
+- Several LLM servers, one per card, each behind its own gate. Today there is one LLM backend;
+  it can span several cards (`llm.card` as a list) but not run twice.
+- Vulkan device numbers. Detected cards get `CUDA_VISIBLE_DEVICES` or `ROCR_VISIBLE_DEVICES`;
+  Vulkan programs (`GGML_VK_VISIBLE_DEVICES`) are still pinned by hand.
+- Reading llama-swap's device options. gpuq takes a model's cards from `[llm.models]` or from
+  its estimated size; it could read `-dev`, `--tensor-split` and the `*_VISIBLE_DEVICES` of each
+  model's command instead.
+- Reserving fewer cards for `--cards N`. A waiting `--cards 2` lease is first in line on every
+  card it could use, not only on two of them.
 
 ## Web UI
 

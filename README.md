@@ -12,6 +12,8 @@ compute jobs, and AI tools such as LLM servers and image generators.
 
 gpuq is in early development. The configuration format may change before 1.0.
 
+![Clients go through the gate and control API to the arbiter, which places work on gpu0 and gpu1; the LLM backend spans both cards and the integrated GPU is excluded](docs/architecture.svg)
+
 ## Features
 
 - Priority classes, configurable
@@ -21,7 +23,10 @@ gpuq is in early development. The configuration format may change before 1.0.
 - Service control through systemd, Docker, Podman or custom commands
 - HTTP gate in front of LLM servers and services, holding requests while the GPU is busy
 - Resident LLM model, reloaded with its KV cache after other jobs
-- Several GPUs with one queue: a job can be pinned to a card or placed on the first card with room
+- Every AMD and NVIDIA GPU detected and scheduled from one queue, with device ids worked out
+  from PCI addresses; integrated GPUs can be left out
+- Jobs on one card, on any card with room, or on several cards at once, granted all together
+- LLM servers split over several cards, unloaded and reloaded on all of them together
 - AMD and NVIDIA VRAM probes, plus a custom probe command
 
 ## Supported software
@@ -60,6 +65,10 @@ Minimal configuration, `/etc/gpuq/config.toml`:
 backend = "none"
 ```
 
+gpuq detects the GPUs itself. To leave one out, for example the CPU's integrated GPU, add
+`exclude = ["0000:15:00.0"]` (its PCI address, shown by `gpuq check-config`) or
+`skip_integrated = true` to a `[gpu]` table.
+
 Start the daemon:
 
 ```sh
@@ -89,7 +98,9 @@ Run a job:
 gpuq run --class batch --vram 8G -- blender -b scene.blend -a
 ```
 
-With several GPUs, `--card NAME` picks a card and `--card any` takes the first one with room.
+A job goes to any card with room. With several GPUs, `--card NAME` pins it to one card,
+`--card gpu0,gpu1` or `--card all` gives it several cards at once, and `--cards 2` any two
+cards with room. `--vram` applies to each card.
 
 Other commands:
 
