@@ -71,13 +71,20 @@ where
 
 /// A port for a listener that is bound later. It is taken below the kernel's ephemeral range
 /// (32768 and up), so an outgoing connection cannot grab it before the listener binds it.
+/// The check binds without listening: a child forked by another test thread holds a copy of
+/// the socket until it execs, and a copy that listened would accept the readiness probes
+/// meant for the real listener.
 pub fn free_port() -> u16 {
     use std::sync::atomic::{AtomicU16, Ordering};
     static NEXT: AtomicU16 = AtomicU16::new(0);
     let base = 20_000 + (std::process::id() % 12) as u16 * 1_000;
     loop {
         let port = base + NEXT.fetch_add(1, Ordering::Relaxed) % 1_000;
-        if std::net::TcpListener::bind(("127.0.0.1", port)).is_ok() {
+        let addr = std::net::SocketAddr::from(([127, 0, 0, 1], port));
+        let bound = tokio::net::TcpSocket::new_v4()
+            .and_then(|s| s.set_reuseaddr(true).map(|()| s))
+            .and_then(|s| s.bind(addr));
+        if bound.is_ok() {
             return port;
         }
     }
