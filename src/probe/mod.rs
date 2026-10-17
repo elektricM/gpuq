@@ -8,6 +8,7 @@ pub mod command;
 pub mod detect;
 pub mod intel;
 pub mod nvidia;
+pub mod scan;
 
 use async_trait::async_trait;
 use serde::Serialize;

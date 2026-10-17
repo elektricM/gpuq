@@ -63,7 +63,7 @@ fn is_executable(p: &Path) -> bool {
 }
 
 /// Whether `name` resolves to an executable file (directly if it has a slash, else on PATH).
-fn which(name: &str) -> bool {
+pub fn which(name: &str) -> bool {
     if name.contains('/') {
         return is_executable(Path::new(name));
     }
