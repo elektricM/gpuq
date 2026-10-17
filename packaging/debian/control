@@ -1,0 +1,21 @@
+Source: gpuq
+Section: utils
+Priority: optional
+Maintainer: Martin Dolez <martin@dolez.fr>
+Build-Depends: debhelper-compat (= 13),
+               cargo-1.85,
+               rustc-1.85
+Standards-Version: 4.6.2
+Homepage: https://github.com/elektricM/gpuq
+Vcs-Browser: https://github.com/elektricM/gpuq
+Vcs-Git: https://github.com/elektricM/gpuq.git
+Rules-Requires-Root: no
+
+Package: gpuq
+Architecture: amd64 arm64
+Depends: ${misc:Depends}, ${shlibs:Depends}
+Description: GPU scheduler for Linux
+ gpuq is a GPU scheduler for Linux machines with one or more GPUs. Programs
+ request the GPU through gpuq, which grants it by priority and available VRAM.
+ To free the card, gpuq can signal running jobs, stop and start services, and
+ unload models from LLM servers.

@@ -1,0 +1,60 @@
+#!/usr/bin/make -f
+# Builds offline: the vendored crates come from the orig-vendor component tarball,
+# extracted into vendor/.
+
+include /usr/share/dpkg/default.mk
+
+export PATH := /usr/lib/rust-1.85/bin:$(PATH)
+export CARGO_HOME := $(CURDIR)/debian/cargo-home
+export CARGO_TARGET_DIR := $(CURDIR)/target
+# CFLAGS with -flto break ring's assembly at link time. Cargo still applies its own LTO.
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all optimize=-lto
+export CARGO_PROFILE_RELEASE_STRIP := false
+
+ifneq (,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
+CARGO_JOBS := -j $(patsubst parallel=%,%,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
+endif
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	mkdir -p $(CARGO_HOME)
+	sed 's|^directory = .*|directory = "$(CURDIR)/vendor"|' packaging/vendor-config.toml \
+		> $(CARGO_HOME)/config.toml
+
+override_dh_auto_build:
+	cargo build --release --offline --locked $(CARGO_JOBS)
+
+override_dh_auto_test:
+ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
+	cargo test --offline --locked $(CARGO_JOBS)
+endif
+
+override_dh_auto_install:
+	install -Dm755 target/release/gpuq debian/gpuq/usr/bin/gpuq
+	install -Dm644 packaging/systemd/gpuq.service debian/gpuq/usr/lib/systemd/system/gpuq.service
+	install -Dm644 packaging/systemd/gpuq.user.service debian/gpuq/usr/lib/systemd/user/gpuq.service
+	install -Dm644 packaging/systemd/gpuq.sysusers debian/gpuq/usr/lib/sysusers.d/gpuq.conf
+	install -Dm644 examples/gpuq.toml debian/gpuq/etc/gpuq/config.toml
+	install -Dm644 completions/gpuq.bash debian/gpuq/usr/share/bash-completion/completions/gpuq
+	install -Dm644 completions/_gpuq debian/gpuq/usr/share/zsh/vendor-completions/_gpuq
+	install -Dm644 completions/gpuq.fish debian/gpuq/usr/share/fish/vendor_completions.d/gpuq.fish
+
+# The unit is installed but not enabled: the configuration has to be written first.
+override_dh_installsystemd:
+	dh_installsystemd --no-enable --no-start
+
+override_dh_installsystemduser:
+	dh_installsystemduser --no-enable
+
+override_dh_installchangelogs:
+	dh_installchangelogs CHANGELOG.md
+
+override_dh_auto_clean:
+	rm -rf target $(CARGO_HOME)
+
+# dh_clean removes *.orig files, which include the vendored Cargo.toml.orig files that
+# the crate checksums cover.
+override_dh_clean:
+	dh_clean -XCargo.toml.orig

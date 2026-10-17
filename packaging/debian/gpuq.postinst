@@ -1,0 +1,10 @@
+#!/bin/sh
+set -e
+
+if [ "$1" = configure ] && command -v systemd-sysusers >/dev/null 2>&1; then
+    systemd-sysusers gpuq.conf || true
+fi
+
+#DEBHELPER#
+
+exit 0

@@ -1,0 +1,31 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: gpuq
+Upstream-Contact: Martin Dolez <martin@dolez.fr>
+Source: https://github.com/elektricM/gpuq
+
+Files: *
+Copyright: 2026 Martin Dolez
+License: GPL-3+
+
+Files: vendor/*
+Copyright: The authors of each crate, listed in vendor/*/Cargo.toml
+License: Apache-2.0 or MIT, and others
+ The vendored Rust crates are under Apache-2.0, MIT, ISC, BSD-3-Clause,
+ BSL-1.0, Unicode-3.0, CDLA-Permissive-2.0 and Unlicense, alone or in
+ combination. Each crate's license is in its Cargo.toml and license files
+ under vendor/. The Apache License 2.0 is in
+ /usr/share/common-licenses/Apache-2.0.
+
+License: GPL-3+
+ This program is free software: you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation, either version 3 of the License, or
+ (at your option) any later version.
+ .
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+ .
+ On Debian systems, the full text of the GNU General Public License
+ version 3 can be found in /usr/share/common-licenses/GPL-3.
