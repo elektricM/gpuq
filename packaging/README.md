@@ -30,9 +30,9 @@ The release workflow (`.github/workflows/release.yml`) runs on `v*` tags and att
 To build without network access from the source tarball:
 
 ```sh
-tar -xzf gpuq-0.2.0.tar.gz
-cd gpuq-0.2.0
-tar -xJf ../gpuq-0.2.0-vendor.tar.xz
+tar -xzf gpuq-0.3.0.tar.gz
+cd gpuq-0.3.0
+tar -xJf ../gpuq-0.3.0-vendor.tar.xz
 cat packaging/vendor-config.toml >> .cargo/config.toml
 cargo build --release --offline --locked
 ```
@@ -80,7 +80,7 @@ makepkg --printsrcinfo > .SRCINFO
 makepkg -f                          # build and test once
 namcap PKGBUILD *.pkg.tar.zst
 git add PKGBUILD .SRCINFO
-git commit -m "Update to 0.2.0"
+git commit -m "Update to 0.3.0"
 git push
 ```
 
@@ -99,7 +99,7 @@ copr-cli create gpuq --chroot fedora-rawhide-x86_64 --chroot fedora-rawhide-aarc
   --description "GPU scheduler for Linux" --enable-net off
 spectool -g -C ~/rpmbuild/SOURCES packaging/rpm/gpuq.spec
 rpmbuild -bs --define "_sourcedir $HOME/rpmbuild/SOURCES" packaging/rpm/gpuq.spec
-copr-cli build gpuq ~/rpmbuild/SRPMS/gpuq-0.2.0-1.*.src.rpm
+copr-cli build gpuq ~/rpmbuild/SRPMS/gpuq-0.3.0-1.*.src.rpm
 ```
 
 Users then run `sudo dnf copr enable <user>/gpuq && sudo dnf install gpuq`.
@@ -116,11 +116,11 @@ cd home:<user>
 osc mkpac gpuq
 cd gpuq
 cp ../../packaging/rpm/gpuq.spec .
-curl -L -o gpuq-0.2.0.tar.gz https://github.com/elektricM/gpuq/archive/refs/tags/v0.2.0.tar.gz
-curl -LO https://github.com/elektricM/gpuq/releases/download/v0.2.0/gpuq-0.2.0-vendor.tar.xz
-osc add gpuq.spec gpuq-0.2.0.tar.gz gpuq-0.2.0-vendor.tar.xz
+curl -L -o gpuq-0.3.0.tar.gz https://github.com/elektricM/gpuq/archive/refs/tags/v0.3.0.tar.gz
+curl -LO https://github.com/elektricM/gpuq/releases/download/v0.3.0/gpuq-0.3.0-vendor.tar.xz
+osc add gpuq.spec gpuq-0.3.0.tar.gz gpuq-0.3.0-vendor.tar.xz
 osc build openSUSE_Tumbleweed x86_64   # local test build
-osc commit -m "Update to 0.2.0"
+osc commit -m "Update to 0.3.0"
 ```
 
 Enable the openSUSE Tumbleweed and Leap repositories for the project in the web interface
@@ -137,21 +137,21 @@ builders have no network, so the vendored crates are shipped as a second orig ta
 
 ```sh
 sudo apt install devscripts debhelper dput
-curl -LO https://github.com/elektricM/gpuq/archive/refs/tags/v0.2.0.tar.gz
-curl -LO https://github.com/elektricM/gpuq/releases/download/v0.2.0/gpuq-0.2.0-vendor.tar.xz
-mv v0.2.0.tar.gz gpuq_0.2.0.orig.tar.gz
-mv gpuq-0.2.0-vendor.tar.xz gpuq_0.2.0.orig-vendor.tar.xz
-tar -xzf gpuq_0.2.0.orig.tar.gz
-cd gpuq-0.2.0
-tar -xJf ../gpuq_0.2.0.orig-vendor.tar.xz
+curl -LO https://github.com/elektricM/gpuq/archive/refs/tags/v0.3.0.tar.gz
+curl -LO https://github.com/elektricM/gpuq/releases/download/v0.3.0/gpuq-0.3.0-vendor.tar.xz
+mv v0.3.0.tar.gz gpuq_0.3.0.orig.tar.gz
+mv gpuq-0.3.0-vendor.tar.xz gpuq_0.3.0.orig-vendor.tar.xz
+tar -xzf gpuq_0.3.0.orig.tar.gz
+cd gpuq-0.3.0
+tar -xJf ../gpuq_0.3.0.orig-vendor.tar.xz
 cp -r packaging/debian debian
 dpkg-buildpackage -S -sa -k<KEYID>     # signed source package
 cd ..
-dput ppa:<user>/gpuq gpuq_0.2.0-1~noble1_source.changes
+dput ppa:<user>/gpuq gpuq_0.3.0-1~noble1_source.changes
 ```
 
 For another Ubuntu release, add a `debian/changelog` entry with the release name in the
-version and distribution (for example `0.2.0-1~questing1 questing`) and upload again.
+version and distribution (for example `0.3.0-1~questing1 questing`) and upload again.
 
 ## Debian
 

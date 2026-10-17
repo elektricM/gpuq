@@ -8,7 +8,7 @@
 %global _lto_cflags %{nil}
 
 Name:           gpuq
-Version:        0.2.0
+Version:        0.3.0
 Release:        1%{?dist}
 Summary:        GPU scheduler for Linux
 # gpuq is GPL-3.0-or-later; the rest covers the vendored crates linked into the binary.
@@ -117,6 +117,10 @@ cargo test --offline --locked %{?_smp_mflags}
 %{_datadir}/fish/vendor_completions.d/%{name}.fish
 
 %changelog
+* Sat Oct 17 2026 Martin Dolez <martin@dolez.fr> - 0.3.0-1
+- Leases and the LLM on several cards
+- Detects every GPU and its device id by PCI address
+
 * Sat Oct 17 2026 Martin Dolez <martin@dolez.fr> - 0.2.0-1
 - Renamed from gpud to gpuq
 - Man pages and shell completions

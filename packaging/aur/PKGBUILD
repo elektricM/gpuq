@@ -1,6 +1,6 @@
 # Maintainer: Martin Dolez <martin@dolez.fr>
 pkgname=gpuq
-pkgver=0.2.0
+pkgver=0.3.0
 pkgrel=1
 pkgdesc='GPU scheduler for Linux'
 arch=(x86_64 aarch64)
@@ -11,7 +11,7 @@ makedepends=(cargo)
 backup=('etc/gpuq/config.toml')
 options=('!lto')  # makepkg's LTO flags break ring's assembly at link time
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('dcf03d7cfe3517c4c22afa1ccd8a0a0588af782c12fea66a21330e4d91190f4f')
+sha256sums=('cb88769cce9ec9a3fac10ac0b460317527e6af6d725e0fd727bcbca6bfa206cc')
 
 prepare() {
   cd "$pkgname-$pkgver"

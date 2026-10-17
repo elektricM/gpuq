@@ -25,7 +25,7 @@ nix-build -E 'with import <nixpkgs> { }; callPackage ./package.nix { }'
 2. Copy `package.nix` to `pkgs/by-name/gp/gpuq/package.nix`, set
    `maintainers = with lib.maintainers; [ elektricM ];`, drop the two SPDX and copyright
    comment lines (nixpkgs files are covered by its MIT license), and commit it as
-   `gpuq: init at 0.2.0`.
+   `gpuq: init at 0.3.0`.
 
 3. Check it builds and passes the nixpkgs checks:
 

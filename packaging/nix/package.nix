@@ -9,16 +9,16 @@
 
 rustPlatform.buildRustPackage (finalAttrs: {
   pname = "gpuq";
-  version = "0.2.0";
+  version = "0.3.0";
 
   src = fetchFromGitHub {
     owner = "elektricM";
     repo = "gpuq";
     tag = "v${finalAttrs.version}";
-    hash = "sha256-urlLkDwTp2bFHmDYGHhhcJljRNiYnEKqVIwA20zRywg=";
+    hash = "sha256-CzE9iY1aNkHwjcHsNbEPbB6Rv6UMZFppK1cX+QtN6AU=";
   };
 
-  cargoHash = "sha256-tELTq9rmSOkyZoKYdl8j4atNWFnDHwCXCwfNDIybeAI=";
+  cargoHash = "sha256-Y3E12YI87bhUI+N4NdsoJ6BCc0y6lC2+FLe0vLbsUkI=";
 
   nativeBuildInputs = [ installShellFiles ];
 
