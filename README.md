@@ -43,10 +43,13 @@ Static binaries for x86_64 and aarch64, and `.deb` and `.rpm` packages, are avai
 Building from source requires Rust 1.80 or later:
 
 ```sh
-cargo install --git https://github.com/elektricM/gpuq
+cargo install --locked --git https://github.com/elektricM/gpuq
 ```
 
-A PKGBUILD for Arch Linux is in [packaging/aur](packaging/aur).
+Each release also has a `gpuq-<version>-vendor.tar.xz` with the dependencies, for builds
+without network access. Recipes for the AUR, Fedora and openSUSE, Ubuntu and Nix are in
+[packaging/](packaging/README.md). Man pages are in [man/](man) and shell completions in
+[completions/](completions).
 
 ## Usage
 
