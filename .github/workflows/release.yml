@@ -59,8 +59,8 @@ jobs:
           target="${{ matrix.target }}"
           name="gpuq-${version}-${target}"
           mkdir -p dist "stage/${name}"
-          cp "target/${target}/release/gpuq" README.md LICENSE "stage/${name}/"
-          cp -r examples "stage/${name}/examples"
+          cp "target/${target}/release/gpuq" README.md CHANGELOG.md LICENSE "stage/${name}/"
+          cp -r examples man completions docs "stage/${name}/"
           mkdir -p "stage/${name}/packaging"
           cp -r packaging/systemd "stage/${name}/packaging/systemd"
           tar -C stage -czf "dist/${name}.tar.gz" "${name}"
@@ -73,8 +73,34 @@ jobs:
           name: dist-${{ matrix.target }}
           path: dist/*
 
+  vendor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Vendor the dependencies
+        run: |
+          set -eux
+          version="${GITHUB_REF_NAME#v}"
+          mkdir -p dist
+          cargo vendor --locked vendor > /dev/null
+          tar --sort=name --owner=0 --group=0 --numeric-owner \
+            --mtime="@$(git log -1 --format=%ct)" \
+            -cJf "dist/gpuq-${version}-vendor.tar.xz" vendor
+          cp packaging/vendor-config.toml "dist/gpuq-${version}-vendor-config.toml"
+          ls -l dist
+      - name: Check an offline build from the vendored sources
+        run: |
+          set -eux
+          cat packaging/vendor-config.toml >> .cargo/config.toml
+          CARGO_HOME="$RUNNER_TEMP/empty-cargo-home" cargo build --offline --locked
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-vendor
+          path: dist/*
+
   release:
-    needs: build
+    needs: [build, vendor]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
@@ -88,4 +114,4 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           files: dist/*
-          generate_release_notes: true
+          draft: true
