@@ -626,6 +626,16 @@ fn services_can_name_several_cards() {
         "{TWO_CARDS}\n[[service]]\nname = \"s\"\nvram = \"2G\"\ncard = [\"big\", \"any\"]\n"
     ));
     assert!(e.contains("not allowed for services"), "{e}");
+    // Two cards need an env each.
+    let e = err_text(
+        "[[gpu.card]]\nname = \"a\"\nvendor = \"nvidia\"\nvisible_devices = \"0\"\n[[gpu.card]]\nname = \"b\"\nvendor = \"nvidia\"\n[[service]]\nname = \"s\"\nvram = \"2G\"\ncard = [\"a\", \"b\"]\n",
+    );
+    assert!(e.contains("card \"b\" has no visible_devices"), "{e}");
+    // And their env has to merge.
+    let e = err_text(
+        "[[gpu.card]]\nname = \"a\"\nvendor = \"nvidia\"\nvisible_devices = \"0\"\n[[gpu.card]]\nname = \"b\"\nvendor = \"command\"\ncommand = [\"true\"]\nvisible_devices = \"0\"\n[[service]]\nname = \"s\"\nvram = \"2G\"\ncard = [\"a\", \"b\"]\n",
+    );
+    assert!(e.contains("both set CUDA_VISIBLE_DEVICES"), "{e}");
 }
 
 #[test]

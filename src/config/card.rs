@@ -339,7 +339,11 @@ impl Config {
                 ));
                 continue;
             }
-            p.extend(check_list(label, &list));
+            let problems = check_list(label.clone(), &list);
+            if problems.is_empty() && list.len() > 1 {
+                p.extend(self.set_problems(&label, &list, cards));
+            }
+            p.extend(problems);
         }
         if let Some(c) = self.immich.as_ref().and_then(|im| im.card.as_ref()) {
             if !names.contains(c) {
@@ -349,6 +353,29 @@ impl Config {
             }
         }
         p
+    }
+
+    /// A service on several cards gets their env merged: each needs one, and they must merge.
+    fn set_problems(&self, label: &str, list: &[String], cards: &[CardSpec]) -> Vec<String> {
+        let picked: Vec<&CardSpec> = list
+            .iter()
+            .filter_map(|n| cards.iter().find(|c| &c.name == n))
+            .collect();
+        if let Some(c) = picked.iter().find(|c| c.env.is_empty()) {
+            return vec![format!(
+                "{label}: card {:?} has no visible_devices; a service on several cards needs it on each",
+                c.name
+            )];
+        }
+        let merged = crate::arbiter::merge_env(
+            picked
+                .iter()
+                .map(|c| (c.name.as_str(), c.vendor.as_str(), c.env.as_slice())),
+        );
+        match merged {
+            Ok(_) => Vec::new(),
+            Err(e) => vec![format!("{label}: {e}")],
+        }
     }
 
     pub(super) fn card_problems(&self) -> Vec<String> {
