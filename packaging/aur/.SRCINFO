@@ -1,15 +1,17 @@
 pkgbase = gpuq
-	pkgdesc = GPU manager and queue: one card, many AI and GPU workloads
-	pkgver = 0.1.1
+	pkgdesc = GPU scheduler for Linux
+	pkgver = 0.2.0
 	pkgrel = 1
 	url = https://github.com/elektricM/gpuq
 	arch = x86_64
 	arch = aarch64
 	license = GPL-3.0-or-later
 	makedepends = cargo
+	depends = gcc-libs
+	depends = glibc
 	options = !lto
 	backup = etc/gpuq/config.toml
-	source = gpuq-0.1.1.tar.gz::https://github.com/elektricM/gpuq/archive/refs/tags/v0.1.1.tar.gz
-	sha256sums = 98de4e15e1385165060931e3e4106a936a6fcd16fd92de3590d6a10258b7e41e
+	source = gpuq-0.2.0.tar.gz::https://github.com/elektricM/gpuq/archive/refs/tags/v0.2.0.tar.gz
+	sha256sums = SKIP
 
 pkgname = gpuq

@@ -1,21 +1,22 @@
-# Maintainer: Martin
+# Maintainer: Martin Dolez <martin@dolez.fr>
 pkgname=gpuq
-pkgver=0.1.1
+pkgver=0.2.0
 pkgrel=1
-pkgdesc='GPU manager and queue: one card, many AI and GPU workloads'
+pkgdesc='GPU scheduler for Linux'
 arch=(x86_64 aarch64)
 url='https://github.com/elektricM/gpuq'
 license=('GPL-3.0-or-later')
+depends=(gcc-libs glibc)
 makedepends=(cargo)
 backup=('etc/gpuq/config.toml')
 options=('!lto')  # makepkg's LTO flags break ring's assembly at link time
-source=("$pkgname-$pkgver.tar.gz::https://github.com/elektricM/gpuq/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('98de4e15e1385165060931e3e4106a936a6fcd16fd92de3590d6a10258b7e41e')
+source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
+sha256sums=('SKIP')
 
 prepare() {
   cd "$pkgname-$pkgver"
   export RUSTUP_TOOLCHAIN=stable
-  cargo fetch --locked
+  cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
 }
 
 build() {
@@ -34,12 +35,17 @@ check() {
 
 package() {
   cd "$pkgname-$pkgver"
-  install -Dm755 target/release/gpuq "$pkgdir/usr/bin/gpuq"
+  install -Dm755 target/release/gpuq -t "$pkgdir/usr/bin"
   install -Dm644 packaging/systemd/gpuq.service "$pkgdir/usr/lib/systemd/system/gpuq.service"
   install -Dm644 packaging/systemd/gpuq.user.service "$pkgdir/usr/lib/systemd/user/gpuq.service"
   install -Dm644 packaging/systemd/gpuq.sysusers "$pkgdir/usr/lib/sysusers.d/gpuq.conf"
   install -Dm644 examples/gpuq.toml "$pkgdir/etc/gpuq/config.toml"
-  install -Dm644 examples/gpuq.toml "$pkgdir/usr/share/doc/$pkgname/examples/gpuq.toml"
-  install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
-  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  install -Dm644 man/*.1 -t "$pkgdir/usr/share/man/man1"
+  install -Dm644 completions/gpuq.bash "$pkgdir/usr/share/bash-completion/completions/gpuq"
+  install -Dm644 completions/_gpuq -t "$pkgdir/usr/share/zsh/site-functions"
+  install -Dm644 completions/gpuq.fish -t "$pkgdir/usr/share/fish/vendor_completions.d"
+  install -Dm644 README.md CHANGELOG.md -t "$pkgdir/usr/share/doc/$pkgname"
+  install -Dm644 docs/*.md -t "$pkgdir/usr/share/doc/$pkgname/docs"
+  install -Dm644 examples/* -t "$pkgdir/usr/share/doc/$pkgname/examples"
+  install -Dm644 LICENSE -t "$pkgdir/usr/share/licenses/$pkgname"
 }
