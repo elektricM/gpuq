@@ -8,7 +8,7 @@ gpuq\-hold \- Hold a lease until Ctrl\-C
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
-\fBgpuq hold\fR [\fB\-\-api\fR] [\fB\-\-class\fR] [\fB\-\-vram\fR] [\fB\-\-name\fR] [\fB\-\-card\fR] [\fB\-h\fR|\fB\-\-help\fR] 
+\fBgpuq hold\fR [\fB\-\-api\fR] [\fB\-\-class\fR] [\fB\-\-vram\fR] [\fB\-\-name\fR] [\fB\-\-card\fR] [\fB\-\-cards\fR] [\fB\-h\fR|\fB\-\-help\fR] 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
@@ -29,8 +29,11 @@ VRAM to reserve, e.g. 8G, 3000M or all
 \fB\-\-name\fR \fI<NAME>\fR [default: manual]
 Lease name shown in `gpuq status`
 .TP
-\fB\-\-card\fR \fI<NAME|any>\fR
-Card to hold: a name from `gpuq status`, or `any`. Default: the primary card
+\fB\-\-card\fR \fI<NAME|LIST|all|any>\fR
+Card to hold: a name from `gpuq status`, a comma list, `all` or `any`. Default: any card with room
+.TP
+\fB\-\-cards\fR \fI<N>\fR
+Hold this many cards at once, any that have room
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 Print help

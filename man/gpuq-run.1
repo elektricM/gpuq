@@ -8,7 +8,7 @@ gpuq\-run \- Run a command under a GPU lease
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH SYNOPSIS
-\fBgpuq run\fR [\fB\-\-api\fR] [\fB\-\-class\fR] [\fB\-\-vram\fR] [\fB\-\-name\fR] [\fB\-\-yieldable\fR] [\fB\-\-yield\-signal\fR] [\fB\-\-card\fR] [\fB\-\-fallback\fR] [\fB\-h\fR|\fB\-\-help\fR] [\fICMD\fR] 
+\fBgpuq run\fR [\fB\-\-api\fR] [\fB\-\-class\fR] [\fB\-\-vram\fR] [\fB\-\-name\fR] [\fB\-\-yieldable\fR] [\fB\-\-yield\-signal\fR] [\fB\-\-card\fR] [\fB\-\-cards\fR] [\fB\-\-fallback\fR] [\fB\-h\fR|\fB\-\-help\fR] [\fICMD\fR] 
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH DESCRIPTION
@@ -35,8 +35,11 @@ Signal the job when something more important needs the card
 \fB\-\-yield\-signal\fR \fI<SIGNAL>\fR
 Signal sent on a yield request, e.g. SIGUSR1 or TERM. Default: gpuq\*(Aqs `[run] yield_signal`, else SIGUSR1
 .TP
-\fB\-\-card\fR \fI<NAME|any>\fR
-Card to run on: a name from `gpuq status`, or `any` for the first card with room. Default: the primary card
+\fB\-\-card\fR \fI<NAME|LIST|all|any>\fR
+Card to run on: a name from `gpuq status`, a comma list such as gpu0,gpu1 for several cards at once, `all` for every card, or `any`. Default: any card with room
+.TP
+\fB\-\-cards\fR \fI<N>\fR
+Run on this many cards at once, any that have room. \-\-vram applies to each card
 .TP
 \fB\-\-fallback\fR
 If gpuq is not running, run the command anyway

@@ -64,7 +64,8 @@ _arguments "${_arguments_options[@]}" : \
 '--vram=[VRAM to reserve, e.g. 8G, 3000M or all]:VRAM:_default' \
 '--name=[Lease name shown in \`gpuq status\` (default\: the command'\''s basename)]:NAME:_default' \
 '--yield-signal=[Signal sent on a yield request, e.g. SIGUSR1 or TERM. Default\: gpuq'\''s \`\[run\] yield_signal\`, else SIGUSR1]:SIGNAL:_default' \
-'--card=[Card to run on\: a name from \`gpuq status\`, or \`any\` for the first card with room. Default\: the primary card]:NAME|any:_default' \
+'--card=[Card to run on\: a name from \`gpuq status\`, a comma list such as gpu0,gpu1 for several cards at once, \`all\` for every card, or \`any\`. Default\: any card with room]:NAME|LIST|all|any:_default' \
+'(--card)--cards=[Run on this many cards at once, any that have room. --vram applies to each card]:N:_default' \
 '--api=[Address of the gpuq control API (default\: \$GPUQ_API, else 127.0.0.1\:9390)]:HOST:PORT:_default' \
 '--yieldable[Signal the job when something more important needs the card]' \
 '--fallback[If gpuq is not running, run the command anyway]' \
@@ -78,7 +79,8 @@ _arguments "${_arguments_options[@]}" : \
 '--class=[Priority class from gpuq'\''s \[classes\] table]:CLASS:_default' \
 '--vram=[VRAM to reserve, e.g. 8G, 3000M or all]:VRAM:_default' \
 '--name=[Lease name shown in \`gpuq status\`]:NAME:_default' \
-'--card=[Card to hold\: a name from \`gpuq status\`, or \`any\`. Default\: the primary card]:NAME|any:_default' \
+'--card=[Card to hold\: a name from \`gpuq status\`, a comma list, \`all\` or \`any\`. Default\: any card with room]:NAME|LIST|all|any:_default' \
+'(--card)--cards=[Hold this many cards at once, any that have room]:N:_default' \
 '--api=[Address of the gpuq control API (default\: \$GPUQ_API, else 127.0.0.1\:9390)]:HOST:PORT:_default' \
 '-h[Print help]' \
 '--help[Print help]' \

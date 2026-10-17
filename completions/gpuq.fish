@@ -48,7 +48,8 @@ complete -c gpuq -n "__fish_gpuq_using_subcommand run" -l class -d 'Priority cla
 complete -c gpuq -n "__fish_gpuq_using_subcommand run" -l vram -d 'VRAM to reserve, e.g. 8G, 3000M or all' -r
 complete -c gpuq -n "__fish_gpuq_using_subcommand run" -l name -d 'Lease name shown in `gpuq status` (default: the command\'s basename)' -r
 complete -c gpuq -n "__fish_gpuq_using_subcommand run" -l yield-signal -d 'Signal sent on a yield request, e.g. SIGUSR1 or TERM. Default: gpuq\'s `[run] yield_signal`, else SIGUSR1' -r
-complete -c gpuq -n "__fish_gpuq_using_subcommand run" -l card -d 'Card to run on: a name from `gpuq status`, or `any` for the first card with room. Default: the primary card' -r
+complete -c gpuq -n "__fish_gpuq_using_subcommand run" -l card -d 'Card to run on: a name from `gpuq status`, a comma list such as gpu0,gpu1 for several cards at once, `all` for every card, or `any`. Default: any card with room' -r
+complete -c gpuq -n "__fish_gpuq_using_subcommand run" -l cards -d 'Run on this many cards at once, any that have room. --vram applies to each card' -r
 complete -c gpuq -n "__fish_gpuq_using_subcommand run" -l api -d 'Address of the gpuq control API (default: $GPUQ_API, else 127.0.0.1:9390)' -r
 complete -c gpuq -n "__fish_gpuq_using_subcommand run" -l yieldable -d 'Signal the job when something more important needs the card'
 complete -c gpuq -n "__fish_gpuq_using_subcommand run" -l fallback -d 'If gpuq is not running, run the command anyway'
@@ -56,7 +57,8 @@ complete -c gpuq -n "__fish_gpuq_using_subcommand run" -s h -l help -d 'Print he
 complete -c gpuq -n "__fish_gpuq_using_subcommand hold" -l class -d 'Priority class from gpuq\'s [classes] table' -r
 complete -c gpuq -n "__fish_gpuq_using_subcommand hold" -l vram -d 'VRAM to reserve, e.g. 8G, 3000M or all' -r
 complete -c gpuq -n "__fish_gpuq_using_subcommand hold" -l name -d 'Lease name shown in `gpuq status`' -r
-complete -c gpuq -n "__fish_gpuq_using_subcommand hold" -l card -d 'Card to hold: a name from `gpuq status`, or `any`. Default: the primary card' -r
+complete -c gpuq -n "__fish_gpuq_using_subcommand hold" -l card -d 'Card to hold: a name from `gpuq status`, a comma list, `all` or `any`. Default: any card with room' -r
+complete -c gpuq -n "__fish_gpuq_using_subcommand hold" -l cards -d 'Hold this many cards at once, any that have room' -r
 complete -c gpuq -n "__fish_gpuq_using_subcommand hold" -l api -d 'Address of the gpuq control API (default: $GPUQ_API, else 127.0.0.1:9390)' -r
 complete -c gpuq -n "__fish_gpuq_using_subcommand hold" -s h -l help -d 'Print help'
 complete -c gpuq -n "__fish_gpuq_using_subcommand help; and not __fish_seen_subcommand_from daemon check-config status run hold help" -f -a "daemon" -d 'Run the daemon'

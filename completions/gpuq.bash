@@ -227,7 +227,7 @@ _gpuq() {
             return 0
             ;;
         gpuq__hold)
-            opts="-h --class --vram --name --card --api --help"
+            opts="-h --class --vram --name --card --cards --api --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -249,6 +249,10 @@ _gpuq() {
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
+                --cards)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
                 --api)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
@@ -261,7 +265,7 @@ _gpuq() {
             return 0
             ;;
         gpuq__run)
-            opts="-h --class --vram --name --yieldable --yield-signal --card --fallback --api --help [CMD]..."
+            opts="-h --class --vram --name --yieldable --yield-signal --card --cards --fallback --api --help [CMD]..."
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -284,6 +288,10 @@ _gpuq() {
                     return 0
                     ;;
                 --card)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --cards)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
