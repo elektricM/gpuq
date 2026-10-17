@@ -1,0 +1,7 @@
+# Append to .cargo/config.toml (or $CARGO_HOME/config.toml) after extracting
+# gpuq-<version>-vendor.tar.xz in the source directory, then build with --offline.
+[source.crates-io]
+replace-with = "vendored-sources"
+
+[source.vendored-sources]
+directory = "vendor"
