@@ -7,6 +7,8 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-17
+
 ### Added
 
 - Leases on several cards at once: `gpuq run --card gpu0,gpu1`, `--card all` and `--cards N`
@@ -120,7 +122,8 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Control API and the `daemon`, `check-config`, `status`, `run` and `hold` commands.
 - Static musl binaries, `.deb` and `.rpm` packages, and a PKGBUILD.
 
-[Unreleased]: https://github.com/elektricM/gpuq/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/elektricM/gpuq/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/elektricM/gpuq/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/elektricM/gpuq/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/elektricM/gpuq/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/elektricM/gpuq/releases/tag/v0.1.0
