@@ -7,6 +7,30 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `[desktop]`: free the VRAM the graphical desktop holds on a card. `policy = "stop"` stops the
+  configured user units and display manager while an LLM model from `models` is loaded, less
+  than `min_free_mib` is free, or a job does not fit, and starts the display manager again
+  `restore_delay_s` after the last reason. `policy = "offload"` restarts the desktop pointed at
+  another card instead (`[desktop.offload]`), checks that it left the card, and uses
+  `fallback` when it cannot. Off by default. Never acts while a user is logged in at the seat.
+- The processes holding a card are found through `/proc/*/fd` and DRM fdinfo by PCI address,
+  with their resident VRAM; processes in `ignore`, such as a headless compositor, never count
+  as the desktop. Nothing is killed: only the configured units are stopped and started.
+- Each change is checked: units down or up, the desktop's processes gone, VRAM before and
+  after; a release that does not complete is rolled back. After each change the system and
+  user journals are read for new errors, failed units and core dumps.
+- After a stop, `session_env` is set in the user manager and the D-Bus activation environment,
+  so D-Bus activated services do not start against the display that is gone.
+- `gpuq desktop [status|release|restore]`, `GET /desktop`, `POST /desktop/release` and
+  `POST /desktop/restore`; `gpuq status` and `GET /status` show the desktop state.
+- Optional `wake_on_input`: a key press at the seat restores the desktop.
+
+### Fixed
+
+- An unreachable Immich is logged once, and again when it is back, instead of on every poll.
+
 ## [0.3.1] - 2026-10-17
 
 ### Changed

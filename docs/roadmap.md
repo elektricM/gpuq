@@ -2,11 +2,12 @@
 
 Nothing here is implemented. It is the order I would do it in, and what works today instead.
 
-## Desktop and game detection
+## Foreground and game detection
 
 Taking the card back for the desktop (a game, a video call, a compositor that needs VRAM)
 should be automatic: detect the foreground GPU user, ask everything to yield, hand the card
-back afterwards.
+back afterwards. (The other direction, freeing the VRAM an idle desktop holds, is
+`[desktop]`, see `desktop.md`.)
 
 Today it is manual. The `interactive` class outranks `background` and `batch`, and
 `gpuq hold --class interactive --vram all` takes the whole card until you press Ctrl-C.

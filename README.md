@@ -34,6 +34,8 @@ How the scheduler works inside, with a diagram: [docs/how-it-works.md](docs/how-
 - Jobs on one card, on any card with room, or on several cards at once, granted all together
 - LLM servers split over several cards, unloaded and reloaded on all of them together
 - AMD and NVIDIA VRAM probes, plus a custom probe command
+- Optional: the graphical desktop is stopped or moved to another GPU while its VRAM is needed,
+  and given back afterwards
 
 ## Supported software
 
@@ -106,11 +108,24 @@ gpuq daemon          run the scheduler
 
 To run an LLM server behind gpuq, see [docs/integrations.md](docs/integrations.md).
 
+### The desktop
+
+On a machine used mostly remotely, the display manager and the session hold VRAM on the card.
+With `[desktop] policy = "stop"`, gpuq stops them while a large model is loaded or a job does
+not fit, and starts the display manager again later. `policy = "offload"` restarts the desktop
+on another GPU instead, when the monitors are connected there. Nothing happens while someone is
+logged in at the seat. See [docs/desktop.md](docs/desktop.md).
+
+```
+gpuq desktop                 state and the processes on the card
+gpuq desktop restore         give the desktop back now
+```
+
 ## Roadmap
 
 - One LLM server per GPU
 - Web UI
-- Desktop and game detection
+- Foreground and game detection
 - Prometheus metrics
 - Configuration reload
 - Intel VRAM probe
@@ -122,6 +137,7 @@ See [docs/roadmap.md](docs/roadmap.md).
 - [How it works](docs/how-it-works.md)
 - [Integrations](docs/integrations.md)
 - [Configuration reference](docs/config.md)
+- [The desktop](docs/desktop.md)
 - [Lease API](docs/lease-api.md)
 - [Roadmap](docs/roadmap.md)
 
