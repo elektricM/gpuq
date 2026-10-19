@@ -119,8 +119,8 @@ needs the VRAM if `offload.move_back = true`. Moving back removes the environmen
 
 Some setups cannot be moved by an environment variable. An X11 display manager greeter, for
 example, runs Xorg, which opens the display node of every card. There `offload` finds Xorg
-still on the card and falls back; switching the greeter to Wayland, or an Xorg config that
-names one card, makes it work.
+still on the card and falls back. A compositor told to use another card may still open this
+card's render node too. `gpuq desktop` lists what is left on the card.
 
 ## Checking the journal
 
