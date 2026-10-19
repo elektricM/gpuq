@@ -562,7 +562,7 @@ impl Controller {
         let failed_before = self.failed_units().await;
         self.m.begin(Instant::now(), &step);
         // Logged below with more detail.
-        self.last_logged = norm(self.m.why());
+        self.last_logged = format!("{} {}", self.m.state().name(), norm(self.m.why()));
         self.publish();
         let result = if what == "release" {
             tracing::info!("desktop: releasing {} ({why})", self.card);
@@ -584,7 +584,7 @@ impl Controller {
             Err(e) => tracing::warn!("desktop: {what} failed: {e}"),
         }
         self.persist();
-        self.last_logged = norm(self.m.why());
+        self.last_logged = format!("{} {}", self.m.state().name(), norm(self.m.why()));
         if let Some(a) = &self.arbiter {
             a.wake();
         }
@@ -684,7 +684,7 @@ impl Controller {
         if self.cfg.min_free_mib > 0 && !l.models.is_empty() {
             if let Some(f) = free.filter(|f| *f < self.cfg.min_free_mib) {
                 if self.pressure.is_none() {
-                    tracing::info!(
+                    tracing::debug!(
                         "desktop: {f} MiB free on {} with {} loaded",
                         self.card,
                         l.models.join(", ")
@@ -731,9 +731,16 @@ impl Controller {
         let now = Instant::now();
         let seen = self.last_seen.clone();
         let m = &self.m;
-        let key = norm(m.why());
+        // A new state is logged; a new reason within the same state (a model swapped in or
+        // out) only at debug level, so model swaps do not fill the journal.
+        let key = format!("{} {}", m.state().name(), norm(m.why()));
         if key != self.last_logged {
-            tracing::info!("desktop: {} ({})", m.state().name(), m.why());
+            let state_changed = self.last_logged.split(' ').next() != Some(m.state().name());
+            if state_changed {
+                tracing::info!("desktop: {} ({})", m.state().name(), m.why());
+            } else {
+                tracing::debug!("desktop: {} ({})", m.state().name(), m.why());
+            }
             self.last_logged = key;
         }
         let impossible = self.offload_impossible.clone();
