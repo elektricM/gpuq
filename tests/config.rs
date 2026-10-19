@@ -740,3 +740,23 @@ fn desktop_example_parses() {
     assert!(cfg.desktop.enabled());
     assert_eq!(cfg.desktop.ignore, vec!["kwin_wayland --virtual"]);
 }
+
+#[test]
+fn hold_other_models_parses_per_class() {
+    let cfg = Config::from_toml_str(
+        "[classes]\nrecorder = 0\n[llm.class_tuning.recorder]\nhold_other_models_s = 60\n",
+    )
+    .unwrap();
+    let s = cfg.arbiter_settings();
+    let holders: Vec<(&str, Duration)> = s.tuning.model_holders().collect();
+    assert_eq!(holders, vec![("recorder", Duration::from_secs(60))]);
+    assert_eq!(
+        Config::from_toml_str("")
+            .unwrap()
+            .arbiter_settings()
+            .tuning
+            .model_holders()
+            .count(),
+        0
+    );
+}

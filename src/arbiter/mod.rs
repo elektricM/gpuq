@@ -20,6 +20,10 @@
 //! its next safe point when something more important waits. Priority comes from the class
 //! table (lower number = more important).
 //!
+//! In the `llm` phase, a class with `hold_other_models` keeps the backend on its model: while
+//! it has requests in flight, or had one less than that long ago, requests of less important
+//! classes for another model wait, so the server does not swap models back and forth.
+//!
 //! A lease can hold several cards. It is granted all at once or not at all, so nothing ever
 //! holds one card while it waits for another. The LLM can also span several cards; it then
 //! gives all of them back together.
@@ -113,11 +117,15 @@ impl Classes {
     }
 }
 
-/// Per-class overrides for the quiet time after an LLM request and the reload delay.
+/// Per-class overrides for the quiet time after an LLM request and the reload delay, and
+/// how long the class keeps other models off the backend.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct ClassTuning {
     pub gap: Option<Duration>,
     pub reload_delay: Option<Duration>,
+    /// While requests of this class are in flight, and this long after the last one,
+    /// requests of less important classes for another model wait.
+    pub hold_other_models: Option<Duration>,
 }
 
 /// Scheduling knobs, from the `[llm]`, `[gpu]` and `[hooks]` config sections.
@@ -160,6 +168,13 @@ impl Tuning {
             .get(class)
             .and_then(|t| t.gap)
             .unwrap_or(self.gap)
+    }
+
+    /// Classes that hold other models off the backend, with their hold time.
+    pub fn model_holders(&self) -> impl Iterator<Item = (&str, Duration)> {
+        self.class_tuning
+            .iter()
+            .filter_map(|(c, t)| Some((c.as_str(), t.hold_other_models?)))
     }
 
     pub fn reload_delay_after(&self, class: &str) -> Duration {
@@ -460,6 +475,21 @@ pub struct Status {
     pub cards: Vec<CardStatus>,
     /// The cards the LLM backend holds now; empty while it is unloaded.
     pub llm_cards: Vec<String>,
+    /// LLM requests waiting because a more important class is using another model.
+    pub model_hold: Option<ModelHold>,
+}
+
+/// Requests held so the backend stays on the model a more important class uses.
+#[derive(Clone, Debug, Serialize)]
+pub struct ModelHold {
+    /// The class being served, and its model.
+    pub behind_class: String,
+    pub behind_model: String,
+    /// How many requests wait, and for which models.
+    pub held: usize,
+    pub models: Vec<String>,
+    /// Since the hold began.
+    pub since_s: u64,
 }
 
 // ------------------------------------------------------------------------ handle
@@ -473,7 +503,10 @@ enum Msg {
         class: String,
         reply: oneshot::Sender<()>,
     },
-    ExitLlm,
+    ExitLlm {
+        class: String,
+        model: String,
+    },
     Acquire {
         id: u64,
         req: LeaseRequest,
@@ -657,6 +690,8 @@ impl Handle {
         cancel.disarm();
         Ok(LlmGuard {
             tx: self.tx.clone(),
+            class: class.to_owned(),
+            model: model.to_owned(),
         })
     }
 
@@ -725,11 +760,16 @@ impl Drop for CancelOnDrop {
 #[must_use = "the request counts as in flight until the guard is dropped"]
 pub struct LlmGuard {
     tx: mpsc::UnboundedSender<Msg>,
+    class: String,
+    model: String,
 }
 
 impl Drop for LlmGuard {
     fn drop(&mut self) {
-        let _ = self.tx.send(Msg::ExitLlm);
+        let _ = self.tx.send(Msg::ExitLlm {
+            class: std::mem::take(&mut self.class),
+            model: std::mem::take(&mut self.model),
+        });
     }
 }
 

@@ -100,6 +100,9 @@ fn render(st: &Value) -> String {
             put("", format!("journal {}", check_line(c)));
         }
     }
+    if let Some(h) = st.get("model_hold").filter(|v| v.is_object()) {
+        put("holding", hold_line(h));
+    }
     for l in arr(st, "leases") {
         let y = if l.get("yield_requested").and_then(Value::as_bool) == Some(true) {
             " YIELD REQUESTED"
@@ -225,6 +228,20 @@ fn immich_line(im: &Value) -> String {
         line.push_str(&format!("   error: {e}"));
     }
     line
+}
+
+/// `2 llm requests for strata-iq3s behind recorder (qwen3.8-27b-rec) for 1m5s`.
+fn hold_line(h: &Value) -> String {
+    let models: Vec<&str> = arr(h, "models").iter().filter_map(Value::as_str).collect();
+    let held = n(h, "held");
+    format!(
+        "{held} LLM request{} for {} behind {} ({}) for {}",
+        if held == 1 { "" } else { "s" },
+        models.join(", "),
+        s(h, "behind_class"),
+        s(h, "behind_model"),
+        age(n(h, "since_s"))
+    )
 }
 
 /// `released (stopped) 2m5s: why` for the `desktop` object.
@@ -397,6 +414,16 @@ mod tests {
             "{t}"
         );
         assert!(!render(&json!({"state": "llm"})).contains("immich"));
+    }
+
+    #[test]
+    fn renders_a_model_hold() {
+        let st = json!({"state": "llm", "model_hold": {"behind_class": "recorder",
+            "behind_model": "qwen3.8-27b-rec", "held": 2, "models": ["strata-iq3s"],
+            "since_s": 65}});
+        assert!(render(&st).contains(
+            "holding    2 LLM requests for strata-iq3s behind recorder (qwen3.8-27b-rec) for 1m5s\n"
+        ));
     }
 
     #[test]

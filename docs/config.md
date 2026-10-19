@@ -260,6 +260,21 @@ Per-class overrides, for a class that is often followed by another LLM request.
 |---|---|---|
 | `gap_s` | falls back to `llm.gap_s` | Silence required before other classes take the card after a request of this class. |
 | `reload_delay_s` | falls back to `llm.reload_delay_s` | Pause before reloading the resident model after a job of this class. |
+| `hold_other_models_s` | unset (off) | Keep the LLM server on this class's model: while the class has requests in flight, and this long after its last one, requests of less important classes for another model wait in the queue. Requests for the same model, and of this class or more important ones, are never held. |
+
+`hold_other_models_s` is for a server that holds one model at a time (llama-swap with an
+exclusive group, Ollama with one model): without it, two clients that use different models
+make the server swap at every request. Set it a bit longer than the pauses between the
+class's requests. Held requests do not time out in gpuq; `gpuq status` shows them on a
+`holding` line, and the log has one line when a hold starts and one when it ends.
+
+```toml
+[llm.model_classes]
+"qwen3.8-27b-rec" = "recorder"
+
+[llm.class_tuning.recorder]
+hold_other_models_s = 60   # other models wait while the recorder writes its notes
+```
 
 ### [llm.service]
 

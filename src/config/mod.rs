@@ -303,6 +303,10 @@ pub struct ClassTuningCfg {
     pub gap: Option<Duration>,
     #[serde(rename = "reload_delay_s", deserialize_with = "secs::option")]
     pub reload_delay: Option<Duration>,
+    /// While this class has LLM requests in flight, and this long after its last one,
+    /// requests of less important classes for another model wait.
+    #[serde(rename = "hold_other_models_s", deserialize_with = "secs::option")]
+    pub hold_other_models: Option<Duration>,
 }
 
 /// `[llm.models.<id>]`: where one model runs.
@@ -648,6 +652,7 @@ impl Config {
                         ClassTuning {
                             gap: t.gap,
                             reload_delay: t.reload_delay,
+                            hold_other_models: t.hold_other_models,
                         },
                     )
                 })

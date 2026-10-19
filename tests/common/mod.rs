@@ -359,6 +359,7 @@ pub fn base_settings() -> Settings {
         ClassTuning {
             gap: Some(secs(1.0)),
             reload_delay: Some(secs(60.0)),
+            hold_other_models: None,
         },
     );
     Settings {

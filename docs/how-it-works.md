@@ -92,3 +92,13 @@ llm = 2
 ```
 
 Details of every timing and class setting are in [config.md](config.md).
+
+## One model at a time
+
+An LLM server that holds one model at a time swaps whenever the next request asks for
+another model. With two clients on two models, that is a cold load at every turn. A class
+with `hold_other_models_s` (see `[llm.class_tuning]` in config.md) keeps the server on its
+model: while it has requests in flight, and for that long after the last one, requests of
+less important classes for another model wait in the queue. They go through together once the
+class has been quiet, so the server swaps once each way.
+

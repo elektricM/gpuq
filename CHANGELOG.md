@@ -26,6 +26,11 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `gpuq desktop [status|release|restore]`, `GET /desktop`, `POST /desktop/release` and
   `POST /desktop/restore`; `gpuq status` and `GET /status` show the desktop state.
 - Optional `wake_on_input`: a key press at the seat restores the desktop.
+- `[llm.class_tuning.<class>] hold_other_models_s`: while that class uses the LLM, and that
+  long after its last request, requests of less important classes for another model wait, so a
+  server with one model at a time does not swap back and forth. Same-model and more important
+  requests pass. `gpuq status` shows a `holding` line and `GET /status` a `model_hold` object;
+  the log has one line when a hold starts and one when it ends.
 
 ### Fixed
 

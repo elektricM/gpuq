@@ -39,8 +39,8 @@ use tokio::sync::{mpsc, oneshot, watch};
 use tokio::time::{sleep, sleep_until, timeout, Instant};
 
 use super::{
-    merge_env, CardSel, CardStatus, Classes, Granted, HistoryEntry, LeaseRequest, LeaseStatus, Msg,
-    OffloadHook, QueueStatus, Settings, Status, Tuning, Vram, WaiterKind,
+    merge_env, CardSel, CardStatus, Classes, Granted, HistoryEntry, LeaseRequest, LeaseStatus,
+    ModelHold, Msg, OffloadHook, QueueStatus, Settings, Status, Tuning, Vram, WaiterKind,
 };
 use crate::backend::{Backend, BackendError, Placement};
 use crate::probe::{VramProbe, VramReading};
@@ -406,6 +406,30 @@ impl Target {
     }
 }
 
+/// What one class does with the LLM.
+struct ClassUse {
+    /// Canonical id of the model it last used.
+    model: String,
+    inflight: usize,
+    last: Instant,
+}
+
+struct HoldLog {
+    behind_class: String,
+    behind_model: String,
+    since: Instant,
+    released: usize,
+    longest: Duration,
+}
+
+/// Why a request waits for another class's model.
+struct HeldBehind {
+    class: String,
+    model: String,
+    /// When the hold ends if nothing else happens; None while that class has requests in flight.
+    until: Option<Instant>,
+}
+
 enum Want {
     Job {
         vram: Vram,
@@ -432,6 +456,8 @@ struct Waiter {
     note: String,
     /// When it was first held behind a batch lease.
     held_at: Option<Instant>,
+    /// Held because a more important class uses another model (see `model_hold`).
+    model_held: bool,
     /// For an LLM request: the cards its model runs on.
     target: Target,
     want: Want,
@@ -592,7 +618,12 @@ struct Actor {
     last_llm: Instant,
     last_llm_class: String,
     saved: HashSet<String>,
-    recent_admits: VecDeque<u64>,
+    /// Recent admissions (id, class, model), to undo one whose client vanished.
+    recent_admits: VecDeque<(u64, String, String)>,
+    /// Per class: the model it last used, its requests in flight, when it was last active.
+    llm_use: HashMap<String, ClassUse>,
+    /// The hold behind a class's model under way: for one start and one end line.
+    hold_log: Option<HoldLog>,
 
     waiters: Vec<Waiter>,
     history: VecDeque<(SystemTime, String)>,
@@ -704,6 +735,8 @@ impl Actor {
             last_llm_class: "llm".into(),
             saved: HashSet::new(),
             recent_admits: VecDeque::new(),
+            llm_use: HashMap::new(),
+            hold_log: None,
             waiters: Vec::new(),
             history: VecDeque::new(),
             next_seq: 0,
@@ -982,9 +1015,10 @@ impl Actor {
                 class,
                 reply,
             } => self.enter_llm(id, model, class, reply),
-            Msg::ExitLlm => {
+            Msg::ExitLlm { class, model } => {
                 self.inflight = self.inflight.saturating_sub(1);
                 self.last_llm = Instant::now();
+                self.exit_class(&class, &model);
             }
             Msg::Acquire { id, req, reply } => self.acquire(id, req, reply),
             Msg::Cancel(id) => self.cancel(id),
@@ -1005,17 +1039,32 @@ impl Actor {
         let in_llm = cards
             .iter()
             .all(|&c| matches!(self.cards[c].state, State::Llm { .. }));
+        let behind = self.held_behind(&model, prio, Instant::now());
         if in_llm
+            && behind.is_none()
             && !blocked(&self.waiters, (prio, seq), &cards, &self.steer)
             && !self.needs_slot_restore(&model)
         {
             if reply.send(()).is_ok() {
-                self.admit(id, &class);
+                self.admit(id, &class, &model);
             }
             return;
         }
-        let phase = self.cards[cards[0]].state.phase().name();
-        self.event(format!("hold {class} request for {model} (state {phase})"));
+        let model_held = behind.is_some();
+        let note = match &behind {
+            Some(b) => {
+                self.log_hold_start(b);
+                if let Some(until) = b.until {
+                    self.want(until);
+                }
+                hold_note(b)
+            }
+            None => {
+                let phase = self.cards[cards[0]].state.phase().name();
+                self.event(format!("hold {class} request for {model} (state {phase})"));
+                String::new()
+            }
+        };
         let target = match cards[..] {
             [c] => Target::Card(c),
             _ => Target::Set(cards),
@@ -1027,11 +1076,104 @@ impl Actor {
             prio,
             name: model.clone(),
             since: SystemTime::now(),
-            note: String::new(),
+            note,
             held_at: None,
+            model_held,
             target,
             want: Want::Llm { model, reply },
         });
+    }
+
+    // -------------------------------------------------------------- model holds
+
+    /// The more important class whose model `model` would push off the backend, if any.
+    fn held_behind(&self, model: &str, prio: u32, now: Instant) -> Option<HeldBehind> {
+        let want = self.backend.resolve(model);
+        let mut best: Option<(u32, HeldBehind)> = None;
+        for (class, hold) in self.t.model_holders() {
+            let class_prio = self.classes.llm_prio(class);
+            if class_prio >= prio {
+                continue;
+            }
+            let Some(u) = self.llm_use.get(class) else {
+                continue;
+            };
+            if u.model == want {
+                continue;
+            }
+            let until = u.last + hold;
+            if u.inflight == 0 && now >= until {
+                continue;
+            }
+            if best.as_ref().is_some_and(|(p, _)| *p <= class_prio) {
+                continue;
+            }
+            let b = HeldBehind {
+                class: class.to_owned(),
+                model: u.model.clone(),
+                until: (u.inflight == 0).then_some(until),
+            };
+            best = Some((class_prio, b));
+        }
+        best.map(|(_, b)| b)
+    }
+
+    fn log_hold_start(&mut self, b: &HeldBehind) {
+        if self.hold_log.is_some() {
+            return;
+        }
+        self.hold_log = Some(HoldLog {
+            behind_class: b.class.clone(),
+            behind_model: b.model.clone(),
+            since: Instant::now(),
+            released: 0,
+            longest: Duration::ZERO,
+        });
+        self.event(format!(
+            "holding LLM requests for other models while {} uses {}",
+            b.class, b.model
+        ));
+    }
+
+    /// Once no request waits behind another class's model any more, say how it went.
+    fn log_hold_end(&mut self) {
+        if self.waiters.iter().any(|w| w.model_held) {
+            return;
+        }
+        let Some(h) = self.hold_log.take() else {
+            return;
+        };
+        self.event(format!(
+            "released {} LLM request(s) held while {} used {} ({:.0}s, longest wait {:.0}s)",
+            h.released,
+            h.behind_class,
+            h.behind_model,
+            h.since.elapsed().as_secs_f64(),
+            h.longest.as_secs_f64()
+        ));
+    }
+
+    fn enter_class(&mut self, class: &str, model: &str) {
+        let model = self.backend.resolve(model);
+        let now = Instant::now();
+        let u = self.llm_use.entry(class.to_owned()).or_insert(ClassUse {
+            model: model.clone(),
+            inflight: 0,
+            last: now,
+        });
+        u.model = model;
+        u.inflight += 1;
+        u.last = now;
+    }
+
+    fn exit_class(&mut self, class: &str, model: &str) {
+        if let Some(u) = self.llm_use.get_mut(class) {
+            u.inflight = u.inflight.saturating_sub(1);
+            u.last = Instant::now();
+            if u.inflight == 0 {
+                u.model = self.backend.resolve(model);
+            }
+        }
     }
 
     /// The cards a request names. Unknown names were refused by the handle already.
@@ -1105,6 +1247,7 @@ impl Actor {
             since: SystemTime::now(),
             note: String::new(),
             held_at: None,
+            model_held: false,
             target,
             want: Want::Job {
                 vram: req.vram,
@@ -1152,8 +1295,10 @@ impl Actor {
             // Granted in the same breath as the client went away.
             let lease = self.leases.remove(i);
             self.after_release(lease);
-        } else if let Some(i) = self.recent_admits.iter().position(|&a| a == id) {
-            self.recent_admits.remove(i);
+        } else if let Some(i) = self.recent_admits.iter().position(|a| a.0 == id) {
+            if let Some((_, class, model)) = self.recent_admits.remove(i) {
+                self.exit_class(&class, &model);
+            }
             self.inflight = self.inflight.saturating_sub(1);
             self.last_llm = Instant::now();
         }
@@ -1189,14 +1334,16 @@ impl Actor {
         }
     }
 
-    fn admit(&mut self, id: u64, class: &str) {
+    fn admit(&mut self, id: u64, class: &str, model: &str) {
         self.inflight += 1;
         self.last_llm = Instant::now();
         self.last_llm_class = class.to_owned();
+        self.enter_class(class, model);
         if self.recent_admits.len() == RECENT_ADMITS {
             self.recent_admits.pop_front();
         }
-        self.recent_admits.push_back(id);
+        self.recent_admits
+            .push_back((id, class.to_owned(), model.to_owned()));
     }
 
     // -------------------------------------------------------------- scheduling
@@ -1390,6 +1537,9 @@ impl Actor {
             if blocked(&self.waiters, key, &cards, &self.steer) {
                 continue;
             }
+            if self.still_held(idx) {
+                continue;
+            }
             let restore = match &self.waiters[idx].want {
                 Want::Llm { model, .. } => self.needs_slot_restore(model),
                 Want::Job { .. } => continue,
@@ -1406,16 +1556,46 @@ impl Actor {
             let Want::Llm { model, reply } = w.want else {
                 continue;
             };
-            self.event(format!(
-                "release held {} request for {model} after {:.0}s",
-                w.class,
-                age_s(w.since)
-            ));
+            if w.model_held {
+                if let Some(h) = &mut self.hold_log {
+                    h.released += 1;
+                    h.longest = h.longest.max(Duration::from_secs_f64(age_s(w.since)));
+                }
+            } else {
+                self.event(format!(
+                    "release held {} request for {model} after {:.0}s",
+                    w.class,
+                    age_s(w.since)
+                ));
+            }
             if reply.send(()).is_ok() {
-                self.admit(w.id, &w.class);
+                self.admit(w.id, &w.class, &model);
             }
         }
+        self.log_hold_end();
         false
+    }
+
+    /// Whether waiter `idx` must keep waiting for another class's model. Updates its note
+    /// and asks for a pass when the hold runs out.
+    fn still_held(&mut self, idx: usize) -> bool {
+        let w = &self.waiters[idx];
+        let Want::Llm { model, .. } = &w.want else {
+            return false;
+        };
+        match self.held_behind(model, w.prio, Instant::now()) {
+            Some(b) => {
+                self.log_hold_start(&b);
+                if let Some(until) = b.until {
+                    self.want(until);
+                }
+                let w = &mut self.waiters[idx];
+                w.model_held = true;
+                w.note = hold_note(&b);
+                true
+            }
+            None => false,
+        }
     }
 
     /// Llm phase of the LLM's cards: hand them to the top job once it may have them.
@@ -1579,6 +1759,10 @@ impl Actor {
     }
 
     fn serve_llm_waiter(&mut self, i: usize, idx: usize) -> bool {
+        // Loading this model would push out the one a more important class is using.
+        if self.still_held(idx) {
+            return false;
+        }
         if self.busy(i) {
             if self.hold_for_batch(i, idx, Instant::now()) {
                 return false;
@@ -2119,7 +2303,38 @@ impl Actor {
                 .collect(),
             cards,
             llm_cards: self.names(&llm_set),
+            model_hold: self.model_hold_status(),
         }
+    }
+
+    fn model_hold_status(&self) -> Option<ModelHold> {
+        let h = self.hold_log.as_ref()?;
+        let held: Vec<&Waiter> = self.waiters.iter().filter(|w| w.model_held).collect();
+        if held.is_empty() {
+            return None;
+        }
+        let mut models: Vec<String> = held.iter().map(|w| w.name.clone()).collect();
+        models.sort();
+        models.dedup();
+        Some(ModelHold {
+            behind_class: h.behind_class.clone(),
+            behind_model: h.behind_model.clone(),
+            held: held.len(),
+            models,
+            since_s: h.since.elapsed().as_secs(),
+        })
+    }
+}
+
+fn hold_note(b: &HeldBehind) -> String {
+    match b.until {
+        None => format!("held while {} uses {}", b.class, b.model),
+        Some(t) => format!(
+            "held while {} uses {} (quiet for {:.0}s more)",
+            b.class,
+            b.model,
+            t.saturating_duration_since(Instant::now()).as_secs_f64()
+        ),
     }
 }
 
@@ -2250,6 +2465,7 @@ mod tests {
             since: SystemTime::now(),
             note: String::new(),
             held_at: None,
+            model_held: false,
             target,
             want,
         }
