@@ -7,6 +7,7 @@
 //! Durations are written as seconds (integer or float) and exposed as [`Duration`].
 
 mod card;
+mod desktop;
 mod immich;
 mod service;
 mod vram;
@@ -22,6 +23,7 @@ use crate::arbiter::{ClassTuning, Classes, LlmPlan, Settings, Tuning};
 use crate::Mib;
 
 pub use card::{default_env_vars, CardList, CardSpec, GpuCard};
+pub use desktop::{Desktop, Offload, Policy as DesktopPolicy};
 pub use immich::Immich;
 pub use service::{Flavor, Service, ServiceGate, ServiceKind, ServiceSpec};
 pub use vram::{parse_vram, VramParseError};
@@ -85,6 +87,8 @@ pub struct Config {
     pub service: Vec<Service>,
     /// The Immich ML adapter; present means enabled.
     pub immich: Option<Immich>,
+    /// Freeing the desktop's VRAM; off unless `policy` says otherwise.
+    pub desktop: Desktop,
 }
 
 impl Default for Config {
@@ -99,6 +103,7 @@ impl Default for Config {
             run: Run::default(),
             service: Vec::new(),
             immich: None,
+            desktop: Desktop::default(),
         }
     }
 }
@@ -534,6 +539,7 @@ impl Config {
             let classes: Vec<&str> = classes.keys().map(String::as_str).collect();
             p.extend(im.problems(&classes));
         }
+        p.extend(self.desktop.problems());
         if self.gate.port == 0 {
             p.push("gate.port must be non-zero".into());
         }
@@ -728,7 +734,20 @@ impl Config {
         if let Some(im) = &self.immich {
             let _ = writeln!(s, "{}", im.summary());
         }
+        let cards = self.cards_with(found);
+        let _ = writeln!(s, "{}", self.desktop.summary(&self.desktop_card(&cards)));
         s
+    }
+
+    /// The card `[desktop]` acts on: `desktop.card`, else the LLM's first card.
+    pub fn desktop_card(&self, cards: &[CardSpec]) -> String {
+        if !self.desktop.card.is_empty() {
+            return self.desktop.card.clone();
+        }
+        self.llm_card_names(cards)
+            .into_iter()
+            .next()
+            .unwrap_or_else(|| "gpu0".into())
     }
 }
 

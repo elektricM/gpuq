@@ -32,6 +32,7 @@ complete -c gpuq -n "__fish_gpuq_needs_command" -f -a "check-config" -d 'Load an
 complete -c gpuq -n "__fish_gpuq_needs_command" -f -a "status" -d 'Show the arbiter state, leases and queue'
 complete -c gpuq -n "__fish_gpuq_needs_command" -f -a "run" -d 'Run a command under a GPU lease'
 complete -c gpuq -n "__fish_gpuq_needs_command" -f -a "hold" -d 'Hold a lease until Ctrl-C'
+complete -c gpuq -n "__fish_gpuq_needs_command" -f -a "desktop" -d 'Show or change what gpuq does with the desktop ([desktop] in the config)'
 complete -c gpuq -n "__fish_gpuq_needs_command" -f -a "help" -d 'Print this message or the help of the given subcommand(s)'
 complete -c gpuq -n "__fish_gpuq_using_subcommand daemon" -s c -l config -d 'Config file (default: search the usual places)' -r -F
 complete -c gpuq -n "__fish_gpuq_using_subcommand daemon" -l api -d 'Address of the gpuq control API (default: $GPUQ_API, else 127.0.0.1:9390)' -r
@@ -61,9 +62,32 @@ complete -c gpuq -n "__fish_gpuq_using_subcommand hold" -l card -d 'Card to hold
 complete -c gpuq -n "__fish_gpuq_using_subcommand hold" -l cards -d 'Hold this many cards at once, any that have room' -r
 complete -c gpuq -n "__fish_gpuq_using_subcommand hold" -l api -d 'Address of the gpuq control API (default: $GPUQ_API, else 127.0.0.1:9390)' -r
 complete -c gpuq -n "__fish_gpuq_using_subcommand hold" -s h -l help -d 'Print help'
-complete -c gpuq -n "__fish_gpuq_using_subcommand help; and not __fish_seen_subcommand_from daemon check-config status run hold help" -f -a "daemon" -d 'Run the daemon'
-complete -c gpuq -n "__fish_gpuq_using_subcommand help; and not __fish_seen_subcommand_from daemon check-config status run hold help" -f -a "check-config" -d 'Load and validate the config, then exit'
-complete -c gpuq -n "__fish_gpuq_using_subcommand help; and not __fish_seen_subcommand_from daemon check-config status run hold help" -f -a "status" -d 'Show the arbiter state, leases and queue'
-complete -c gpuq -n "__fish_gpuq_using_subcommand help; and not __fish_seen_subcommand_from daemon check-config status run hold help" -f -a "run" -d 'Run a command under a GPU lease'
-complete -c gpuq -n "__fish_gpuq_using_subcommand help; and not __fish_seen_subcommand_from daemon check-config status run hold help" -f -a "hold" -d 'Hold a lease until Ctrl-C'
-complete -c gpuq -n "__fish_gpuq_using_subcommand help; and not __fish_seen_subcommand_from daemon check-config status run hold help" -f -a "help" -d 'Print this message or the help of the given subcommand(s)'
+complete -c gpuq -n "__fish_gpuq_using_subcommand desktop; and not __fish_seen_subcommand_from status release restore help" -l api -d 'Address of the gpuq control API (default: $GPUQ_API, else 127.0.0.1:9390)' -r
+complete -c gpuq -n "__fish_gpuq_using_subcommand desktop; and not __fish_seen_subcommand_from status release restore help" -s h -l help -d 'Print help'
+complete -c gpuq -n "__fish_gpuq_using_subcommand desktop; and not __fish_seen_subcommand_from status release restore help" -f -a "status" -d 'Show the state, why, and the processes on the card (the default)'
+complete -c gpuq -n "__fish_gpuq_using_subcommand desktop; and not __fish_seen_subcommand_from status release restore help" -f -a "release" -d 'Free the card now: move or stop the desktop as the policy says'
+complete -c gpuq -n "__fish_gpuq_using_subcommand desktop; and not __fish_seen_subcommand_from status release restore help" -f -a "restore" -d 'Give the desktop back now, and hold off automatic releases'
+complete -c gpuq -n "__fish_gpuq_using_subcommand desktop; and not __fish_seen_subcommand_from status release restore help" -f -a "help" -d 'Print this message or the help of the given subcommand(s)'
+complete -c gpuq -n "__fish_gpuq_using_subcommand desktop; and __fish_seen_subcommand_from status" -l api -d 'Address of the gpuq control API (default: $GPUQ_API, else 127.0.0.1:9390)' -r
+complete -c gpuq -n "__fish_gpuq_using_subcommand desktop; and __fish_seen_subcommand_from status" -l json -d 'Print the state as JSON'
+complete -c gpuq -n "__fish_gpuq_using_subcommand desktop; and __fish_seen_subcommand_from status" -s h -l help -d 'Print help'
+complete -c gpuq -n "__fish_gpuq_using_subcommand desktop; and __fish_seen_subcommand_from release" -l api -d 'Address of the gpuq control API (default: $GPUQ_API, else 127.0.0.1:9390)' -r
+complete -c gpuq -n "__fish_gpuq_using_subcommand desktop; and __fish_seen_subcommand_from release" -l force -d 'Also when someone is logged in at the seat'
+complete -c gpuq -n "__fish_gpuq_using_subcommand desktop; and __fish_seen_subcommand_from release" -s h -l help -d 'Print help'
+complete -c gpuq -n "__fish_gpuq_using_subcommand desktop; and __fish_seen_subcommand_from restore" -l hold -d 'Hold off automatic releases this many seconds (default: hold_s from the config)' -r
+complete -c gpuq -n "__fish_gpuq_using_subcommand desktop; and __fish_seen_subcommand_from restore" -l api -d 'Address of the gpuq control API (default: $GPUQ_API, else 127.0.0.1:9390)' -r
+complete -c gpuq -n "__fish_gpuq_using_subcommand desktop; and __fish_seen_subcommand_from restore" -s h -l help -d 'Print help'
+complete -c gpuq -n "__fish_gpuq_using_subcommand desktop; and __fish_seen_subcommand_from help" -f -a "status" -d 'Show the state, why, and the processes on the card (the default)'
+complete -c gpuq -n "__fish_gpuq_using_subcommand desktop; and __fish_seen_subcommand_from help" -f -a "release" -d 'Free the card now: move or stop the desktop as the policy says'
+complete -c gpuq -n "__fish_gpuq_using_subcommand desktop; and __fish_seen_subcommand_from help" -f -a "restore" -d 'Give the desktop back now, and hold off automatic releases'
+complete -c gpuq -n "__fish_gpuq_using_subcommand desktop; and __fish_seen_subcommand_from help" -f -a "help" -d 'Print this message or the help of the given subcommand(s)'
+complete -c gpuq -n "__fish_gpuq_using_subcommand help; and not __fish_seen_subcommand_from daemon check-config status run hold desktop help" -f -a "daemon" -d 'Run the daemon'
+complete -c gpuq -n "__fish_gpuq_using_subcommand help; and not __fish_seen_subcommand_from daemon check-config status run hold desktop help" -f -a "check-config" -d 'Load and validate the config, then exit'
+complete -c gpuq -n "__fish_gpuq_using_subcommand help; and not __fish_seen_subcommand_from daemon check-config status run hold desktop help" -f -a "status" -d 'Show the arbiter state, leases and queue'
+complete -c gpuq -n "__fish_gpuq_using_subcommand help; and not __fish_seen_subcommand_from daemon check-config status run hold desktop help" -f -a "run" -d 'Run a command under a GPU lease'
+complete -c gpuq -n "__fish_gpuq_using_subcommand help; and not __fish_seen_subcommand_from daemon check-config status run hold desktop help" -f -a "hold" -d 'Hold a lease until Ctrl-C'
+complete -c gpuq -n "__fish_gpuq_using_subcommand help; and not __fish_seen_subcommand_from daemon check-config status run hold desktop help" -f -a "desktop" -d 'Show or change what gpuq does with the desktop ([desktop] in the config)'
+complete -c gpuq -n "__fish_gpuq_using_subcommand help; and not __fish_seen_subcommand_from daemon check-config status run hold desktop help" -f -a "help" -d 'Print this message or the help of the given subcommand(s)'
+complete -c gpuq -n "__fish_gpuq_using_subcommand help; and __fish_seen_subcommand_from desktop" -f -a "status" -d 'Show the state, why, and the processes on the card (the default)'
+complete -c gpuq -n "__fish_gpuq_using_subcommand help; and __fish_seen_subcommand_from desktop" -f -a "release" -d 'Free the card now: move or stop the desktop as the policy says'
+complete -c gpuq -n "__fish_gpuq_using_subcommand help; and __fish_seen_subcommand_from desktop" -f -a "restore" -d 'Give the desktop back now, and hold off automatic releases'

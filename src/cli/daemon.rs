@@ -26,6 +26,7 @@ use crate::backend::ollama::Ollama;
 use crate::backend::stopstart::StopStart;
 use crate::backend::Backend;
 use crate::config::{CardSpec, Config, ConfigError, GpuVendor, LlmBackend};
+use crate::desktop;
 use crate::gate::{Gate, GateOptions};
 use crate::probe::detect::{make_probe, ProbeOptions, Vendor};
 use crate::workload::hook::CommandHook;
@@ -246,11 +247,35 @@ fn build_backend(cfg: &Config) -> Result<Built, String> {
     })
 }
 
-/// `/status` extra: what the backend has loaded.
+/// `/status` extra: what the backend has loaded, Immich and the desktop.
 struct BackendStatus {
     backend: Arc<dyn Backend>,
     swap: Option<Arc<LlamaSwap>>,
     immich: Option<Arc<ImmichView>>,
+    desktop: Option<desktop::Handle>,
+}
+
+/// The offload hook of the desktop task, bound once that task exists.
+#[derive(Default)]
+struct LateHook(std::sync::OnceLock<desktop::Handle>);
+
+#[async_trait]
+impl OffloadHook for LateHook {
+    async fn run(&self, card: &str) -> bool {
+        match self.0.get() {
+            Some(h) => h.run(card).await,
+            None => false,
+        }
+    }
+}
+
+/// The PCI address of a card: from the config or detection, else from an AMD probe's device.
+fn card_pci(c: &CardSpec, probe: Option<&dyn crate::probe::VramProbe>) -> Option<String> {
+    if let Some(p) = crate::probe::scan::normalize_pci(&c.pci) {
+        return Some(p);
+    }
+    let dev = probe?.device();
+    crate::probe::scan::normalize_pci(dev.strip_prefix("amd:")?)
 }
 
 #[async_trait]
@@ -277,6 +302,12 @@ impl StatusExtra for BackendStatus {
         };
         if let (Some(view), Some(obj)) = (&self.immich, extra.as_object_mut()) {
             obj.insert("immich".into(), view.json());
+        }
+        if let (Some(d), Some(obj)) = (&self.desktop, extra.as_object_mut()) {
+            obj.insert(
+                "desktop".into(),
+                serde_json::to_value(d.status()).unwrap_or(Value::Null),
+            );
         }
         extra
     }
@@ -346,14 +377,26 @@ async fn serve(cfg: Config, path: Option<&Path>) -> Result<(), String> {
     if !problems.is_empty() {
         return Err(ConfigError::Invalid(problems).to_string());
     }
+    let desktop_card = cfg.desktop_card(&specs);
+    let desktop_spec = specs.iter().find(|c| c.name == desktop_card).cloned();
     let cards = build_cards(specs)?;
     let Built { backend, swap } = build_backend(&cfg)?;
-    let hook: Option<Arc<dyn OffloadHook>> = (!cfg.hooks.offload.is_empty()).then(|| {
+    let command_hook: Option<Arc<dyn OffloadHook>> = (!cfg.hooks.offload.is_empty()).then(|| {
         Arc::new(CommandHook::new(
             cfg.hooks.offload.clone(),
             cfg.hooks.offload_timeout,
         )) as Arc<dyn OffloadHook>
     });
+    // The desktop task needs the arbiter, and the arbiter its hook: bind it once both exist.
+    let desktop_hook = Arc::new(LateHook::default());
+    let hook = match (cfg.desktop.enabled(), command_hook) {
+        (false, h) => h,
+        (true, None) => Some(desktop_hook.clone() as Arc<dyn OffloadHook>),
+        (true, Some(h)) => Some(Arc::new(desktop::Chain(vec![
+            desktop_hook.clone() as Arc<dyn OffloadHook>,
+            h,
+        ])) as Arc<dyn OffloadHook>),
+    };
 
     let gate_listener = match cfg.llm.backend {
         LlmBackend::None => None,
@@ -361,9 +404,56 @@ async fn serve(cfg: Config, path: Option<&Path>) -> Result<(), String> {
     };
     let api_listener = bind("api", &cfg.api.host, cfg.api.port).await?;
 
+    let desktop_probe = cards
+        .iter()
+        .find(|c| c.name == desktop_card)
+        .map(|c| c.probe.clone());
     let handle = arbiter::spawn_cards(cfg.arbiter_settings(), cards, 0, backend.clone(), hook);
     let (stop_tx, stop_rx) = watch::channel(false);
     let mut tasks = JoinSet::new();
+
+    let desktop = if cfg.desktop.enabled() {
+        let d = &cfg.desktop;
+        let pci = desktop_spec
+            .as_ref()
+            .and_then(|c| card_pci(c, desktop_probe.as_deref()));
+        let nodes = match (&pci, &desktop_spec) {
+            (Some(p), Some(c)) => desktop::procs::Nodes::for_pci(&c.sysfs_root, p),
+            _ => desktop::procs::Nodes::default(),
+        };
+        if nodes.is_empty() {
+            tracing::warn!(
+                "desktop: no DRM nodes found for {desktop_card}; processes on it cannot be checked"
+            );
+        }
+        let sys = desktop::system::Real::new(
+            nodes,
+            desktop_probe,
+            &d.user,
+            d.elevate.clone(),
+            d.command_timeout,
+            d.stop_timeout,
+        );
+        let input = d
+            .wake_on_input
+            .then(|| desktop::input::InputWatch::start(d.input_devices.clone()));
+        let parts = desktop::Parts {
+            card: desktop_card.clone(),
+            pci,
+            sys: Arc::new(sys),
+            work: Arc::new(desktop::Gpuq {
+                arbiter: handle.clone(),
+                backend: backend.clone(),
+            }),
+            input,
+            arbiter: Some(handle.clone()),
+        };
+        let h = desktop::spawn(d.clone(), parts, stop_rx.clone()).await;
+        let _ = desktop_hook.0.set(h.clone());
+        Some(h)
+    } else {
+        None
+    };
 
     if let Some(listener) = gate_listener {
         let options = GateOptions {
@@ -383,8 +473,12 @@ async fn serve(cfg: Config, path: Option<&Path>) -> Result<(), String> {
         backend,
         swap,
         immich: immich_view.clone(),
+        desktop: desktop.clone(),
     });
-    let api = Api::new(handle.clone(), extra).with_yield_signal(cfg.run.yield_signal.clone());
+    let mut api = Api::new(handle.clone(), extra).with_yield_signal(cfg.run.yield_signal.clone());
+    if let Some(d) = desktop {
+        api = api.with_desktop(d);
+    }
     tasks.spawn(api.serve(api_listener, stopped(stop_rx.clone())));
     if let (Some(im), Some(view)) = (cfg.immich.clone(), immich_view) {
         let (arbiter, rx) = (handle.clone(), stop_rx.clone());

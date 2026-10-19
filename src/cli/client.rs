@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Martin Dolez
 
-//! Minimal HTTP/1 client for the control API: JSON GETs and the NDJSON lease stream.
+//! Minimal HTTP/1 client for the control API: JSON GETs and POSTs, the NDJSON lease stream.
 use bytes::Bytes;
 use http_body_util::{BodyExt, Full};
 use hyper::body::Incoming;
@@ -124,6 +124,26 @@ pub async fn get_json(addr: &str, path: &str) -> Result<Value, ClientError> {
         return Err(ClientError::Refused(error_text(status, &text)));
     }
     serde_json::from_str(&text).map_err(|e| ClientError::Other(format!("bad reply: {e}")))
+}
+
+/// POST a JSON body; the status and the JSON answer, whatever the status.
+pub async fn post_json(
+    addr: &str,
+    path: &str,
+    body: &Value,
+) -> Result<(StatusCode, Value), ClientError> {
+    let req = Request::post(path)
+        .header(HOST, addr)
+        .header(CONTENT_TYPE, "application/json")
+        .body(Full::new(Bytes::from(body.to_string())))
+        .map_err(|e| ClientError::Other(e.to_string()))?;
+    let resp = send(addr, req).await?;
+    let status = resp.status;
+    let text = read_all(resp).await;
+    match serde_json::from_str(&text) {
+        Ok(v) => Ok((status, v)),
+        Err(_) => Err(ClientError::Refused(error_text(status, &text))),
+    }
 }
 
 /// An open `POST /lease` response. Dropping it closes the connection and so the lease.

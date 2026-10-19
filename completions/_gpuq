@@ -86,6 +86,81 @@ _arguments "${_arguments_options[@]}" : \
 '--help[Print help]' \
 && ret=0
 ;;
+(desktop)
+_arguments "${_arguments_options[@]}" : \
+'--api=[Address of the gpuq control API (default\: \$GPUQ_API, else 127.0.0.1\:9390)]:HOST:PORT:_default' \
+'-h[Print help]' \
+'--help[Print help]' \
+":: :_gpuq__desktop_commands" \
+"*::: :->desktop" \
+&& ret=0
+
+    case $state in
+    (desktop)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:gpuq-desktop-command-$line[1]:"
+        case $line[1] in
+            (status)
+_arguments "${_arguments_options[@]}" : \
+'--api=[Address of the gpuq control API (default\: \$GPUQ_API, else 127.0.0.1\:9390)]:HOST:PORT:_default' \
+'--json[Print the state as JSON]' \
+'-h[Print help]' \
+'--help[Print help]' \
+&& ret=0
+;;
+(release)
+_arguments "${_arguments_options[@]}" : \
+'--api=[Address of the gpuq control API (default\: \$GPUQ_API, else 127.0.0.1\:9390)]:HOST:PORT:_default' \
+'--force[Also when someone is logged in at the seat]' \
+'-h[Print help]' \
+'--help[Print help]' \
+&& ret=0
+;;
+(restore)
+_arguments "${_arguments_options[@]}" : \
+'--hold=[Hold off automatic releases this many seconds (default\: hold_s from the config)]:SECS:_default' \
+'--api=[Address of the gpuq control API (default\: \$GPUQ_API, else 127.0.0.1\:9390)]:HOST:PORT:_default' \
+'-h[Print help]' \
+'--help[Print help]' \
+&& ret=0
+;;
+(help)
+_arguments "${_arguments_options[@]}" : \
+":: :_gpuq__desktop__help_commands" \
+"*::: :->help" \
+&& ret=0
+
+    case $state in
+    (help)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:gpuq-desktop-help-command-$line[1]:"
+        case $line[1] in
+            (status)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(release)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(restore)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(help)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+        esac
+    ;;
+esac
+;;
+        esac
+    ;;
+esac
+;;
 (help)
 _arguments "${_arguments_options[@]}" : \
 ":: :_gpuq__help_commands" \
@@ -118,6 +193,34 @@ _arguments "${_arguments_options[@]}" : \
 _arguments "${_arguments_options[@]}" : \
 && ret=0
 ;;
+(desktop)
+_arguments "${_arguments_options[@]}" : \
+":: :_gpuq__help__desktop_commands" \
+"*::: :->desktop" \
+&& ret=0
+
+    case $state in
+    (desktop)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:gpuq-help-desktop-command-$line[1]:"
+        case $line[1] in
+            (status)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(release)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(restore)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+        esac
+    ;;
+esac
+;;
 (help)
 _arguments "${_arguments_options[@]}" : \
 && ret=0
@@ -139,6 +242,7 @@ _gpuq_commands() {
 'status:Show the arbiter state, leases and queue' \
 'run:Run a command under a GPU lease' \
 'hold:Hold a lease until Ctrl-C' \
+'desktop:Show or change what gpuq does with the desktop (\[desktop\] in the config)' \
 'help:Print this message or the help of the given subcommand(s)' \
     )
     _describe -t commands 'gpuq commands' commands "$@"
@@ -153,6 +257,61 @@ _gpuq__daemon_commands() {
     local commands; commands=()
     _describe -t commands 'gpuq daemon commands' commands "$@"
 }
+(( $+functions[_gpuq__desktop_commands] )) ||
+_gpuq__desktop_commands() {
+    local commands; commands=(
+'status:Show the state, why, and the processes on the card (the default)' \
+'release:Free the card now\: move or stop the desktop as the policy says' \
+'restore:Give the desktop back now, and hold off automatic releases' \
+'help:Print this message or the help of the given subcommand(s)' \
+    )
+    _describe -t commands 'gpuq desktop commands' commands "$@"
+}
+(( $+functions[_gpuq__desktop__help_commands] )) ||
+_gpuq__desktop__help_commands() {
+    local commands; commands=(
+'status:Show the state, why, and the processes on the card (the default)' \
+'release:Free the card now\: move or stop the desktop as the policy says' \
+'restore:Give the desktop back now, and hold off automatic releases' \
+'help:Print this message or the help of the given subcommand(s)' \
+    )
+    _describe -t commands 'gpuq desktop help commands' commands "$@"
+}
+(( $+functions[_gpuq__desktop__help__help_commands] )) ||
+_gpuq__desktop__help__help_commands() {
+    local commands; commands=()
+    _describe -t commands 'gpuq desktop help help commands' commands "$@"
+}
+(( $+functions[_gpuq__desktop__help__release_commands] )) ||
+_gpuq__desktop__help__release_commands() {
+    local commands; commands=()
+    _describe -t commands 'gpuq desktop help release commands' commands "$@"
+}
+(( $+functions[_gpuq__desktop__help__restore_commands] )) ||
+_gpuq__desktop__help__restore_commands() {
+    local commands; commands=()
+    _describe -t commands 'gpuq desktop help restore commands' commands "$@"
+}
+(( $+functions[_gpuq__desktop__help__status_commands] )) ||
+_gpuq__desktop__help__status_commands() {
+    local commands; commands=()
+    _describe -t commands 'gpuq desktop help status commands' commands "$@"
+}
+(( $+functions[_gpuq__desktop__release_commands] )) ||
+_gpuq__desktop__release_commands() {
+    local commands; commands=()
+    _describe -t commands 'gpuq desktop release commands' commands "$@"
+}
+(( $+functions[_gpuq__desktop__restore_commands] )) ||
+_gpuq__desktop__restore_commands() {
+    local commands; commands=()
+    _describe -t commands 'gpuq desktop restore commands' commands "$@"
+}
+(( $+functions[_gpuq__desktop__status_commands] )) ||
+_gpuq__desktop__status_commands() {
+    local commands; commands=()
+    _describe -t commands 'gpuq desktop status commands' commands "$@"
+}
 (( $+functions[_gpuq__help_commands] )) ||
 _gpuq__help_commands() {
     local commands; commands=(
@@ -161,6 +320,7 @@ _gpuq__help_commands() {
 'status:Show the arbiter state, leases and queue' \
 'run:Run a command under a GPU lease' \
 'hold:Hold a lease until Ctrl-C' \
+'desktop:Show or change what gpuq does with the desktop (\[desktop\] in the config)' \
 'help:Print this message or the help of the given subcommand(s)' \
     )
     _describe -t commands 'gpuq help commands' commands "$@"
@@ -174,6 +334,30 @@ _gpuq__help__check-config_commands() {
 _gpuq__help__daemon_commands() {
     local commands; commands=()
     _describe -t commands 'gpuq help daemon commands' commands "$@"
+}
+(( $+functions[_gpuq__help__desktop_commands] )) ||
+_gpuq__help__desktop_commands() {
+    local commands; commands=(
+'status:Show the state, why, and the processes on the card (the default)' \
+'release:Free the card now\: move or stop the desktop as the policy says' \
+'restore:Give the desktop back now, and hold off automatic releases' \
+    )
+    _describe -t commands 'gpuq help desktop commands' commands "$@"
+}
+(( $+functions[_gpuq__help__desktop__release_commands] )) ||
+_gpuq__help__desktop__release_commands() {
+    local commands; commands=()
+    _describe -t commands 'gpuq help desktop release commands' commands "$@"
+}
+(( $+functions[_gpuq__help__desktop__restore_commands] )) ||
+_gpuq__help__desktop__restore_commands() {
+    local commands; commands=()
+    _describe -t commands 'gpuq help desktop restore commands' commands "$@"
+}
+(( $+functions[_gpuq__help__desktop__status_commands] )) ||
+_gpuq__help__desktop__status_commands() {
+    local commands; commands=()
+    _describe -t commands 'gpuq help desktop status commands' commands "$@"
 }
 (( $+functions[_gpuq__help__help_commands] )) ||
 _gpuq__help__help_commands() {

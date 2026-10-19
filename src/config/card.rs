@@ -352,6 +352,7 @@ impl Config {
                 ));
             }
         }
+        p.extend(self.desktop.card_problem(&names));
         p
     }
 

@@ -94,6 +94,12 @@ fn render(st: &Value) -> String {
     if let Some(im) = st.get("immich").filter(|v| v.is_object()) {
         put("immich", immich_line(im));
     }
+    if let Some(d) = st.get("desktop").filter(|v| v.is_object()) {
+        put("desktop", desktop_line(d));
+        if let Some(c) = d.get("last_check").filter(|c| c.is_object()) {
+            put("", format!("journal {}", check_line(c)));
+        }
+    }
     for l in arr(st, "leases") {
         let y = if l.get("yield_requested").and_then(Value::as_bool) == Some(true) {
             " YIELD REQUESTED"
@@ -221,6 +227,60 @@ fn immich_line(im: &Value) -> String {
     line
 }
 
+/// `released (stopped) 2m5s: why` for the `desktop` object.
+pub(super) fn desktop_line(d: &Value) -> String {
+    let how = d
+        .get("how")
+        .and_then(|h| {
+            h.as_str()
+                .map(str::to_owned)
+                .or_else(|| h.as_object()?.keys().next().cloned())
+        })
+        .map_or(String::new(), |h| format!(" ({h})"));
+    let mut line = format!(
+        "{}{how} {}: {}",
+        s(d, "state"),
+        age(n(d, "since_s")),
+        s(d, "why")
+    );
+    if let Some(h) = d.get("hold_s").and_then(Value::as_u64) {
+        line.push_str(&format!("   hold {}", age(h)));
+    }
+    line
+}
+
+/// `clean after the release` or `2 errors, 1 core dump after the release`.
+pub(super) fn check_line(c: &Value) -> String {
+    let after = c.get("after").and_then(Value::as_str).unwrap_or("change");
+    if c.get("clean").and_then(Value::as_bool) == Some(true) {
+        return format!("clean after the {after}");
+    }
+    let count = |k: &str| c.get(k).and_then(Value::as_array).map_or(0, Vec::len);
+    let plural =
+        |n: usize, one: &str, many: &str| format!("{n} {}", if n == 1 { one } else { many });
+    let mut parts = Vec::new();
+    for (k, one, many) in [
+        ("errors", "error", "errors"),
+        ("coredumps", "core dump", "core dumps"),
+        ("new_failed_units", "failed unit", "failed units"),
+    ] {
+        let k_n = count(k);
+        if k_n > 0 {
+            parts.push(plural(k_n, one, many));
+        }
+    }
+    format!("{} after the {after}", parts.join(", "))
+}
+
+/// `45s`, `2m5s`, `3h4m`.
+fn age(s: u64) -> String {
+    match s {
+        0..=59 => format!("{s}s"),
+        60..=3599 => format!("{}m{}s", s / 60, s % 60),
+        _ => format!("{}h{}m", s / 3600, s / 60 % 60),
+    }
+}
+
 /// `model (state)` for one entry of the backend's model list.
 fn model_line(m: &Value) -> String {
     match m {
@@ -337,6 +397,23 @@ mod tests {
             "{t}"
         );
         assert!(!render(&json!({"state": "llm"})).contains("immich"));
+    }
+
+    #[test]
+    fn renders_the_desktop() {
+        let st = json!({"state": "llm", "desktop": {"state": "released", "how": "stopped",
+            "since_s": 3700, "why": "kept released: model big loaded",
+            "last_check": {"after": "release", "clean": true}}});
+        let t = render(&st);
+        assert!(
+            t.contains("desktop    released (stopped) 1h1m: kept released: model big loaded\n"),
+            "{t}"
+        );
+        assert!(t.contains("journal clean after the release"), "{t}");
+        let st = json!({"state": "llm", "desktop": {"state": "released",
+            "how": {"moved": {"auto_restore": false}}, "since_s": 5, "why": "moved"}});
+        assert!(render(&st).contains("released (moved) 5s: moved"));
+        assert!(!render(&json!({"state": "llm"})).contains("desktop"));
     }
 
     #[test]

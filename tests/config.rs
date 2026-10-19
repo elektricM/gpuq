@@ -655,3 +655,80 @@ fn exclusions_are_checked() {
     assert!(err_text(&card("all")).contains("reserved"));
     assert!(err_text("[gpu]\ndevice = \"all\"\n").contains("gpu.device"));
 }
+
+#[test]
+fn desktop_is_off_by_default() {
+    let cfg = Config::from_toml_str("").unwrap();
+    assert!(!cfg.desktop.enabled());
+    assert!(cfg.describe_with(&[]).contains("desktop: off"));
+}
+
+#[test]
+fn desktop_section_parses() {
+    let cfg = Config::from_toml_str(
+        r#"
+[desktop]
+policy = "offload"
+fallback = "stop"
+system_units = ["sddm.service"]
+user_units = ["plasma-kwin_wayland.service"]
+elevate = ["sudo", "-n"]
+ignore = ["kwin_wayland --virtual"]
+models = ["qwen3.8-27b*"]
+min_free_mib = 1024
+restore_delay_s = 900
+hold_s = 60
+
+[desktop.offload]
+user_env = { KWIN_DRM_DEVICES = "/dev/dri/by-path/pci-0000:15:00.0-card" }
+move_back = true
+settle_s = 20
+
+[desktop.session_env]
+DISPLAY = ""
+WAYLAND_DISPLAY = "wayland-chell"
+"#,
+    )
+    .unwrap();
+    let d = &cfg.desktop;
+    assert!(d.enabled());
+    assert_eq!(d.restore_delay, Duration::from_secs(900));
+    assert_eq!(d.offload.settle, Duration::from_secs(20));
+    assert!(d.offload.move_back);
+    assert_eq!(d.session_env["WAYLAND_DISPLAY"], "wayland-chell");
+    let text = cfg.describe_with(&[]);
+    assert!(
+        text.contains("desktop: offload, else stop on gpu0"),
+        "{text}"
+    );
+    assert!(text.contains("models qwen3.8-27b*"), "{text}");
+}
+
+#[test]
+fn desktop_problems_are_reported() {
+    let bad = |toml: &str| match Config::from_toml_str(toml) {
+        Err(e) => e.to_string(),
+        Ok(_) => panic!("accepted: {toml}"),
+    };
+    let e = bad("[desktop]\npolicy = \"stop\"\nsystem_units = []\n");
+    assert!(e.contains("nothing to stop"), "{e}");
+    let e = bad("[desktop]\npolicy = \"offload\"\n");
+    assert!(e.contains("needs offload.user_env"), "{e}");
+    let e = bad("[desktop]\npolicy = \"stop\"\nfallback = \"offload\"\n");
+    assert!(e.contains("fallback must be"), "{e}");
+    let e = bad("[desktop]\npolicy = \"stop\"\nignore = [\"\"]\n");
+    assert!(e.contains("match every process"), "{e}");
+    let e = bad("[desktop]\npolicy = \"sometimes\"\n");
+    assert!(e.contains("unknown variant"), "{e}");
+    let e = bad("[desktop]\nenable = true\n");
+    assert!(e.contains("unknown field"), "{e}");
+    let e = bad("[desktop.session_env]\n\"1X\" = \"\"\n[desktop]\npolicy = \"stop\"\n");
+    assert!(e.contains("not a variable name"), "{e}");
+    // A card that does not exist is found once the cards are known.
+    let cfg = Config::from_toml_str("[desktop]\npolicy = \"stop\"\ncard = \"big\"\n").unwrap();
+    let problems = cfg.reference_problems(&cfg.cards_with(&[]));
+    assert!(
+        problems.iter().any(|p| p.contains("desktop.card \"big\"")),
+        "{problems:?}"
+    );
+}

@@ -7,6 +7,8 @@
 //! * `GET /healthz`: `ok`.
 //! * `POST /lease`: JSON request, NDJSON response. The lease lives exactly as long as the
 //!   connection, so a crashed client can never leak the card. See `docs/lease-api.md`.
+//! * `GET /desktop`, `POST /desktop/release`, `POST /desktop/restore`: the `[desktop]`
+//!   feature, when it is on. See `docs/desktop.md`.
 //!
 //! Each lease stream is driven by one task that owns the pending acquire and then the
 //! [`Lease`](crate::arbiter::Lease). The response body only holds the receiving end of a
@@ -75,6 +77,7 @@ pub struct Api {
     extra: Arc<dyn StatusExtra>,
     ping: Duration,
     yield_signal: Option<String>,
+    desktop: Option<crate::desktop::Handle>,
 }
 
 impl Api {
@@ -84,7 +87,14 @@ impl Api {
             extra: extra_status,
             ping: PING_INTERVAL,
             yield_signal: None,
+            desktop: None,
         }
+    }
+
+    /// Serve the desktop routes.
+    pub fn with_desktop(mut self, desktop: crate::desktop::Handle) -> Self {
+        self.desktop = Some(desktop);
+        self
     }
 
     /// Change the keepalive ping interval (tests use a short one).
@@ -146,7 +156,17 @@ impl Api {
             (&Method::GET, "/status") => self.status().await,
             (&Method::GET, "/healthz") => text(StatusCode::OK, "ok"),
             (&Method::POST, "/lease") => self.lease(req).await,
-            (_, "/status" | "/healthz" | "/lease") => json_resp(
+            (&Method::GET, "/desktop") => match &self.desktop {
+                Some(d) => json_resp(
+                    StatusCode::OK,
+                    serde_json::to_value(d.status_with_holders().await).unwrap_or(Value::Null),
+                ),
+                None => no_desktop(),
+            },
+            (&Method::POST, "/desktop/release" | "/desktop/restore") => {
+                self.desktop_change(req).await
+            }
+            (_, "/status" | "/healthz" | "/lease" | "/desktop") => json_resp(
                 StatusCode::METHOD_NOT_ALLOWED,
                 json!({"error": "method not allowed"}),
             ),
@@ -177,6 +197,50 @@ impl Api {
             obj.extend(extra);
         }
         json_resp(StatusCode::OK, v)
+    }
+
+    /// `POST /desktop/release` (`{"force": true}` ignores sessions at the seat) and
+    /// `POST /desktop/restore` (`{"hold_s": 600}` overrides `hold_s`). Answers when done.
+    async fn desktop_change(&self, req: Request<Incoming>) -> Response<RespBody> {
+        let Some(d) = self.desktop.clone() else {
+            return no_desktop();
+        };
+        let release = req.uri().path() == "/desktop/release";
+        let raw = match Limited::new(req.into_body(), MAX_REQUEST).collect().await {
+            Ok(c) => c.to_bytes(),
+            Err(e) => return json_resp(StatusCode::BAD_REQUEST, json!({"error": e.to_string()})),
+        };
+        let body: Value = if raw.iter().all(u8::is_ascii_whitespace) {
+            json!({})
+        } else {
+            match serde_json::from_slice(&raw) {
+                Ok(v) => v,
+                Err(e) => {
+                    return json_resp(StatusCode::BAD_REQUEST, json!({"error": e.to_string()}))
+                }
+            }
+        };
+        let result = if release {
+            let force = body.get("force").and_then(Value::as_bool).unwrap_or(false);
+            d.release(force).await
+        } else {
+            let hold = body
+                .get("hold_s")
+                .and_then(Value::as_f64)
+                .and_then(|s| Duration::try_from_secs_f64(s).ok());
+            d.restore(hold).await
+        };
+        let st = serde_json::to_value(d.status()).unwrap_or(Value::Null);
+        match result {
+            Ok(msg) => json_resp(
+                StatusCode::OK,
+                json!({"ok": true, "message": msg, "desktop": st}),
+            ),
+            Err(e) => json_resp(
+                StatusCode::CONFLICT,
+                json!({"ok": false, "error": e, "desktop": st}),
+            ),
+        }
     }
 
     async fn lease(&self, req: Request<Incoming>) -> Response<RespBody> {
@@ -320,6 +384,13 @@ fn parse_cards(obj: &serde_json::Map<String, Value>) -> Result<CardSel, String> 
             "card must be a card name, \"any\", \"all\" or a comma list, not {v}"
         )),
     }
+}
+
+fn no_desktop() -> Response<RespBody> {
+    json_resp(
+        StatusCode::NOT_FOUND,
+        json!({"error": "the desktop feature is off ([desktop] policy = \"off\")"}),
+    )
 }
 
 fn json_resp(status: StatusCode, v: Value) -> Response<RespBody> {

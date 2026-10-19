@@ -9,6 +9,7 @@
 //! gpuq status [--json]
 //! gpuq run [--class C] [--vram 8G|all] [--card NAME|LIST|all|any | --cards N] [--yieldable] [--fallback] [--name N] -- cmd ...
 //! gpuq hold [--class C] [--vram all] [--card NAME|LIST|all|any | --cards N] [--name N]
+//! gpuq desktop [status [--json] | release [--force] | restore [--hold SECS]]
 //! ```
 //!
 //! Clients find the daemon through `GPUQ_API` (default `127.0.0.1:9390`) and exit with 69
@@ -16,6 +17,7 @@
 
 mod client;
 mod daemon;
+mod desktop;
 mod run;
 mod status;
 
@@ -84,6 +86,11 @@ enum Cmd {
     Run(run::RunArgs),
     /// Hold a lease until Ctrl-C.
     Hold(run::HoldArgs),
+    /// Show or change what gpuq does with the desktop ([desktop] in the config).
+    Desktop {
+        #[command(subcommand)]
+        action: Option<desktop::Action>,
+    },
 }
 
 /// The clap command, used to generate the man pages and shell completions.
@@ -103,6 +110,7 @@ pub fn main() -> ExitCode {
         Cmd::Status { json } => block_on(status::status(&api, json)),
         Cmd::Run(args) => block_on(run::run(&api, args)),
         Cmd::Hold(args) => block_on(run::hold(&api, args)),
+        Cmd::Desktop { action } => block_on(desktop::desktop(&api, action)),
     }
 }
 
