@@ -561,6 +561,8 @@ impl Controller {
         let started = unix_now();
         let failed_before = self.failed_units().await;
         self.m.begin(Instant::now(), &step);
+        // Logged below with more detail.
+        self.last_logged = norm(self.m.why());
         self.publish();
         let result = if what == "release" {
             tracing::info!("desktop: releasing {} ({why})", self.card);
