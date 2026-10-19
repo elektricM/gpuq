@@ -732,3 +732,11 @@ fn desktop_problems_are_reported() {
         "{problems:?}"
     );
 }
+
+#[test]
+fn desktop_example_parses() {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("examples/desktop.toml");
+    let cfg = Config::load(Some(&path)).unwrap();
+    assert!(cfg.desktop.enabled());
+    assert_eq!(cfg.desktop.ignore, vec!["kwin_wayland --virtual"]);
+}

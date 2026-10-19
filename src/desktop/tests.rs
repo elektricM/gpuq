@@ -563,7 +563,17 @@ async fn offload_with_fallback_off_leaves_the_desktop_running() {
     let st = r.h.status();
     assert_eq!(st.state, State::Active);
     assert!(st.offload_impossible.unwrap().contains("no other card"));
+    // From then on nothing is released, by the policy or by hand.
+    pass(3600).await;
+    assert_eq!(r.h.status().state, State::Active);
+    assert!(r
+        .h
+        .release(true)
+        .await
+        .unwrap_err()
+        .contains("fallback is off"));
     assert_eq!(r.fake.calls("stop"), 0);
+    assert_eq!(r.fake.calls("restart"), 0);
 }
 
 #[tokio::test(start_paused = true)]

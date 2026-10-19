@@ -667,6 +667,12 @@ impl Controller {
     /// Reasons to release, and reasons not to restore yet.
     fn reasons(&mut self, l: &Load) -> (Vec<String>, Vec<String>) {
         let mut wants = Vec::new();
+        let mut keeps: Vec<String> = l.leases.iter().map(|x| format!("lease {x}")).collect();
+        keeps.extend(l.moving.clone());
+        if self.policy() == Policy::Off {
+            // Offload turned out impossible and the fallback is off: nothing to release for.
+            return (wants, keeps);
+        }
         for m in &l.models {
             if self.cfg.models.iter().any(|p| glob(p, m)) {
                 wants.push(format!("model {m} loaded"));
@@ -709,8 +715,6 @@ impl Controller {
                 }
             }
         }
-        let mut keeps: Vec<String> = l.leases.iter().map(|x| format!("lease {x}")).collect();
-        keeps.extend(l.moving.clone());
         (wants, keeps)
     }
 
@@ -763,6 +767,12 @@ impl Controller {
     }
 
     async fn release(&mut self) -> Result<(String, How), String> {
+        if self.policy() == Policy::Off {
+            let why = self.offload_impossible.clone().unwrap_or_default();
+            return Err(format!(
+                "offload does not work here ({why}) and fallback is off"
+            ));
+        }
         let t0 = Instant::now();
         let units = self.units().await?;
         let cgroups = cgroups_of(&units);
