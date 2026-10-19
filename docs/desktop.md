@@ -75,8 +75,10 @@ Everything else is left alone. A headless compositor used by browser automation,
 the desktop; it can also be listed in `ignore` to be sure. gpuq never kills a process: it only
 stops and starts the units it is given.
 
-Without root, gpuq sees only its own user's processes; `gpuq desktop` says how many it could
-not read. The units are checked with systemd either way.
+Without root, gpuq sees only its own user's processes, and not those started with file
+capabilities (`kwin_wayland` has one). With `elevate` set, it then runs the scan as
+`<elevate> gpuq scan-drm --pci <addr>` and uses that; otherwise `gpuq desktop` says how many
+processes it could not read. The units are checked with systemd either way.
 
 ## Stop
 

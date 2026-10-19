@@ -44,7 +44,7 @@ use procs::{desktop_holders, Holder, Scan};
 use system::{Health, Scope, System, UnitInfo};
 
 /// Pause between checks while units stop or start.
-const VERIFY_POLL: Duration = Duration::from_millis(500);
+const VERIFY_POLL: Duration = Duration::from_secs(1);
 /// Pause after the desktop is gone before VRAM is measured.
 const DRIVER_SETTLE: Duration = Duration::from_secs(2);
 /// Journal lines kept per check.

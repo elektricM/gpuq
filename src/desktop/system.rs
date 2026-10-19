@@ -106,6 +106,8 @@ pub trait System: Send + Sync + 'static {
 /// The real system.
 pub struct Real {
     nodes: Nodes,
+    /// `sysfs root, PCI address` for `gpuq scan-drm` through `elevate`.
+    card: Option<(PathBuf, String)>,
     probe: Option<Arc<dyn VramProbe>>,
     /// `["--user"]`, plus `--machine=<user>@.host` for another user.
     user_args: Vec<String>,
@@ -119,6 +121,7 @@ impl Real {
     /// `user`: whose user manager to talk to; empty or the current user means our own.
     pub fn new(
         nodes: Nodes,
+        card: Option<(PathBuf, String)>,
         probe: Option<Arc<dyn VramProbe>>,
         user: &str,
         elevate: Vec<String>,
@@ -146,6 +149,7 @@ impl Real {
         };
         Real {
             nodes,
+            card,
             probe,
             user_args,
             runtime_dir,
@@ -173,6 +177,13 @@ impl Real {
         argv.extend(units.iter().cloned());
         run(&argv, self.stop_timeout).await.map(|_| ())
     }
+}
+
+/// This program, also after its file was replaced on disk.
+fn self_exe() -> Option<String> {
+    let p = std::env::current_exe().ok()?;
+    let s = p.to_string_lossy();
+    Some(s.strip_suffix(" (deleted)").unwrap_or(&s).to_owned())
 }
 
 fn current_user() -> Option<String> {
@@ -394,9 +405,35 @@ impl System for Real {
 
     async fn scan(&self) -> Scan {
         let nodes = self.nodes.clone();
-        tokio::task::spawn_blocking(move || procs::scan(std::path::Path::new("/proc"), &nodes))
-            .await
-            .unwrap_or_default()
+        let local =
+            tokio::task::spawn_blocking(move || procs::scan(std::path::Path::new("/proc"), &nodes))
+                .await
+                .unwrap_or_default();
+        let (Some((sysfs, pci)), false, true) =
+            (&self.card, self.elevate.is_empty(), local.unreadable > 0)
+        else {
+            return local;
+        };
+        // Other users' processes (and capability-raised ones) need root to read.
+        let Some(exe) = self_exe() else {
+            return local;
+        };
+        let mut argv = self.elevate.clone();
+        argv.extend([
+            exe,
+            "scan-drm".into(),
+            "--sysfs".into(),
+            sysfs.display().to_string(),
+            "--pci".into(),
+            pci.clone(),
+        ]);
+        match run(&argv, self.command_timeout).await {
+            Ok(out) => serde_json::from_str(&out).unwrap_or(local),
+            Err(e) => {
+                tracing::debug!("desktop: elevated scan: {e}");
+                local
+            }
+        }
     }
 
     async fn vram_used(&self) -> Option<Mib> {

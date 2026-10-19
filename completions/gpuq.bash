@@ -34,6 +34,9 @@ _gpuq() {
             gpuq,run)
                 cmd="gpuq__run"
                 ;;
+            gpuq,scan-drm)
+                cmd="gpuq__scan__drm"
+                ;;
             gpuq,status)
                 cmd="gpuq__status"
                 ;;
@@ -79,6 +82,9 @@ _gpuq() {
             gpuq__help,run)
                 cmd="gpuq__help__run"
                 ;;
+            gpuq__help,scan-drm)
+                cmd="gpuq__help__scan__drm"
+                ;;
             gpuq__help,status)
                 cmd="gpuq__help__status"
                 ;;
@@ -98,7 +104,7 @@ _gpuq() {
 
     case "${cmd}" in
         gpuq)
-            opts="-h -V --api --help --version daemon check-config status run hold desktop help"
+            opts="-h -V --api --help --version daemon check-config status run hold desktop scan-drm help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 1 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -314,7 +320,7 @@ _gpuq() {
             return 0
             ;;
         gpuq__help)
-            opts="daemon check-config status run hold desktop help"
+            opts="daemon check-config status run hold desktop scan-drm help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -453,6 +459,20 @@ _gpuq() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
+        gpuq__help__scan__drm)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
         gpuq__help__status)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
@@ -533,6 +553,32 @@ _gpuq() {
                     return 0
                     ;;
                 --cards)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --api)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        gpuq__scan__drm)
+            opts="-h --sysfs --pci --api --help"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                --sysfs)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --pci)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;

@@ -426,8 +426,13 @@ async fn serve(cfg: Config, path: Option<&Path>) -> Result<(), String> {
                 "desktop: no DRM nodes found for {desktop_card}; processes on it cannot be checked"
             );
         }
+        let card = match (&pci, &desktop_spec) {
+            (Some(p), Some(c)) => Some((c.sysfs_root.clone(), p.clone())),
+            _ => None,
+        };
         let sys = desktop::system::Real::new(
             nodes,
+            card,
             desktop_probe,
             &d.user,
             d.elevate.clone(),

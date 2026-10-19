@@ -56,7 +56,7 @@ fn generate() -> std::io::Result<BTreeMap<PathBuf, Vec<u8>>> {
         PathBuf::from("man/gpuq.1"),
         man_page(cmd.clone(), &source, ROOT_EXTRA)?,
     );
-    for sub in cmd.get_subcommands() {
+    for sub in cmd.get_subcommands().filter(|s| !s.is_hide_set()) {
         let name = format!("gpuq-{}", sub.get_name());
         let sub = sub
             .clone()

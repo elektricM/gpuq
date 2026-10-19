@@ -91,6 +91,14 @@ enum Cmd {
         #[command(subcommand)]
         action: Option<desktop::Action>,
     },
+    /// Print the processes that hold a card as JSON (run by the daemon through `elevate`).
+    #[command(hide = true)]
+    ScanDrm {
+        #[arg(long, default_value = "/sys/bus/pci/devices")]
+        sysfs: PathBuf,
+        #[arg(long)]
+        pci: String,
+    },
 }
 
 /// The clap command, used to generate the man pages and shell completions.
@@ -111,6 +119,7 @@ pub fn main() -> ExitCode {
         Cmd::Run(args) => block_on(run::run(&api, args)),
         Cmd::Hold(args) => block_on(run::hold(&api, args)),
         Cmd::Desktop { action } => block_on(desktop::desktop(&api, action)),
+        Cmd::ScanDrm { sysfs, pci } => desktop::scan_drm(&sysfs, &pci),
     }
 }
 

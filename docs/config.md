@@ -350,7 +350,7 @@ it to another card. How it works: [desktop.md](desktop.md). Example:
 | `system_units` | `["display-manager.service"]` | Stopped on release (after `user_units`), started on restore. |
 | `user_units` | `[]` | Units of the user manager stopped on release, e.g. the compositor and the shell. Not started on restore: a login starts them. With no `system_units`, a restore starts these instead. |
 | `user` | the user gpuq runs as | Whose user manager `user_units` and `session_env` refer to. As root, gpuq uses `systemctl --user --machine=<user>@.host`. |
-| `elevate` | `[]` | argv prefix for commands that change system units and read the system journal, e.g. `["sudo", "-n"]`. Not needed as root or with a polkit rule. |
+| `elevate` | `[]` | argv prefix for commands that change system units, read the system journal and list the processes of other users on the card (`gpuq scan-drm`), e.g. `["sudo", "-n"]`. Not needed as root or with a polkit rule. |
 | `ignore` | `[]` | Processes never counted as the desktop: an exact process name, or a piece of the command line such as `"kwin_wayland --virtual"`. |
 | `models` | `[]` | LLM models that want the desktop off the card while loaded. `*` matches any text. |
 | `min_free_mib` | `0` | Release when an LLM model is loaded and less than this is free. The reason lasts while that model stays loaded. `0` = off. |

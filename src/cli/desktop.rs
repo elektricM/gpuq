@@ -94,6 +94,22 @@ fn list(v: &Value, key: &str) -> Vec<String> {
         .unwrap_or_default()
 }
 
+/// `gpuq scan-drm`: the holders of the card at `pci`, as JSON on stdout.
+pub fn scan_drm(sysfs: &std::path::Path, pci: &str) -> ExitCode {
+    let Some(pci) = crate::probe::scan::normalize_pci(pci) else {
+        say(&format!("bad PCI address {pci:?}"));
+        return ExitCode::FAILURE;
+    };
+    let nodes = crate::desktop::procs::Nodes::for_pci(sysfs, &pci);
+    if nodes.is_empty() {
+        say(&format!("no DRM nodes for {pci}"));
+        return ExitCode::FAILURE;
+    }
+    let scan = crate::desktop::procs::scan(std::path::Path::new("/proc"), &nodes);
+    println!("{}", serde_json::to_string(&scan).unwrap_or_default());
+    ExitCode::SUCCESS
+}
+
 /// The text form of `GET /desktop`.
 pub fn render(v: &Value) -> String {
     let mut out = String::new();

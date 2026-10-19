@@ -6,13 +6,15 @@
 //!
 //! The nodes of a card come from its PCI address (`/sys/bus/pci/devices/<addr>/drm`), so a
 //! card is never confused with another one. Only processes whose `fd` directory can be read
-//! are seen: all of them as root, the own user's otherwise.
+//! are seen: all of them as root, the own user's otherwise (and not those with file
+//! capabilities, such as `kwin_wayland`). Without root, gpuq runs the scan through `elevate`
+//! (`gpuq scan-drm`) when it has one.
 
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 /// The DRM device nodes of one card.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -56,7 +58,7 @@ fn is_digits(s: &str) -> bool {
 }
 
 /// One process with the card open.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Holder {
     pub pid: u32,
     pub comm: String,
@@ -71,7 +73,7 @@ pub struct Holder {
 }
 
 /// The result of one scan.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Scan {
     pub holders: Vec<Holder>,
     /// Processes whose open files could not be read (other users, without root).

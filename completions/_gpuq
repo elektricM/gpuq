@@ -161,6 +161,15 @@ esac
     ;;
 esac
 ;;
+(scan-drm)
+_arguments "${_arguments_options[@]}" : \
+'--sysfs=[]:SYSFS:_files' \
+'--pci=[]:PCI:_default' \
+'--api=[Address of the gpuq control API (default\: \$GPUQ_API, else 127.0.0.1\:9390)]:HOST:PORT:_default' \
+'-h[Print help]' \
+'--help[Print help]' \
+&& ret=0
+;;
 (help)
 _arguments "${_arguments_options[@]}" : \
 ":: :_gpuq__help_commands" \
@@ -221,6 +230,10 @@ _arguments "${_arguments_options[@]}" : \
     ;;
 esac
 ;;
+(scan-drm)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
 (help)
 _arguments "${_arguments_options[@]}" : \
 && ret=0
@@ -243,6 +256,7 @@ _gpuq_commands() {
 'run:Run a command under a GPU lease' \
 'hold:Hold a lease until Ctrl-C' \
 'desktop:Show or change what gpuq does with the desktop (\[desktop\] in the config)' \
+'scan-drm:Print the processes that hold a card as JSON (run by the daemon through \`elevate\`)' \
 'help:Print this message or the help of the given subcommand(s)' \
     )
     _describe -t commands 'gpuq commands' commands "$@"
@@ -321,6 +335,7 @@ _gpuq__help_commands() {
 'run:Run a command under a GPU lease' \
 'hold:Hold a lease until Ctrl-C' \
 'desktop:Show or change what gpuq does with the desktop (\[desktop\] in the config)' \
+'scan-drm:Print the processes that hold a card as JSON (run by the daemon through \`elevate\`)' \
 'help:Print this message or the help of the given subcommand(s)' \
     )
     _describe -t commands 'gpuq help commands' commands "$@"
@@ -374,6 +389,11 @@ _gpuq__help__run_commands() {
     local commands; commands=()
     _describe -t commands 'gpuq help run commands' commands "$@"
 }
+(( $+functions[_gpuq__help__scan-drm_commands] )) ||
+_gpuq__help__scan-drm_commands() {
+    local commands; commands=()
+    _describe -t commands 'gpuq help scan-drm commands' commands "$@"
+}
 (( $+functions[_gpuq__help__status_commands] )) ||
 _gpuq__help__status_commands() {
     local commands; commands=()
@@ -388,6 +408,11 @@ _gpuq__hold_commands() {
 _gpuq__run_commands() {
     local commands; commands=()
     _describe -t commands 'gpuq run commands' commands "$@"
+}
+(( $+functions[_gpuq__scan-drm_commands] )) ||
+_gpuq__scan-drm_commands() {
+    local commands; commands=()
+    _describe -t commands 'gpuq scan-drm commands' commands "$@"
 }
 (( $+functions[_gpuq__status_commands] )) ||
 _gpuq__status_commands() {
