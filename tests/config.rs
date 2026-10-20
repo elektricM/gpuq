@@ -465,6 +465,25 @@ vendor = "nvidia"
 }
 
 #[test]
+fn mesa_cards_get_a_graphics_pin_by_pci_address() {
+    let cfg = parse(TWO_CARDS).unwrap();
+    let pin = |name: &str| {
+        cfg.cards()
+            .into_iter()
+            .find(|c| c.name == name)
+            .unwrap()
+            .pin_env()
+    };
+    // AMD at 0000:03:00.0: Vulkan and OpenGL see that card and no other.
+    assert_eq!(pin("big"), [kv("DRI_PRIME", "pci-0000_03_00_0!")]);
+    // NVIDIA's Vulkan driver is not Mesa.
+    assert!(pin("small").is_empty());
+    // No PCI address, nothing to pin to.
+    let cfg = parse("[[gpu.card]]\nname = \"a\"\nvendor = \"intel\"\n").unwrap();
+    assert!(cfg.cards()[0].pin_env().is_empty());
+}
+
+#[test]
 fn visible_devices_env_overrides_the_vendor_default() {
     let cfg = parse(
         r#"

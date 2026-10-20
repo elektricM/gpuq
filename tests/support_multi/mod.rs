@@ -195,6 +195,7 @@ impl MultiRig {
                         }
                         None => Vec::new(),
                     },
+                    pin_env: Vec::new(),
                     vendor: match &opts.custom[i] {
                         Some((_, vendor)) => vendor.clone(),
                         None => "nvidia".into(),

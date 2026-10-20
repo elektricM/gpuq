@@ -89,6 +89,21 @@ pub struct CardSpec {
 }
 
 impl CardSpec {
+    /// Environment that shows a program this card and no other through Mesa (Vulkan and
+    /// OpenGL): `DRI_PRIME=pci-0000_03_00_0!`. The `*_VISIBLE_DEVICES` variables in `env` only
+    /// steer ROCm, CUDA and oneAPI, so a Vulkan program (whisper.cpp, llama.cpp built with
+    /// Vulkan) would otherwise take Vulkan device 0, which may be another card or the iGPU.
+    /// Empty for NVIDIA, whose Vulkan driver is not Mesa, and for cards without a PCI address.
+    pub fn pin_env(&self) -> Vec<(String, String)> {
+        match (self.vendor, crate::probe::scan::normalize_pci(&self.pci)) {
+            (GpuVendor::Amd | GpuVendor::Intel, Some(pci)) => vec![(
+                "DRI_PRIME".to_owned(),
+                format!("pci-{}!", pci.replace([':', '.'], "_")),
+            )],
+            _ => Vec::new(),
+        }
+    }
+
     /// `K=V, K2=V2`, or None when the card has no env.
     pub fn env_summary(&self) -> Option<String> {
         (!self.env.is_empty()).then(|| {

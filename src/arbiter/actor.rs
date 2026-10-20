@@ -576,6 +576,7 @@ struct CardState {
     name: String,
     probe: Arc<dyn VramProbe>,
     env: Vec<(String, String)>,
+    pin_env: Vec<(String, String)>,
     vendor: String,
     limits: Limits,
     state: State,
@@ -696,6 +697,7 @@ impl Actor {
                 name: c.name,
                 probe: c.probe,
                 env: c.env,
+                pin_env: c.pin_env,
                 vendor: c.vendor,
                 limits: Limits {
                     margin_mib: c.margin_mib,
@@ -887,6 +889,15 @@ impl Actor {
                 .flat_map(|&c| self.cards[c].env.iter().cloned())
                 .collect()
         })
+    }
+
+    /// What a lease on `cards` hands its job, see [`super::lease_env`].
+    fn lease_env(&self, cards: &[usize]) -> Vec<(String, String)> {
+        let pins: Vec<&[(String, String)]> = cards
+            .iter()
+            .map(|&c| self.cards[c].pin_env.as_slice())
+            .collect();
+        super::lease_env(self.merged_env(cards), &pins)
     }
 
     fn env_ok(&self, cards: &[usize]) -> bool {
@@ -1274,7 +1285,7 @@ impl Actor {
         let granted = Granted {
             id: id.clone(),
             cards: self.names(&lease.cards),
-            env: self.merged_env(&lease.cards),
+            env: self.lease_env(&lease.cards),
             yield_rx,
         };
         self.leases.push(lease);

@@ -256,6 +256,9 @@ pub struct Card {
     /// Vendor, e.g. "amd" or "nvidia". Two cards of different vendors may share a lease only
     /// when their env uses different variables, see [`merge_env`].
     pub vendor: String,
+    /// Environment that pins graphics APIs (Vulkan, OpenGL) to this card alone. Only a lease
+    /// on this one card gets it, see [`lease_env`].
+    pub pin_env: Vec<(String, String)>,
 }
 
 impl fmt::Debug for Card {
@@ -265,6 +268,7 @@ impl fmt::Debug for Card {
             .field("device", &self.probe.device())
             .field("env", &self.env)
             .field("vendor", &self.vendor)
+            .field("pin_env", &self.pin_env)
             .finish()
     }
 }
@@ -358,6 +362,23 @@ pub fn merge_env<'a>(
         }
     }
     Ok(out.into_iter().map(|(k, v, _, _)| (k, v)).collect())
+}
+
+/// The env a lease hands its job: the merged env of its cards, plus the graphics pin of its
+/// card when it holds exactly one. Mesa takes a single device, so a lease on several cards
+/// gets no pin and its Vulkan program sees every card.
+pub fn lease_env(
+    merged: Vec<(String, String)>,
+    pins: &[&[(String, String)]],
+) -> Vec<(String, String)> {
+    let mut env = merged;
+    if let [pin] = pins {
+        for (k, v) in pin.iter() {
+            env.retain(|(e, _)| e != k);
+            env.push((k.clone(), v.clone()));
+        }
+    }
+    env
 }
 
 /// A job asking for the card.
@@ -564,6 +585,7 @@ pub fn spawn(
         whole_card_baseline_mib: settings.tuning.whole_card_baseline_mib,
         env: Vec::new(),
         vendor: String::new(),
+        pin_env: Vec::new(),
     };
     spawn_cards(settings, vec![card], 0, backend, offload)
 }
@@ -847,5 +869,32 @@ impl fmt::Debug for Lease {
             .field("class", &self.class)
             .field("vram", &self.vram)
             .finish()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::lease_env;
+
+    fn kv(k: &str, v: &str) -> (String, String) {
+        (k.to_owned(), v.to_owned())
+    }
+
+    #[test]
+    fn a_one_card_lease_gets_the_pin_of_its_card() {
+        let merged = vec![kv("ROCR_VISIBLE_DEVICES", "GPU-1")];
+        let pin = [kv("DRI_PRIME", "pci-0000_03_00_0!")];
+        assert_eq!(
+            lease_env(merged.clone(), &[&pin]),
+            [
+                kv("ROCR_VISIBLE_DEVICES", "GPU-1"),
+                kv("DRI_PRIME", "pci-0000_03_00_0!")
+            ]
+        );
+        // Two cards: Mesa takes one device, so no pin at all.
+        let other = [kv("DRI_PRIME", "pci-0000_07_00_0!")];
+        assert_eq!(lease_env(merged.clone(), &[&pin, &other]), merged);
+        // A card without a pin (NVIDIA) changes nothing.
+        assert_eq!(lease_env(merged.clone(), &[&[]]), merged);
     }
 }

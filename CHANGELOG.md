@@ -34,6 +34,11 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- A lease on one AMD or Intel card now also gets `DRI_PRIME=pci-<address>!`, so Vulkan and
+  OpenGL programs see that card and no other. `HIP_VISIBLE_DEVICES` and `ROCR_VISIBLE_DEVICES`
+  only steer ROCm: a Vulkan build of whisper.cpp took Vulkan device 0, the integrated GPU,
+  while gpuq had unloaded the LLM from the card it leased. Leases on several cards get no pin,
+  since Mesa takes a single device.
 - An unreachable Immich is logged once, and again when it is back, instead of on every poll.
 
 ## [0.3.1] - 2026-10-17

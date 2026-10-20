@@ -75,6 +75,7 @@ fn build_cards(specs: Vec<CardSpec>) -> Result<Vec<arbiter::Card>, String> {
     specs
         .into_iter()
         .map(|c| {
+            let pin_env = c.pin_env();
             let probe = make_probe(&probe_options(&c))
                 .map_err(|e| format!("card {}: no usable VRAM probe: {e}", c.name))?;
             match c.env_summary() {
@@ -88,6 +89,7 @@ fn build_cards(specs: Vec<CardSpec>) -> Result<Vec<arbiter::Card>, String> {
                 whole_card_baseline_mib: c.whole_card_baseline_mib,
                 env: c.env,
                 vendor: c.vendor.as_str().to_owned(),
+                pin_env,
             })
         })
         .collect()
