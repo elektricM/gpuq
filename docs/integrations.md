@@ -3,7 +3,6 @@
 "I run X. How do I plug it in?" Find X below, copy the matching file from `examples/`, change
 the names and ports, run `gpuq check-config -c FILE`.
 
-
 ## Kinds of workload
 
 | Kind | Use it for | You write | gpuq does |
