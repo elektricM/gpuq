@@ -1,51 +1,53 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1000" height="470" viewBox="0 0 1000 470" font-family="Inter, Helvetica, Arial, sans-serif">
 <defs>
 <style>
-.a{animation-duration:16s;animation-iteration-count:infinite;animation-timing-function:cubic-bezier(.45,0,.25,1);animation-fill-mode:both}
+.a{animation-duration:22s;animation-iteration-count:infinite;animation-timing-function:cubic-bezier(.45,0,.25,1);animation-fill-mode:both}
 .sx{transform-box:fill-box;transform-origin:0 50%}
-.lbp{animation-name:lbp}.lbb{animation-name:lbb}.lov{animation-name:lov}.lask{animation-name:lask}.loom{animation-name:loom}.lgpu{animation-name:lgpu}
-.la1{animation-name:la1}.la2{animation-name:la2}.la3{animation-name:la3}.la4{animation-name:la4}
-.lp1{animation-name:lp1}.lp2{animation-name:lp2}.lp3{animation-name:lp3}.lp4{animation-name:lp4}
-.rw0{animation-name:rw0}.rw1{animation-name:rw1}.rw2{animation-name:rw2}.rw3{animation-name:rw3}
-.gw{animation-name:gw}.gwt{animation-name:gwt}.gl{animation-name:gl}.glt{animation-name:glt}.gc{animation-name:gc}.gct{animation-name:gct}
-.r1o{animation-name:r1o}.r1a{animation-name:r1a}.r2o{animation-name:r2o}.r2a{animation-name:r2a}
-.f1{animation-name:f1}.f2{animation-name:f2}.f3{animation-name:f3}.f4{animation-name:f4}.cw{animation-name:cw}.cl{animation-name:cl}.cc{animation-name:cc}
 .fl{stroke-dasharray:18 200;stroke-linecap:round}
-@keyframes lbp{0%,9.4%{transform:scaleX(1)}14.4%,18.8%{transform:scaleX(0)}25%,100%{transform:scaleX(1)}}
-@keyframes lbb{0%,9.4%{transform:scaleX(1)}14.4%,28.5%{transform:scaleX(0)}33.5%,100%{transform:scaleX(1)}}
-@keyframes lov{0%,9.4%{opacity:1;transform:scaleX(1)}12.5%{opacity:0;transform:scaleX(1)}12.6%,37.4%{opacity:0;transform:scaleX(0)}37.5%{opacity:1;transform:scaleX(0)}40.5%,43.8%{opacity:1;transform:scaleX(.45)}46.8%,100%{opacity:1;transform:scaleX(1)}}
-@keyframes lask{0%,9.4%{opacity:1}12.5%,44%{opacity:0}47%,100%{opacity:1}}
-@keyframes loom{0%,9.4%{opacity:1}12.5%,46%{opacity:0}48%{opacity:1}50.5%{opacity:.15}53%{opacity:1}55.5%{opacity:.15}58%,100%{opacity:1}}
-@keyframes lgpu{0%,9.4%{stroke:#ff4d4d}13%,44%{stroke:#1f1f1f}47%,100%{stroke:#ff4d4d}}
-@keyframes la1{0%,9.4%{opacity:1}12.5%,16.3%{opacity:0}18.8%,100%{opacity:1}}
-@keyframes la2{0%,9.4%{opacity:1}12.5%,26%{opacity:0}28.5%,100%{opacity:1}}
-@keyframes la3{0%,9.4%{opacity:1}12.5%,35%{opacity:0}37.5%,100%{opacity:1}}
-@keyframes la4{0%,9.4%{opacity:1}12.5%,41.3%{opacity:0}43.8%,100%{opacity:1}}
-@keyframes lp1{0%,16.3%,19.5%,100%{transform:translateX(0)}17.8%{transform:translateX(5px)}}
-@keyframes lp2{0%,26%,29.2%,100%{transform:translateX(0)}27.5%{transform:translateX(5px)}}
-@keyframes lp3{0%,35%,38.2%,100%{transform:translateX(0)}36.5%{transform:translateX(5px)}}
-@keyframes lp4{0%,41.3%,44.5%,100%{transform:translateX(0)}42.8%{transform:translateX(5px)}}
-@keyframes rw0{0%,9.4%{opacity:1}14.4%,31.3%{opacity:.25}33.8%,100%{opacity:1}}
-@keyframes rw1{0%,9.4%{opacity:1}14.4%,40%{opacity:.25}42.5%,100%{opacity:1}}
-@keyframes rw2{0%,9.4%{opacity:1}14.4%,48.8%{opacity:.25}51.3%,100%{opacity:1}}
-@keyframes rw3{0%,9.4%{opacity:1}14.4%,52.5%{opacity:.25}55%,100%{opacity:1}}
-@keyframes gw{0%,9.4%{transform:scaleX(1)}14.4%,33.8%{transform:scaleX(0)}38.8%,100%{transform:scaleX(1)}}
-@keyframes gwt{0%,9.4%{opacity:1}12.5%,38%{opacity:0}40%,100%{opacity:1}}
-@keyframes gl{0%,9.4%{transform:scaleX(1)}14.4%,42.5%{transform:scaleX(0)}47.5%,60%{transform:scaleX(1)}65%,82.5%{transform:scaleX(0)}87.5%,100%{transform:scaleX(1)}}
-@keyframes glt{0%,9.4%{opacity:1}12.5%,47%{opacity:0}49%,60%{opacity:1}62%,87%{opacity:0}89%,100%{opacity:1}}
-@keyframes gc{0%,65%{opacity:1;transform:scaleX(0)}70%,78.8%{opacity:1;transform:scaleX(1)}82.5%,100%{opacity:1;transform:scaleX(0)}}
-@keyframes gct{0%,69.5%{opacity:0}71.5%,78%{opacity:1}80%,100%{opacity:0}}
-@keyframes r1o{0%,60%{opacity:1}61.5%,85.5%{opacity:0}87%,100%{opacity:1}}
-@keyframes r1a{0%,61.5%{opacity:0}63%,84%{opacity:1}85.5%,100%{opacity:0}}
-@keyframes r2o{0%,65%{opacity:1}66.5%,80.5%{opacity:0}82%,100%{opacity:1}}
-@keyframes r2a{0%,66.5%{opacity:0}68%,79%{opacity:1}80.5%,100%{opacity:0}}
-@keyframes f1{0%{opacity:0;stroke-dashoffset:18}15.5%{opacity:0;stroke-dashoffset:18}15.6%{opacity:1;stroke-dashoffset:18}20.6%{opacity:1;stroke-dashoffset:-100}20.7%{opacity:0;stroke-dashoffset:-100}100%{opacity:0;stroke-dashoffset:-100}}
-@keyframes f2{0%{opacity:0;stroke-dashoffset:18}18.7%{opacity:0;stroke-dashoffset:18}18.8%{opacity:1;stroke-dashoffset:18}23.8%{opacity:1;stroke-dashoffset:-100}23.9%{opacity:0;stroke-dashoffset:-100}100%{opacity:0;stroke-dashoffset:-100}}
-@keyframes f3{0%{opacity:0;stroke-dashoffset:18}21.8%{opacity:0;stroke-dashoffset:18}21.9%{opacity:1;stroke-dashoffset:18}26.9%{opacity:1;stroke-dashoffset:-100}27.0%{opacity:0;stroke-dashoffset:-100}100%{opacity:0;stroke-dashoffset:-100}}
-@keyframes f4{0%{opacity:0;stroke-dashoffset:18}24.9%{opacity:0;stroke-dashoffset:18}25.0%{opacity:1;stroke-dashoffset:18}30.0%{opacity:1;stroke-dashoffset:-100}30.1%{opacity:0;stroke-dashoffset:-100}100%{opacity:0;stroke-dashoffset:-100}}
-@keyframes cw{0%{opacity:0;stroke-dashoffset:18}33.7%{opacity:0;stroke-dashoffset:18}33.8%{opacity:1;stroke-dashoffset:18}37.5%{opacity:1;stroke-dashoffset:-100}37.6%{opacity:0;stroke-dashoffset:-100}100%{opacity:0;stroke-dashoffset:-100}}
-@keyframes cl{0%{opacity:0;stroke-dashoffset:18}42.4%{opacity:0;stroke-dashoffset:18}42.5%{opacity:1;stroke-dashoffset:18}46.3%{opacity:1;stroke-dashoffset:-100}46.4%{opacity:0;stroke-dashoffset:-100}82.4%{opacity:0;stroke-dashoffset:18}82.5%{opacity:1;stroke-dashoffset:18}86.3%{opacity:1;stroke-dashoffset:-100}86.4%{opacity:0;stroke-dashoffset:-100}100%{opacity:0;stroke-dashoffset:-100}}
-@keyframes cc{0%{opacity:0;stroke-dashoffset:18}64.9%{opacity:0;stroke-dashoffset:18}65.0%{opacity:1;stroke-dashoffset:18}68.8%{opacity:1;stroke-dashoffset:-100}68.9%{opacity:0;stroke-dashoffset:-100}100%{opacity:0;stroke-dashoffset:-100}}
+.lbp{animation-name:lbp}.lbb{animation-name:lbb}.lov{animation-name:lov}.lask{animation-name:lask}.loom{animation-name:loom}.lgpu{animation-name:lgpu}.la1{animation-name:la1}.lp1{animation-name:lp1}.la2{animation-name:la2}.lp2{animation-name:lp2}.la3{animation-name:la3}.lp3{animation-name:lp3}.la4{animation-name:la4}.lp4{animation-name:lp4}.rw0{animation-name:rw0}.rw1{animation-name:rw1}.rw2{animation-name:rw2}.rw3{animation-name:rw3}.r1o{animation-name:r1o}.r1a{animation-name:r1a}.r2o{animation-name:r2o}.r2a{animation-name:r2a}.r3o{animation-name:r3o}.r3a{animation-name:r3a}.gw{animation-name:gw}.gwt{animation-name:gwt}.gl{animation-name:gl}.glt{animation-name:glt}.gs1{animation-name:gs1}.gsb{animation-name:gsb}.gst{animation-name:gst}.gc{animation-name:gc}.gct{animation-name:gct}.ga{animation-name:ga}.gat{animation-name:gat}.f1{animation-name:f1}.f2{animation-name:f2}.f3{animation-name:f3}.f4{animation-name:f4}.cw{animation-name:cw}.cl{animation-name:cl}.cc{animation-name:cc}.ca{animation-name:ca}
+@keyframes lbp{0%,6.82%{transform:scaleX(1)}10.45%,13.64%{transform:scaleX(0)}18.18%,100%{transform:scaleX(1)}}
+@keyframes lbb{0%,6.82%{transform:scaleX(1)}10.45%,20.73%{transform:scaleX(0)}24.36%,100%{transform:scaleX(1)}}
+@keyframes lov{0%,6.82%{opacity:1;transform:scaleX(1)}9.09%{opacity:0;transform:scaleX(1)}9.18%,27.18%{opacity:0;transform:scaleX(0)}27.27%{opacity:1;transform:scaleX(0)}29.45%,31.82%{opacity:1;transform:scaleX(.45)}34.05%,100%{opacity:1;transform:scaleX(1)}}
+@keyframes lask{0%,6.82%{opacity:1}9.09%,32%{opacity:0}34.18%,100%{opacity:1}}
+@keyframes loom{0%,6.82%{opacity:1}9.09%,33.45%{opacity:0}34.91%{opacity:1}36.73%{opacity:0.15}38.55%{opacity:1}40.36%{opacity:0.15}42.18%,100%{opacity:1}}
+@keyframes lgpu{0%,6.82%{stroke:#ff4d4d}9.45%,32%{stroke:#1f1f1f}34.18%,100%{stroke:#ff4d4d}}
+@keyframes la1{0%,6.82%{opacity:1}9.09%,11.82%{opacity:0}13.64%,100%{opacity:1}}
+@keyframes lp1{0%,11.82%,14.18%,100%{transform:translateX(0)}12.95%{transform:translateX(5px)}}
+@keyframes la2{0%,6.82%{opacity:1}9.09%,18.91%{opacity:0}20.73%,100%{opacity:1}}
+@keyframes lp2{0%,18.91%,21.27%,100%{transform:translateX(0)}20.05%{transform:translateX(5px)}}
+@keyframes la3{0%,6.82%{opacity:1}9.09%,25.45%{opacity:0}27.27%,100%{opacity:1}}
+@keyframes lp3{0%,25.45%,27.82%,100%{transform:translateX(0)}26.59%{transform:translateX(5px)}}
+@keyframes la4{0%,6.82%{opacity:1}9.09%,30%{opacity:0}31.82%,100%{opacity:1}}
+@keyframes lp4{0%,30%,32.36%,100%{transform:translateX(0)}31.14%{transform:translateX(5px)}}
+@keyframes rw0{0%,6.82%{opacity:1}10.45%,22.73%{opacity:0.25}24.55%,58.18%{opacity:1}60.91%,91.82%{opacity:0.25}94.55%,100%{opacity:1}}
+@keyframes rw1{0%,6.82%{opacity:1}10.45%,29.09%{opacity:0.25}30.91%,100%{opacity:1}}
+@keyframes rw2{0%,6.82%{opacity:1}10.45%,35.45%{opacity:0.25}37.27%,100%{opacity:1}}
+@keyframes rw3{0%,6.82%{opacity:1}10.45%,38.18%{opacity:0.25}40%,100%{opacity:1}}
+@keyframes r1o{0%{opacity:1}43.64%{opacity:1}45%{opacity:0}62.27%{opacity:0}63.64%{opacity:1}70%{opacity:1}71.36%{opacity:0}85%{opacity:0}86.36%{opacity:1}100%{opacity:1}}
+@keyframes r1a{0%{opacity:0}45%{opacity:0}46.36%{opacity:1}60.91%{opacity:1}62.27%{opacity:0}71.36%{opacity:0}72.73%{opacity:1}83.64%{opacity:1}85%{opacity:0}100%{opacity:0}}
+@keyframes r2o{0%{opacity:1}47.27%{opacity:1}48.64%{opacity:0}56.82%{opacity:0}58.18%{opacity:1}100%{opacity:1}}
+@keyframes r2a{0%{opacity:0}48.64%{opacity:0}50%{opacity:1}55.45%{opacity:1}56.82%{opacity:0}100%{opacity:0}}
+@keyframes r3o{0%{opacity:1}73.64%{opacity:1}75%{opacity:0}82.27%{opacity:0}83.64%{opacity:1}100%{opacity:1}}
+@keyframes r3a{0%{opacity:0}75%{opacity:0}76.36%{opacity:1}80.91%{opacity:1}82.27%{opacity:0}100%{opacity:0}}
+@keyframes gw{0%,6.82%{transform:scaleX(1)}10.45%,24.55%{transform:scaleX(0)}28.18%,58.18%{transform:scaleX(1)}60.91%,92.73%{transform:scaleX(0)}95.45%,100%{transform:scaleX(1)}}
+@keyframes gwt{0%,6.82%{opacity:1}9.09%,27.73%{opacity:0}29.09%,58.18%{opacity:1}59.55%,95.45%{opacity:0}96.82%,100%{opacity:1}}
+@keyframes gl{0%,6.82%{transform:scaleX(1)}10.45%,30.91%{transform:scaleX(0)}34.55%,43.64%{transform:scaleX(1)}47.27%,60.91%{transform:scaleX(0)}65.45%,70%{transform:scaleX(1.0584)}73.64%,83.64%{transform:scaleX(0)}88.18%,91.82%{transform:scaleX(1.0584)}95.45%,100%{transform:scaleX(1)}}
+@keyframes glt{0%,6.82%{opacity:1}9.09%,34.09%{opacity:0}35.45%,43.64%{opacity:1}45%,94.55%{opacity:0}96.36%,100%{opacity:1}}
+@keyframes gs1{0%,60.91%{opacity:1;transform:scaleX(0)}65.45%,70%{opacity:1;transform:scaleX(1)}73.64%,83.64%{opacity:1;transform:scaleX(0)}88.18%,91.82%{opacity:1;transform:scaleX(1)}95.45%,100%{opacity:1;transform:scaleX(0)}}
+@keyframes gsb{0%,64.55%{opacity:0}66.36%,70%{opacity:1}71.36%,87.27%{opacity:0}89.09%,91.82%{opacity:1}93.18%,100%{opacity:0}}
+@keyframes gst{0%,64.55%{opacity:0}66.36%,69.09%{opacity:1}70.45%,87.73%{opacity:0}89.55%,91.36%{opacity:1}92.73%,100%{opacity:0}}
+@keyframes gc{0%,47.27%{opacity:1;transform:scaleX(0)}50.91%,55.45%{opacity:1;transform:scaleX(1)}58.18%,100%{opacity:1;transform:scaleX(0)}}
+@keyframes gct{0%,50.45%{opacity:0}51.82%,54.55%{opacity:1}55.91%,100%{opacity:0}}
+@keyframes ga{0%,73.64%{opacity:1;transform:scaleX(0)}77.27%,80.91%{opacity:1;transform:scaleX(1)}83.64%,100%{opacity:1;transform:scaleX(0)}}
+@keyframes gat{0%,76.82%{opacity:0}78.18%,80.45%{opacity:1}81.59%,100%{opacity:0}}
+@keyframes f1{0%{opacity:0;stroke-dashoffset:18}11.27%{opacity:0;stroke-dashoffset:18}11.36%{opacity:1;stroke-dashoffset:18}15%{opacity:1;stroke-dashoffset:-100}15.09%{opacity:0;stroke-dashoffset:-100}100%{opacity:0;stroke-dashoffset:-100}}
+@keyframes f2{0%{opacity:0;stroke-dashoffset:18}13.55%{opacity:0;stroke-dashoffset:18}13.64%{opacity:1;stroke-dashoffset:18}17.27%{opacity:1;stroke-dashoffset:-100}17.36%{opacity:0;stroke-dashoffset:-100}100%{opacity:0;stroke-dashoffset:-100}}
+@keyframes f3{0%{opacity:0;stroke-dashoffset:18}15.82%{opacity:0;stroke-dashoffset:18}15.91%{opacity:1;stroke-dashoffset:18}19.55%{opacity:1;stroke-dashoffset:-100}19.64%{opacity:0;stroke-dashoffset:-100}100%{opacity:0;stroke-dashoffset:-100}}
+@keyframes f4{0%{opacity:0;stroke-dashoffset:18}18.09%{opacity:0;stroke-dashoffset:18}18.18%{opacity:1;stroke-dashoffset:18}21.82%{opacity:1;stroke-dashoffset:-100}21.91%{opacity:0;stroke-dashoffset:-100}100%{opacity:0;stroke-dashoffset:-100}}
+@keyframes cw{0%{opacity:0;stroke-dashoffset:18}24.45%{opacity:0;stroke-dashoffset:18}24.55%{opacity:1;stroke-dashoffset:18}27.27%{opacity:1;stroke-dashoffset:-100}27.36%{opacity:0;stroke-dashoffset:-100}92.64%{opacity:0;stroke-dashoffset:18}92.73%{opacity:1;stroke-dashoffset:18}95.45%{opacity:1;stroke-dashoffset:-100}95.55%{opacity:0;stroke-dashoffset:-100}100%{opacity:0;stroke-dashoffset:-100}}
+@keyframes cl{0%{opacity:0;stroke-dashoffset:18}30.82%{opacity:0;stroke-dashoffset:18}30.91%{opacity:1;stroke-dashoffset:18}33.64%{opacity:1;stroke-dashoffset:-100}33.73%{opacity:0;stroke-dashoffset:-100}60.82%{opacity:0;stroke-dashoffset:18}60.91%{opacity:1;stroke-dashoffset:18}63.64%{opacity:1;stroke-dashoffset:-100}63.73%{opacity:0;stroke-dashoffset:-100}83.55%{opacity:0;stroke-dashoffset:18}83.64%{opacity:1;stroke-dashoffset:18}86.36%{opacity:1;stroke-dashoffset:-100}86.45%{opacity:0;stroke-dashoffset:-100}100%{opacity:0;stroke-dashoffset:-100}}
+@keyframes cc{0%{opacity:0;stroke-dashoffset:18}47.18%{opacity:0;stroke-dashoffset:18}47.27%{opacity:1;stroke-dashoffset:18}50%{opacity:1;stroke-dashoffset:-100}50.09%{opacity:0;stroke-dashoffset:-100}100%{opacity:0;stroke-dashoffset:-100}}
+@keyframes ca{0%{opacity:0;stroke-dashoffset:18}73.55%{opacity:0;stroke-dashoffset:18}73.64%{opacity:1;stroke-dashoffset:18}76.36%{opacity:1;stroke-dashoffset:-100}76.45%{opacity:0;stroke-dashoffset:-100}100%{opacity:0;stroke-dashoffset:-100}}
 @media (prefers-reduced-motion:reduce){.a{animation:none!important}}
 </style>
 <marker id="m" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#4a4a4a"/></marker>
@@ -142,14 +144,22 @@
 </g>
 </g>
 <g class="a rw3">
+<g class="a r3o">
 <rect x="579.5" y="220.5" width="95" height="18" rx="5" fill="none" stroke="#ffb400" stroke-width="1.3" stroke-dasharray="4 2"/>
 <text x="627" y="234" text-anchor="middle" font-size="11" font-weight="600" fill="#ffb400">3 API req.</text>
 <text x="683" y="234" font-size="11" fill="#ffffff">· waits</text>
+</g>
+<g class="a r3a" opacity="0">
+<rect x="579" y="220" width="96" height="19" rx="5" fill="#ffb400"/>
+<text x="627" y="234" text-anchor="middle" font-size="11" font-weight="600" fill="#1f2328">3 API req.</text>
+<text x="683" y="234" font-size="11" fill="#ffffff">▶ runs</text>
+</g>
 </g>
 <path d="M747,165.0 L775,165.0" stroke="#4a4a4a" stroke-width="1.8" marker-end="url(#m)"/>
 <path class="a fl cw" d="M747,165.0 L775,165.0" pathLength="100" stroke="#00b37e" stroke-width="3.5" opacity="0"/>
 <path class="a fl cl" d="M747,165.0 L775,165.0" pathLength="100" stroke="#a66cff" stroke-width="3.5" opacity="0"/>
 <path class="a fl cc" d="M747,165.0 L775,165.0" pathLength="100" stroke="#3d8bff" stroke-width="3.5" opacity="0"/>
+<path class="a fl ca" d="M747,165.0 L775,165.0" pathLength="100" stroke="#ffb400" stroke-width="3.5" opacity="0"/>
 <g filter="url(#sh)"><rect x="779" y="80" width="191" height="170" rx="16" fill="#ffffff" stroke="#00b37e" stroke-width="3.8"/></g>
 <text x="874.5" y="106" text-anchor="middle" font-size="16" font-weight="700" fill="#1f1f1f">2 GPUs</text>
 <text x="793" y="127" font-size="10" font-weight="600" fill="#4a4a4a">GPU 0 · 24 GB</text>
@@ -163,6 +173,12 @@
 <rect class="a sx gw" x="793" y="177" width="30.6" height="24" rx="4" fill="#00b37e"/>
 <text class="a gwt" x="808.3" y="193.5" text-anchor="middle" font-size="10" font-weight="600" fill="#ffffff">3G</text>
 <text class="a gwt" x="830" y="193.5" font-size="11" font-weight="600" fill="#1f1f1f">Whisper</text>
+<rect class="a sx gs1" x="793" y="177" width="122.25" height="24" rx="4" fill="#a66cff" opacity="0"/>
+<rect class="a gsb" x="899.25" y="154" width="16" height="25" fill="#a66cff" opacity="0"/>
+<text class="a gst" x="846.12" y="148.5" text-anchor="middle" font-size="11" font-weight="600" fill="#ffffff" opacity="0">LLM 30G, split</text>
+<text class="a gst" x="846.12" y="193.5" text-anchor="middle" font-size="11" font-weight="600" fill="#ffffff" opacity="0">LLM 30G, split</text>
+<rect class="a sx ga" x="793" y="177" width="163" height="24" rx="4" fill="#ffb400" opacity="0"/>
+<text class="a gat" x="874.5" y="193.5" text-anchor="middle" font-size="11" font-weight="600" fill="#1f2328" opacity="0">API req., whole card</text>
 <text x="874.5" y="222" text-anchor="middle" font-size="11" fill="#4a4a4a">Whisper takes the free card.</text>
 <text x="874.5" y="238" text-anchor="middle" font-size="11" fill="#4a4a4a">ComfyUI next: the LLM unloads.</text>
 <text x="672.0" y="305" text-anchor="middle" font-size="12.5" fill="#4a4a4a">gpuq hands out the GPUs by priority and free VRAM.</text>
