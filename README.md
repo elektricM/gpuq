@@ -13,10 +13,32 @@ turn, by priority and free VRAM.
 
 ![gpuq overview](docs/overview.svg)
 
-It works with any program that uses the GPU: renders, video encodes, simulations, games,
-compute jobs, and AI tools such as LLM servers and image generators.
+It is meant for a home server or workstation where several programs share the GPUs. It works
+with any program that uses the GPU: renders, video encodes, simulations, games, compute jobs,
+and AI tools such as LLM servers and image generators.
 
 gpuq is in early development. The configuration format may change before 1.0.
+
+## Quick start
+
+```sh
+cargo install gpuq
+mkdir -p ~/.config/gpuq
+printf '[llm]\nbackend = "none"\n' > ~/.config/gpuq/config.toml
+gpuq check-config        # lists the GPUs gpuq found
+gpuq daemon
+```
+
+In another terminal:
+
+```sh
+gpuq run --class batch --vram 8G -- blender -b scene.blend -a
+gpuq status              # the lease, the queue and each card's VRAM
+```
+
+A second `gpuq run` that does not fit next to the first waits in the queue until the card has
+room. To put an LLM server or a service behind gpuq, see
+[docs/integrations.md](docs/integrations.md).
 
 How the scheduler works inside, with a diagram: [docs/how-it-works.md](docs/how-it-works.md).
 
@@ -33,6 +55,9 @@ How the scheduler works inside, with a diagram: [docs/how-it-works.md](docs/how-
   from PCI addresses; integrated GPUs can be left out
 - Jobs on one card, on any card with room, or on several cards at once, granted all together
 - LLM servers split over several cards, unloaded and reloaded on all of them together
+- Optional per-class model hold: while an important client uses the LLM server, requests for
+  other models from less important clients wait, so a server with one model at a time does
+  not swap back and forth
 - AMD and NVIDIA VRAM probes, plus a custom probe command
 - Optional: the graphical desktop is stopped or moved to another GPU while its VRAM is needed,
   and given back afterwards
@@ -66,7 +91,7 @@ without network access. Recipes for the AUR, Fedora and openSUSE, Ubuntu and Nix
 
 ## Usage
 
-Minimal configuration, `/etc/gpuq/config.toml`:
+Minimal system configuration, `/etc/gpuq/config.toml`:
 
 ```toml
 [llm]
@@ -77,7 +102,7 @@ gpuq detects the GPUs itself. To leave one out, for example the CPU's integrated
 `exclude = ["0000:15:00.0"]` (its PCI address, shown by `gpuq check-config`) or
 `skip_integrated = true` to a `[gpu]` table.
 
-Start the daemon:
+Start the daemon as a service:
 
 ```sh
 gpuq check-config
@@ -102,8 +127,9 @@ Other commands:
 ```
 gpuq status          show the current lease holders and the queue
 gpuq hold            hold the GPU until interrupted
-gpuq check-config    validate the configuration and read the GPU
+gpuq check-config    validate the configuration and read the GPUs
 gpuq daemon          run the scheduler
+gpuq desktop         see "The desktop" below
 ```
 
 To run an LLM server behind gpuq, see [docs/integrations.md](docs/integrations.md).
