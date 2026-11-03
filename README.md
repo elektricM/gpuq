@@ -29,7 +29,7 @@ signals a lower-priority job so it can exit cleanly. HTTP requests to Ollama, Co
 similar servers are held until the card is free, so their clients do not need to know about
 gpuq.
 
-It is for a home server where Ollama, ComfyUI, Whisper and Immich share one card, a gaming PC
+It is for a home server where Ollama, ComfyUI and Whisper share one card, a gaming PC
 whose card also runs local AI, or a lab machine where several people run jobs on the same
 GPUs.
 
