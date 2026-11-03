@@ -7,6 +7,8 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-11-03
+
 ### Added
 
 - `[service.control] kind = "http"`: for servers that unload their model through their own
@@ -189,7 +191,8 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Control API and the `daemon`, `check-config`, `status`, `run` and `hold` commands.
 - Static musl binaries, `.deb` and `.rpm` packages, and a PKGBUILD.
 
-[Unreleased]: https://github.com/elektricM/gpuq/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/elektricM/gpuq/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/elektricM/gpuq/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/elektricM/gpuq/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/elektricM/gpuq/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/elektricM/gpuq/compare/v0.2.0...v0.3.0
