@@ -15,12 +15,10 @@ rustPlatform.buildRustPackage (finalAttrs: {
     owner = "elektricM";
     repo = "gpuq";
     tag = "v${finalAttrs.version}";
-    # Fill in after the v0.4.0 tag exists (packaging/README.md, release checklist step 3).
-    hash = lib.fakeHash;
+    hash = "sha256-bfdDLevG2MydVponLdnnf9SKtW8+Zh5lHnlOZ+CK0AA=";
   };
 
-  # Fill in after the v0.4.0 tag exists.
-  cargoHash = lib.fakeHash;
+  cargoHash = "sha256-2pmRwkTlQHyIgIBmt9LrUo2qAmItHt8MJzVv3d4rNp4=";
 
   nativeBuildInputs = [ installShellFiles ];
 

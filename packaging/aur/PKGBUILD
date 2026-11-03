@@ -11,8 +11,7 @@ makedepends=(cargo)
 backup=('etc/gpuq/config.toml')
 options=('!lto')  # makepkg's LTO flags break ring's assembly at link time
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
-# Fill in after the v0.4.0 tag exists (packaging/README.md, release checklist step 3).
-sha256sums=('TODO-fill-after-the-v0.4.0-tag')
+sha256sums=('8dcf4ddc914a2dad153c6b62e5f98754888a781d37093b6eb2a0325f4525a246')
 
 prepare() {
   cd "$pkgname-$pkgver"
