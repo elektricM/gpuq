@@ -8,7 +8,7 @@
 %global _lto_cflags %{nil}
 
 Name:           gpuq
-Version:        0.4.0
+Version:        0.4.1
 Release:        1%{?dist}
 Summary:        GPU scheduler for Linux
 # gpuq is GPL-3.0-or-later; the rest covers the vendored crates linked into the binary.
@@ -117,6 +117,11 @@ cargo test --offline --locked %{?_smp_mflags}
 %{_datadir}/fish/vendor_completions.d/%{name}.fish
 
 %changelog
+* Tue Nov 03 2026 Martin Dolez <martin@dolez.fr> - 0.4.1-1
+- Unload models through the server's own API (Stable Diffusion web UIs, LM Studio,
+  text-generation-webui)
+- install.sh and a Docker Compose example
+
 * Tue Nov 03 2026 Martin Dolez <martin@dolez.fr> - 0.4.0-1
 - Optional desktop release: stop the desktop or move it to another card
 - Hold other LLM models while a more important class uses the server
