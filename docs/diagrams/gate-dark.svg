@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="460" viewBox="0 0 880 460" role="img" aria-labelledby="t d">
+<title id="t">The HTTP gate</title>
+<desc id="d">Open WebUI and scripts talk to the LLM gate on port 11434, which forwards to Ollama or llama-swap. A browser talks to the service gate on port 8188, which forwards to ComfyUI. A chat request that arrives while a job has the GPU is held; when the job ends the model is reloaded and the request is passed through. Requests that need no GPU go straight through. Clients keep their URL and never see gpuq.</desc>
+<defs>
+<style>
+text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans",Helvetica,Arial,sans-serif;font-size:15px;fill:#e6edf3}
+.mono{font-family:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace}
+.h1{font-size:21px;font-weight:700}.h2{font-size:16px;font-weight:600}.sm{font-size:13px}.b{font-weight:600}
+.mid{text-anchor:middle}.end{text-anchor:end}
+.mut{fill:#9198a1}
+.panel{fill:#161b22;stroke:#30363d;stroke-width:1}
+.card{fill:#0d1117;stroke:#3d444d;stroke-width:1}
+.free{fill:#262c36}
+.edge{fill:none;stroke:#9198a1;stroke-width:1.5}
+.ln{fill:none;stroke:#656c76;stroke-width:1.6}.hd{fill:#656c76}
+.dash{stroke-dasharray:5 4}
+.box{stroke-width:1.5}
+.llm .box{fill:#271a40;stroke:#a371f7}.llm text{fill:#d2a8ff}.llm .bar{fill:#8957e5}
+.svc .box{fill:#0c2240;stroke:#4493f8}.svc text{fill:#79c0ff}.svc .bar{fill:#1f6feb}
+.job .box{fill:#2f1a0b;stroke:#db6d28}.job text{fill:#ffa657}.job .bar{fill:#bd561d}
+.gq .box{fill:#0f2a18;stroke:#3fb950}.gq text{fill:#7ee787}.gq .bar{fill:#238636}
+.err .box{fill:#3a1416;stroke:#f85149}.err text{fill:#ffa198}.err .bar{fill:#da3633}.hatch{stroke:#f85149}
+.wait .box{fill:#161b22;stroke:#656c76;stroke-dasharray:5 4}.wait text{fill:#9198a1}
+.cli .box{fill:#161b22;stroke:#656c76}.cli text{fill:#e6edf3}
+g text.on{fill:#ffffff}
+.dot{fill:#30363d}.dot+text{fill:#e6edf3}
+</style>
+<marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="hd" d="M0,0 L10,5 L0,10 z"/></marker>
+</defs>
+<rect class="panel" x="0.5" y="0.5" width="879" height="459" rx="14"/>
+<text class="h1" x="24" y="40">The HTTP gate</text>
+<text class="mut" x="24" y="64">Clients keep their URL. They never see gpuq.</text>
+
+<!-- clients -->
+<g class="cli"><rect class="box" x="24" y="96" width="180" height="50" rx="10"/><text class="b" x="40" y="126">Open WebUI</text></g>
+<g class="cli"><rect class="box" x="24" y="158" width="180" height="50" rx="10"/><text class="b" x="40" y="188">scripts, curl</text></g>
+<g class="cli"><rect class="box" x="24" y="220" width="180" height="50" rx="10"/><text class="b" x="40" y="250">browser</text></g>
+
+<!-- gpuq -->
+<g class="gq"><rect class="box" x="284" y="88" width="312" height="194" rx="12"/>
+<text class="mono h2" x="300" y="114">gpuq</text></g>
+<rect class="card" x="300" y="128" width="280" height="58" rx="8"/>
+<text class="b" x="316" y="152">LLM gate</text><text class="mono sm mut end" x="564" y="152">:11434</text>
+<text class="sm mut" x="316" y="174">holds chat while a job has the GPU</text>
+<rect class="card" x="300" y="208" width="280" height="58" rx="8"/>
+<text class="b" x="316" y="232">service gate</text><text class="mono sm mut end" x="564" y="232">:8188</text>
+<text class="sm mut" x="316" y="254">holds requests, starts the service</text>
+
+<!-- backends -->
+<g class="llm"><rect class="box" x="676" y="132" width="180" height="50" rx="10"/><text class="b" x="692" y="162">Ollama, llama-swap</text></g>
+<g class="svc"><rect class="box" x="676" y="212" width="180" height="50" rx="10"/><text class="b" x="692" y="242">ComfyUI</text></g>
+
+<path class="ln" d="M206,121 C250,121 256,148 296,150" marker-end="url(#ah)"/>
+<path class="ln" d="M206,183 C250,183 256,164 296,163" marker-end="url(#ah)"/>
+<path class="ln" d="M206,245 H296" marker-end="url(#ah)"/>
+<path class="ln" d="M582,157 H672" marker-end="url(#ah)"/>
+<path class="ln" d="M582,237 H672" marker-end="url(#ah)"/>
+
+<!-- one request -->
+<text class="b" x="24" y="324">A chat request while the GPU is busy</text>
+<g class="cli"><rect class="box" x="24" y="340" width="190" height="60" rx="10"/>
+<text class="b" x="40" y="364">Arrives</text><text class="mono sm" x="40" y="386">POST /api/chat</text></g>
+<g class="job"><rect class="box" x="236" y="340" width="190" height="60" rx="10"/>
+<text class="b" x="252" y="364">Held</text><text class="sm" x="252" y="386">a job has the card</text></g>
+<g class="llm"><rect class="box" x="448" y="340" width="190" height="60" rx="10"/>
+<text class="b" x="464" y="364">Job ends</text><text class="sm" x="464" y="386">the model is reloaded</text></g>
+<g class="gq"><rect class="box" x="660" y="340" width="196" height="60" rx="10"/>
+<text class="b" x="676" y="364">Passed through</text><text class="sm" x="676" y="386">the answer streams back</text></g>
+<path class="ln" d="M215,370 H232" marker-end="url(#ah)"/>
+<path class="ln" d="M427,370 H444" marker-end="url(#ah)"/>
+<path class="ln" d="M639,370 H656" marker-end="url(#ah)"/>
+<text class="sm mut" x="24" y="432">Requests that need no GPU, such as model lists and status pages, go straight through.</text>
+</svg>

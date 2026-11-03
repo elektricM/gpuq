@@ -1,3 +1,0 @@
-#!/bin/sh
-# Stand-in for a training run: 22 GiB for 6 s.
-exec gpu-work 6 22528

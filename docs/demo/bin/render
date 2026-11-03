@@ -1,3 +1,0 @@
-#!/bin/sh
-# Stand-in for a render job: 8 GiB for 5 s.
-exec gpu-work 5 8192

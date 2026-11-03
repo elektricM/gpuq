@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="610" viewBox="0 0 880 610" role="img" aria-labelledby="t d">
+<title id="t">What happens to a request</title>
+<desc id="d">A program asks for a lease with a class, VRAM and card. If it fits next to what runs on the card, it is granted. If not, gpuq makes room: it unloads the LLM model once the chat has been quiet, stops a lower-priority service through systemd, Docker or Podman, or signals a lower-priority job; when nothing can move, the request waits in the queue by priority, then arrival. When room is freed it checks again. A granted program runs until the client disconnects, which ends the lease. When the card is idle the model is reloaded.</desc>
+<defs>
+<style>
+text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans",Helvetica,Arial,sans-serif;font-size:15px;fill:#1f2328}
+.mono{font-family:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace}
+.h1{font-size:21px;font-weight:700}.h2{font-size:16px;font-weight:600}.sm{font-size:13px}.b{font-weight:600}
+.mid{text-anchor:middle}.end{text-anchor:end}
+.mut{fill:#59636e}
+.panel{fill:#f6f8fa;stroke:#d1d9e0;stroke-width:1}
+.card{fill:#ffffff;stroke:#d1d9e0;stroke-width:1}
+.free{fill:#e6eaef}
+.edge{fill:none;stroke:#59636e;stroke-width:1.5}
+.ln{fill:none;stroke:#8c959f;stroke-width:1.6}.hd{fill:#8c959f}
+.dash{stroke-dasharray:5 4}
+.box{stroke-width:1.5}
+.llm .box{fill:#fbefff;stroke:#8250df}.llm text{fill:#6639ba}.llm .bar{fill:#8250df}
+.svc .box{fill:#ddf4ff;stroke:#0969da}.svc text{fill:#0550ae}.svc .bar{fill:#0969da}
+.job .box{fill:#fff1e5;stroke:#bc4c00}.job text{fill:#953800}.job .bar{fill:#d4600d}
+.gq .box{fill:#dafbe1;stroke:#1a7f37}.gq text{fill:#116329}.gq .bar{fill:#1f883d}
+.err .box{fill:#ffebe9;stroke:#cf222e}.err text{fill:#a40e26}.err .bar{fill:#cf222e}.hatch{stroke:#cf222e}
+.wait .box{fill:#ffffff;stroke:#8c959f;stroke-dasharray:5 4}.wait text{fill:#59636e}
+.cli .box{fill:#ffffff;stroke:#8c959f}.cli text{fill:#1f2328}
+g text.on{fill:#ffffff}
+.dot{fill:#d1d9e0}.dot+text{fill:#1f2328}
+</style>
+<marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="hd" d="M0,0 L10,5 L0,10 z"/></marker>
+</defs>
+<rect class="panel" x="0.5" y="0.5" width="879" height="609" rx="14"/>
+
+<!-- main column -->
+<g class="cli"><rect class="box" x="44" y="24" width="360" height="80" rx="10"/>
+<text class="h2" x="64" y="52">A program asks for a lease</text>
+<text class="mono sm" x="64" y="76">--class batch --vram 8G</text>
+<text class="sm mut" x="64" y="94">gpuq run, a managed service, the lease API</text></g>
+<path class="ln" d="M224,106 V136" marker-end="url(#ah)"/>
+
+<path class="card" d="M224,140 L364,196 L224,252 L84,196 Z" stroke-width="1.5"/>
+<text class="h2 mid" x="224" y="192">Fits next to what</text>
+<text class="h2 mid" x="224" y="213">runs on the card?</text>
+
+<path class="ln" d="M224,254 V292" marker-end="url(#ah)"/>
+<text class="sm b mut" x="236" y="279">yes</text>
+
+<g class="gq"><rect class="box" x="44" y="296" width="360" height="70" rx="10"/>
+<text class="h2" x="64" y="324">Granted, it runs</text>
+<text class="sm" x="64" y="348">CUDA_VISIBLE_DEVICES points at its card</text></g>
+<path class="ln" d="M224,368 V398" marker-end="url(#ah)"/>
+
+<g class="cli"><rect class="box" x="44" y="402" width="360" height="70" rx="10"/>
+<text class="h2" x="64" y="430">The client disconnects</text>
+<text class="sm mut" x="64" y="454">exit, crash or end of request: the lease ends</text></g>
+<path class="ln" d="M224,474 V504" marker-end="url(#ah)"/>
+
+<g class="llm"><rect class="box" x="44" y="508" width="360" height="70" rx="10"/>
+<text class="h2" x="64" y="536">The card is idle: model reloaded</text>
+<text class="sm" x="64" y="560">with its KV cache, where the server can</text></g>
+
+<!-- no branch -->
+<path class="ln" d="M366,196 H474" marker-end="url(#ah)"/>
+<text class="sm b mut" x="406" y="186">no</text>
+
+<rect class="card" x="480" y="140" width="376" height="400" rx="12"/>
+<text class="h2" x="500" y="170">Make room, or wait</text>
+<text class="sm mut" x="500" y="192">Only what is less important or idle moves.</text>
+
+<g class="llm"><rect class="box" x="500" y="210" width="336" height="62" rx="8"/>
+<text class="b" x="516" y="235">LLM model loaded</text>
+<text class="sm" x="516" y="257">unloaded once the chat has been quiet</text></g>
+<g class="svc"><rect class="box" x="500" y="284" width="336" height="62" rx="8"/>
+<text class="b" x="516" y="309">Lower-priority service</text>
+<text class="sm" x="516" y="331">stopped: systemd, Docker, Podman</text></g>
+<g class="job"><rect class="box" x="500" y="358" width="336" height="62" rx="8"/>
+<text class="b" x="516" y="383">Lower-priority job</text>
+<text class="sm" x="516" y="405">gets a signal, saves its work and exits</text></g>
+<g class="wait"><rect class="box" x="500" y="432" width="336" height="62" rx="8"/>
+<text class="b" x="516" y="457">Nothing can move</text>
+<text class="sm" x="516" y="479">waits in the queue: priority, then arrival</text></g>
+<text class="sm mut" x="500" y="522">Nothing is killed.</text>
+
+<!-- back to the check -->
+<path class="ln" d="M668,138 V120 H230" marker-end="url(#ah)"/>
+<text class="sm b mut" x="668" y="112" text-anchor="middle">room freed: check again</text>
+</svg>

@@ -1,8 +1,0 @@
-#!/bin/sh
-# Fake GPU job for the demo: holds MIB of pretend VRAM on the card gpuq granted, for SECS.
-# Usage: gpu-work SECS MIB
-dir="${GPUQ_DEMO:-/tmp/gpuq-demo}/vram/${GPUQ_CARD:?run me through gpuq run}"
-mkdir -p "$dir"
-echo "$2" > "$dir/$$.job"
-sleep "$1"
-rm -f "$dir/$$.job"

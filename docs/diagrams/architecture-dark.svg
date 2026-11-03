@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="530" viewBox="0 0 880 530" role="img" aria-labelledby="t d">
+<title id="t">gpuq architecture</title>
+<desc id="d">gpuq run, HTTP clients, managed services and programs using the lease API reach gpuq through its gates and its control API. The arbiter keeps one queue by priority and arrival, tracks VRAM per card and makes room by asking jobs to yield, unloading the LLM, stopping services or the desktop. It places work on gpu0 and gpu1; the integrated GPU is excluded. The LLM server is split over gpu0 and gpu1.</desc>
+<defs>
+<style>
+text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans",Helvetica,Arial,sans-serif;font-size:15px;fill:#e6edf3}
+.mono{font-family:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace}
+.h1{font-size:21px;font-weight:700}.h2{font-size:16px;font-weight:600}.sm{font-size:13px}.b{font-weight:600}
+.mid{text-anchor:middle}.end{text-anchor:end}
+.mut{fill:#9198a1}
+.panel{fill:#161b22;stroke:#30363d;stroke-width:1}
+.card{fill:#0d1117;stroke:#3d444d;stroke-width:1}
+.free{fill:#262c36}
+.edge{fill:none;stroke:#9198a1;stroke-width:1.5}
+.ln{fill:none;stroke:#656c76;stroke-width:1.6}.hd{fill:#656c76}
+.dash{stroke-dasharray:5 4}
+.box{stroke-width:1.5}
+.llm .box{fill:#271a40;stroke:#a371f7}.llm text{fill:#d2a8ff}.llm .bar{fill:#8957e5}
+.svc .box{fill:#0c2240;stroke:#4493f8}.svc text{fill:#79c0ff}.svc .bar{fill:#1f6feb}
+.job .box{fill:#2f1a0b;stroke:#db6d28}.job text{fill:#ffa657}.job .bar{fill:#bd561d}
+.gq .box{fill:#0f2a18;stroke:#3fb950}.gq text{fill:#7ee787}.gq .bar{fill:#238636}
+.err .box{fill:#3a1416;stroke:#f85149}.err text{fill:#ffa198}.err .bar{fill:#da3633}.hatch{stroke:#f85149}
+.wait .box{fill:#161b22;stroke:#656c76;stroke-dasharray:5 4}.wait text{fill:#9198a1}
+.cli .box{fill:#161b22;stroke:#656c76}.cli text{fill:#e6edf3}
+g text.on{fill:#ffffff}
+.dot{fill:#30363d}.dot+text{fill:#e6edf3}
+</style>
+<marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="hd" d="M0,0 L10,5 L0,10 z"/></marker>
+</defs>
+<rect class="panel" x="0.5" y="0.5" width="879" height="529" rx="14"/>
+
+<!-- clients -->
+<g class="cli">
+<rect class="box" x="24" y="24" width="198" height="62" rx="10"/><text class="b" x="40" y="50">gpuq run</text><text class="sm mut" x="40" y="72">any command</text>
+<rect class="box" x="234" y="24" width="198" height="62" rx="10"/><text class="b" x="250" y="50">HTTP clients</text><text class="sm mut" x="250" y="72">Open WebUI, scripts</text>
+<rect class="box" x="444" y="24" width="198" height="62" rx="10"/><text class="b" x="460" y="50">Managed services</text><text class="sm mut" x="460" y="72">ComfyUI, SD web UIs</text>
+<rect class="box" x="654" y="24" width="202" height="62" rx="10"/><text class="b" x="670" y="50">Your program</text><text class="sm mut" x="670" y="72">the lease API</text>
+</g>
+<path class="ln" d="M123,88 V128" marker-end="url(#ah)"/>
+<path class="ln" d="M333,88 V128" marker-end="url(#ah)"/>
+<path class="ln" d="M543,88 V128" marker-end="url(#ah)"/>
+<path class="ln" d="M755,88 V128" marker-end="url(#ah)"/>
+
+<!-- gpuq -->
+<g class="gq"><rect class="box" x="24" y="132" width="832" height="232" rx="12"/>
+<text class="mono h2" x="40" y="158">gpuq daemon</text></g>
+<rect class="card" x="40" y="172" width="392" height="58" rx="8"/>
+<text class="b" x="56" y="196">Gates</text><text class="mono sm mut end" x="416" y="196">:11434 :8188</text>
+<text class="sm mut" x="56" y="218">hold HTTP requests until the card is free</text>
+<rect class="card" x="444" y="172" width="396" height="58" rx="8"/>
+<text class="b" x="460" y="196">Control API</text><text class="mono sm mut end" x="824" y="196">:9390</text>
+<text class="sm mut" x="460" y="218">a lease lasts as long as its connection</text>
+
+<text class="b" x="40" y="260">Arbiter</text>
+<rect class="card" x="40" y="272" width="256" height="76" rx="8"/>
+<text class="b" x="56" y="296">Queue</text>
+<text class="sm mut" x="56" y="318">priority class, then arrival;</text>
+<text class="sm mut" x="56" y="336">all of a lease's cards at once</text>
+<rect class="card" x="308" y="272" width="256" height="76" rx="8"/>
+<text class="b" x="324" y="296">VRAM per card</text>
+<text class="sm mut" x="324" y="318">measured, plus what each</text>
+<text class="sm mut" x="324" y="336">lease declared</text>
+<rect class="card" x="576" y="272" width="264" height="76" rx="8"/>
+<text class="b" x="592" y="296">Make room</text>
+<text class="sm mut" x="592" y="318">ask jobs to yield, unload the</text>
+<text class="sm mut" x="592" y="336">LLM, stop services or the desktop</text>
+
+<path class="ln" d="M162,366 V400" marker-end="url(#ah)"/>
+<path class="ln" d="M450,366 V400" marker-end="url(#ah)"/>
+
+<!-- cards -->
+<rect class="card" x="24" y="404" width="276" height="56" rx="10"/>
+<text class="b" x="40" y="430">gpu0</text><text class="sm mut end" x="284" y="430">24 GB</text>
+<text class="sm mut" x="40" y="450">jobs, or the LLM</text>
+<rect class="card" x="312" y="404" width="276" height="56" rx="10"/>
+<text class="b" x="328" y="430">gpu1</text><text class="sm mut end" x="572" y="430">16 GB</text>
+<text class="sm mut" x="328" y="450">jobs, or the LLM</text>
+<g class="wait"><rect class="box" x="600" y="404" width="256" height="56" rx="10"/>
+<text class="b" x="616" y="430">iGPU</text><text class="sm" x="616" y="450">excluded</text></g>
+<g class="llm"><rect class="box" x="24" y="470" width="564" height="40" rx="10"/>
+<text class="b" x="40" y="495">LLM server</text>
+<text class="sm end" x="572" y="495">llama-swap, Ollama, llama-server, vLLM, SGLang</text></g>
+</svg>
