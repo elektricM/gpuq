@@ -1,7 +1,17 @@
 # gpuq
 
-[![ci](https://github.com/elektricM/gpuq/actions/workflows/ci.yml/badge.svg)](https://github.com/elektricM/gpuq/actions/workflows/ci.yml)
-[![license](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
+[![CI status](https://github.com/elektricM/gpuq/actions/workflows/ci.yml/badge.svg)](https://github.com/elektricM/gpuq/actions/workflows/ci.yml)
+[![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
+
+gpuq lets several programs share your GPUs without running out of VRAM: it queues jobs,
+unloads LLM models and stops services until there is room.
+
+![Demo: two 24 GB GPUs. A model split over both is unloaded for three jobs, a fourth job waits for room, a chat request is held, and the model comes back on both cards.](docs/demo.gif)
+
+*Two 24 GB cards. A model split over both is unloaded for three jobs and a fourth waits for
+room. A chat request outranks the batch jobs, so the model comes back for it first, then for
+good. Pretend cards and stand-in programs ([docs/demo](docs/demo/)); the scheduling and every
+number shown come from gpuq.*
 
 ```
 torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 2.00 GiB. GPU 0 has a total
@@ -28,12 +38,6 @@ It is for a home server where Ollama, ComfyUI, Whisper and Immich share one card
 whose card also runs local AI, or a lab machine where several people run jobs on the same
 GPUs.
 
-![gpuq scheduling two cards](docs/demo.gif)
-
-*Two 24 GB cards. A model split over both is unloaded for three jobs, a fourth job waits for
-room, and the model comes back on both cards when the jobs are done. Recorded with pretend
-cards and stand-in programs ([docs/demo](docs/demo/)); the scheduling is gpuq's own.*
-
 ## Quick start
 
 ```sh
@@ -59,7 +63,7 @@ gpuq works with any program that uses the GPU, not only AI tools: renders, video
 simulations and compute jobs go through `gpuq run`. It is in early development; the
 configuration format may change before 1.0.
 
-![gpuq overview](docs/overview.svg)
+![Without gpuq, every program grabs the GPU and one runs out of memory. With gpuq, programs queue by priority class and each gets a card when there is room.](docs/overview.svg)
 
 How the scheduler works inside: [docs/how-it-works.md](docs/how-it-works.md).
 
