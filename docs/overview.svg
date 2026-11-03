@@ -1,53 +1,70 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1000" height="470" viewBox="0 0 1000 470" font-family="Inter, Helvetica, Arial, sans-serif">
 <defs>
 <style>
-.a{animation-duration:22s;animation-iteration-count:infinite;animation-timing-function:cubic-bezier(.45,0,.25,1);animation-fill-mode:both}
+.a{animation-duration:32s;animation-iteration-count:infinite;animation-timing-function:cubic-bezier(.45,0,.25,1);animation-fill-mode:both}
+.l{animation-duration:16s}
 .sx{transform-box:fill-box;transform-origin:0 50%}
 .fl{stroke-dasharray:18 200;stroke-linecap:round}
-.lbp{animation-name:lbp}.lbb{animation-name:lbb}.lov{animation-name:lov}.lask{animation-name:lask}.loom{animation-name:loom}.lgpu{animation-name:lgpu}.la1{animation-name:la1}.lp1{animation-name:lp1}.la2{animation-name:la2}.lp2{animation-name:lp2}.la3{animation-name:la3}.lp3{animation-name:lp3}.la4{animation-name:la4}.lp4{animation-name:lp4}.rw0{animation-name:rw0}.rw1{animation-name:rw1}.rw2{animation-name:rw2}.rw3{animation-name:rw3}.r1o{animation-name:r1o}.r1a{animation-name:r1a}.r2o{animation-name:r2o}.r2a{animation-name:r2a}.r3o{animation-name:r3o}.r3a{animation-name:r3a}.gw{animation-name:gw}.gwt{animation-name:gwt}.gl{animation-name:gl}.glt{animation-name:glt}.gs1{animation-name:gs1}.gsb{animation-name:gsb}.gst{animation-name:gst}.gc{animation-name:gc}.gct{animation-name:gct}.ga{animation-name:ga}.gat{animation-name:gat}.f1{animation-name:f1}.f2{animation-name:f2}.f3{animation-name:f3}.f4{animation-name:f4}.cw{animation-name:cw}.cl{animation-name:cl}.cc{animation-name:cc}.ca{animation-name:ca}
-@keyframes lbp{0%,6.82%{transform:scaleX(1)}10.45%,13.64%{transform:scaleX(0)}18.18%,100%{transform:scaleX(1)}}
-@keyframes lbb{0%,6.82%{transform:scaleX(1)}10.45%,20.73%{transform:scaleX(0)}24.36%,100%{transform:scaleX(1)}}
-@keyframes lov{0%,6.82%{opacity:1;transform:scaleX(1)}9.09%{opacity:0;transform:scaleX(1)}9.18%,27.18%{opacity:0;transform:scaleX(0)}27.27%{opacity:1;transform:scaleX(0)}29.45%,31.82%{opacity:1;transform:scaleX(.45)}34.05%,100%{opacity:1;transform:scaleX(1)}}
-@keyframes lask{0%,6.82%{opacity:1}9.09%,32%{opacity:0}34.18%,100%{opacity:1}}
-@keyframes loom{0%,6.82%{opacity:1}9.09%,33.45%{opacity:0}34.91%{opacity:1}36.73%{opacity:0.15}38.55%{opacity:1}40.36%{opacity:0.15}42.18%,100%{opacity:1}}
-@keyframes lgpu{0%,6.82%{stroke:#ff4d4d}9.45%,32%{stroke:#1f1f1f}34.18%,100%{stroke:#ff4d4d}}
-@keyframes la1{0%,6.82%{opacity:1}9.09%,11.82%{opacity:0}13.64%,100%{opacity:1}}
-@keyframes lp1{0%,11.82%,14.18%,100%{transform:translateX(0)}12.95%{transform:translateX(5px)}}
-@keyframes la2{0%,6.82%{opacity:1}9.09%,18.91%{opacity:0}20.73%,100%{opacity:1}}
-@keyframes lp2{0%,18.91%,21.27%,100%{transform:translateX(0)}20.05%{transform:translateX(5px)}}
-@keyframes la3{0%,6.82%{opacity:1}9.09%,25.45%{opacity:0}27.27%,100%{opacity:1}}
-@keyframes lp3{0%,25.45%,27.82%,100%{transform:translateX(0)}26.59%{transform:translateX(5px)}}
-@keyframes la4{0%,6.82%{opacity:1}9.09%,30%{opacity:0}31.82%,100%{opacity:1}}
-@keyframes lp4{0%,30%,32.36%,100%{transform:translateX(0)}31.14%{transform:translateX(5px)}}
-@keyframes rw0{0%,6.82%{opacity:1}10.45%,22.73%{opacity:0.25}24.55%,58.18%{opacity:1}60.91%,91.82%{opacity:0.25}94.55%,100%{opacity:1}}
-@keyframes rw1{0%,6.82%{opacity:1}10.45%,29.09%{opacity:0.25}30.91%,100%{opacity:1}}
-@keyframes rw2{0%,6.82%{opacity:1}10.45%,35.45%{opacity:0.25}37.27%,100%{opacity:1}}
-@keyframes rw3{0%,6.82%{opacity:1}10.45%,38.18%{opacity:0.25}40%,100%{opacity:1}}
-@keyframes r1o{0%{opacity:1}43.64%{opacity:1}45%{opacity:0}62.27%{opacity:0}63.64%{opacity:1}70%{opacity:1}71.36%{opacity:0}85%{opacity:0}86.36%{opacity:1}100%{opacity:1}}
-@keyframes r1a{0%{opacity:0}45%{opacity:0}46.36%{opacity:1}60.91%{opacity:1}62.27%{opacity:0}71.36%{opacity:0}72.73%{opacity:1}83.64%{opacity:1}85%{opacity:0}100%{opacity:0}}
-@keyframes r2o{0%{opacity:1}47.27%{opacity:1}48.64%{opacity:0}56.82%{opacity:0}58.18%{opacity:1}100%{opacity:1}}
-@keyframes r2a{0%{opacity:0}48.64%{opacity:0}50%{opacity:1}55.45%{opacity:1}56.82%{opacity:0}100%{opacity:0}}
-@keyframes r3o{0%{opacity:1}73.64%{opacity:1}75%{opacity:0}82.27%{opacity:0}83.64%{opacity:1}100%{opacity:1}}
-@keyframes r3a{0%{opacity:0}75%{opacity:0}76.36%{opacity:1}80.91%{opacity:1}82.27%{opacity:0}100%{opacity:0}}
-@keyframes gw{0%,6.82%{transform:scaleX(1)}10.45%,24.55%{transform:scaleX(0)}28.18%,58.18%{transform:scaleX(1)}60.91%,92.73%{transform:scaleX(0)}95.45%,100%{transform:scaleX(1)}}
-@keyframes gwt{0%,6.82%{opacity:1}9.09%,27.73%{opacity:0}29.09%,58.18%{opacity:1}59.55%,95.45%{opacity:0}96.82%,100%{opacity:1}}
-@keyframes gl{0%,6.82%{transform:scaleX(1)}10.45%,30.91%{transform:scaleX(0)}34.55%,43.64%{transform:scaleX(1)}47.27%,60.91%{transform:scaleX(0)}65.45%,70%{transform:scaleX(1.0584)}73.64%,83.64%{transform:scaleX(0)}88.18%,91.82%{transform:scaleX(1.0584)}95.45%,100%{transform:scaleX(1)}}
-@keyframes glt{0%,6.82%{opacity:1}9.09%,34.09%{opacity:0}35.45%,43.64%{opacity:1}45%,94.55%{opacity:0}96.36%,100%{opacity:1}}
-@keyframes gs1{0%,60.91%{opacity:1;transform:scaleX(0)}65.45%,70%{opacity:1;transform:scaleX(1)}73.64%,83.64%{opacity:1;transform:scaleX(0)}88.18%,91.82%{opacity:1;transform:scaleX(1)}95.45%,100%{opacity:1;transform:scaleX(0)}}
-@keyframes gsb{0%,64.55%{opacity:0}66.36%,70%{opacity:1}71.36%,87.27%{opacity:0}89.09%,91.82%{opacity:1}93.18%,100%{opacity:0}}
-@keyframes gst{0%,64.55%{opacity:0}66.36%,69.09%{opacity:1}70.45%,87.73%{opacity:0}89.55%,91.36%{opacity:1}92.73%,100%{opacity:0}}
-@keyframes gc{0%,47.27%{opacity:1;transform:scaleX(0)}50.91%,55.45%{opacity:1;transform:scaleX(1)}58.18%,100%{opacity:1;transform:scaleX(0)}}
-@keyframes gct{0%,50.45%{opacity:0}51.82%,54.55%{opacity:1}55.91%,100%{opacity:0}}
-@keyframes ga{0%,73.64%{opacity:1;transform:scaleX(0)}77.27%,80.91%{opacity:1;transform:scaleX(1)}83.64%,100%{opacity:1;transform:scaleX(0)}}
-@keyframes gat{0%,76.82%{opacity:0}78.18%,80.45%{opacity:1}81.59%,100%{opacity:0}}
-@keyframes f1{0%{opacity:0;stroke-dashoffset:18}11.27%{opacity:0;stroke-dashoffset:18}11.36%{opacity:1;stroke-dashoffset:18}15%{opacity:1;stroke-dashoffset:-100}15.09%{opacity:0;stroke-dashoffset:-100}100%{opacity:0;stroke-dashoffset:-100}}
-@keyframes f2{0%{opacity:0;stroke-dashoffset:18}13.55%{opacity:0;stroke-dashoffset:18}13.64%{opacity:1;stroke-dashoffset:18}17.27%{opacity:1;stroke-dashoffset:-100}17.36%{opacity:0;stroke-dashoffset:-100}100%{opacity:0;stroke-dashoffset:-100}}
-@keyframes f3{0%{opacity:0;stroke-dashoffset:18}15.82%{opacity:0;stroke-dashoffset:18}15.91%{opacity:1;stroke-dashoffset:18}19.55%{opacity:1;stroke-dashoffset:-100}19.64%{opacity:0;stroke-dashoffset:-100}100%{opacity:0;stroke-dashoffset:-100}}
-@keyframes f4{0%{opacity:0;stroke-dashoffset:18}18.09%{opacity:0;stroke-dashoffset:18}18.18%{opacity:1;stroke-dashoffset:18}21.82%{opacity:1;stroke-dashoffset:-100}21.91%{opacity:0;stroke-dashoffset:-100}100%{opacity:0;stroke-dashoffset:-100}}
-@keyframes cw{0%{opacity:0;stroke-dashoffset:18}24.45%{opacity:0;stroke-dashoffset:18}24.55%{opacity:1;stroke-dashoffset:18}27.27%{opacity:1;stroke-dashoffset:-100}27.36%{opacity:0;stroke-dashoffset:-100}92.64%{opacity:0;stroke-dashoffset:18}92.73%{opacity:1;stroke-dashoffset:18}95.45%{opacity:1;stroke-dashoffset:-100}95.55%{opacity:0;stroke-dashoffset:-100}100%{opacity:0;stroke-dashoffset:-100}}
-@keyframes cl{0%{opacity:0;stroke-dashoffset:18}30.82%{opacity:0;stroke-dashoffset:18}30.91%{opacity:1;stroke-dashoffset:18}33.64%{opacity:1;stroke-dashoffset:-100}33.73%{opacity:0;stroke-dashoffset:-100}60.82%{opacity:0;stroke-dashoffset:18}60.91%{opacity:1;stroke-dashoffset:18}63.64%{opacity:1;stroke-dashoffset:-100}63.73%{opacity:0;stroke-dashoffset:-100}83.55%{opacity:0;stroke-dashoffset:18}83.64%{opacity:1;stroke-dashoffset:18}86.36%{opacity:1;stroke-dashoffset:-100}86.45%{opacity:0;stroke-dashoffset:-100}100%{opacity:0;stroke-dashoffset:-100}}
-@keyframes cc{0%{opacity:0;stroke-dashoffset:18}47.18%{opacity:0;stroke-dashoffset:18}47.27%{opacity:1;stroke-dashoffset:18}50%{opacity:1;stroke-dashoffset:-100}50.09%{opacity:0;stroke-dashoffset:-100}100%{opacity:0;stroke-dashoffset:-100}}
-@keyframes ca{0%{opacity:0;stroke-dashoffset:18}73.55%{opacity:0;stroke-dashoffset:18}73.64%{opacity:1;stroke-dashoffset:18}76.36%{opacity:1;stroke-dashoffset:-100}76.45%{opacity:0;stroke-dashoffset:-100}100%{opacity:0;stroke-dashoffset:-100}}
+.lbp{animation-name:lbp}.lbb{animation-name:lbb}.lov{animation-name:lov}.lask{animation-name:lask}.loom{animation-name:loom}.lgpu{animation-name:lgpu}.la1{animation-name:la1}.lp1{animation-name:lp1}.la2{animation-name:la2}.lp2{animation-name:lp2}.la3{animation-name:la3}.lp3{animation-name:lp3}.la4{animation-name:la4}.lp4{animation-name:lp4}.rw0{animation-name:rw0}.rw1{animation-name:rw1}.rw2{animation-name:rw2}.rw3{animation-name:rw3}.r1o{animation-name:r1o}.r1a{animation-name:r1a}.r2o{animation-name:r2o}.r2a{animation-name:r2a}.r3o{animation-name:r3o}.r3a{animation-name:r3a}.gw{animation-name:gw}.gwt{animation-name:gwt}.gl{animation-name:gl}.glt{animation-name:glt}.gs1{animation-name:gs1}.gsb{animation-name:gsb}.gst{animation-name:gst}.gc{animation-name:gc}.gct{animation-name:gct}.ga{animation-name:ga}.gat{animation-name:gat}.gd{animation-name:gd}.gdt{animation-name:gdt}.gb{animation-name:gb}.gbt{animation-name:gbt}.ch{animation-name:ch}.chs{animation-name:chs}.cap0{animation-name:cap0}.cap2{animation-name:cap2}.cap3{animation-name:cap3}.cap4{animation-name:cap4}.cap5{animation-name:cap5}.sl1{animation-name:sl1}.sl2{animation-name:sl2}.sl3{animation-name:sl3}.sl4{animation-name:sl4}.sl5{animation-name:sl5}.f1{animation-name:f1}.f2{animation-name:f2}.f3{animation-name:f3}.f4{animation-name:f4}.cw{animation-name:cw}.cl{animation-name:cl}.cc{animation-name:cc}.ca{animation-name:ca}
+@keyframes lbp{0%,9.38%{transform:scaleX(1)}14.37%,18.75%{transform:scaleX(0)}25%,100%{transform:scaleX(1)}}
+@keyframes lbb{0%,9.38%{transform:scaleX(1)}14.37%,28.5%{transform:scaleX(0)}33.5%,100%{transform:scaleX(1)}}
+@keyframes lov{0%,9.38%{opacity:1;transform:scaleX(1)}12.5%{opacity:0;transform:scaleX(1)}12.62%,37.38%{opacity:0;transform:scaleX(0)}37.5%{opacity:1;transform:scaleX(0)}40.5%,43.75%{opacity:1;transform:scaleX(.45)}46.81%,100%{opacity:1;transform:scaleX(1)}}
+@keyframes lask{0%,9.38%{opacity:1}12.5%,44%{opacity:0}47%,100%{opacity:1}}
+@keyframes loom{0%,9.38%{opacity:1}12.5%,46%{opacity:0}48%{opacity:1}50.5%{opacity:0.15}53%{opacity:1}55.5%{opacity:0.15}58%,100%{opacity:1}}
+@keyframes lgpu{0%,9.38%{stroke:#ff4d4d}13%,44%{stroke:#1f1f1f}47%,100%{stroke:#ff4d4d}}
+@keyframes la1{0%,9.38%{opacity:1}12.5%,16.25%{opacity:0}18.75%,100%{opacity:1}}
+@keyframes lp1{0%,16.25%,19.5%,100%{transform:translateX(0)}17.81%{transform:translateX(5px)}}
+@keyframes la2{0%,9.38%{opacity:1}12.5%,26%{opacity:0}28.5%,100%{opacity:1}}
+@keyframes lp2{0%,26%,29.25%,100%{transform:translateX(0)}27.56%{transform:translateX(5px)}}
+@keyframes la3{0%,9.38%{opacity:1}12.5%,35%{opacity:0}37.5%,100%{opacity:1}}
+@keyframes lp3{0%,35%,38.25%,100%{transform:translateX(0)}36.56%{transform:translateX(5px)}}
+@keyframes la4{0%,9.38%{opacity:1}12.5%,41.25%{opacity:0}43.75%,100%{opacity:1}}
+@keyframes lp4{0%,41.25%,44.5%,100%{transform:translateX(0)}42.81%{transform:translateX(5px)}}
+@keyframes rw0{0%,4.69%{opacity:1}7.19%,15.62%{opacity:0.25}16.88%,40%{opacity:1}41.88%,96.25%{opacity:0.25}98.12%,100%{opacity:1}}
+@keyframes rw1{0%,4.69%{opacity:1}7.19%,20%{opacity:0.25}21.25%,100%{opacity:1}}
+@keyframes rw2{0%,4.69%{opacity:1}7.19%,24.38%{opacity:0.25}25.62%,100%{opacity:1}}
+@keyframes rw3{0%,4.69%{opacity:1}7.19%,26.25%{opacity:0.25}27.5%{opacity:1}65.62%{opacity:1}66.25%{opacity:0.45}66.88%{opacity:1}67.5%{opacity:0.45}68.12%{opacity:1}76.25%{opacity:1}76.88%{opacity:0.45}77.5%{opacity:1}78.12%{opacity:0.45}78.75%{opacity:1}100%{opacity:1}}
+@keyframes r1o{0%{opacity:1}30%{opacity:1}30.94%{opacity:0}42.81%{opacity:0}43.75%{opacity:1}48.12%{opacity:1}49.06%{opacity:0}58.44%{opacity:0}59.38%{opacity:1}85.62%{opacity:1}86.56%{opacity:0}94.06%{opacity:0}95%{opacity:1}100%{opacity:1}}
+@keyframes r1a{0%{opacity:0}30.94%{opacity:0}31.87%{opacity:1}41.88%{opacity:1}42.81%{opacity:0}49.06%{opacity:0}50%{opacity:1}57.5%{opacity:1}58.44%{opacity:0}86.56%{opacity:0}87.5%{opacity:1}93.12%{opacity:1}94.06%{opacity:0}100%{opacity:0}}
+@keyframes r2o{0%{opacity:1}32.5%{opacity:1}33.44%{opacity:0}39.06%{opacity:0}40%{opacity:1}86.88%{opacity:1}87.81%{opacity:0}92.81%{opacity:0}93.75%{opacity:1}100%{opacity:1}}
+@keyframes r2a{0%{opacity:0}33.44%{opacity:0}34.38%{opacity:1}38.12%{opacity:1}39.06%{opacity:0}87.81%{opacity:0}88.75%{opacity:1}91.88%{opacity:1}92.81%{opacity:0}100%{opacity:0}}
+@keyframes r3o{0%{opacity:1}50.62%{opacity:1}51.56%{opacity:0}56.56%{opacity:0}57.5%{opacity:1}69.38%{opacity:1}70.31%{opacity:0}74.06%{opacity:0}75%{opacity:1}81.88%{opacity:1}82.81%{opacity:0}85.94%{opacity:0}86.88%{opacity:1}100%{opacity:1}}
+@keyframes r3a{0%{opacity:0}51.56%{opacity:0}52.5%{opacity:1}55.62%{opacity:1}56.56%{opacity:0}70.31%{opacity:0}71.25%{opacity:1}73.12%{opacity:1}74.06%{opacity:0}82.81%{opacity:0}83.75%{opacity:1}85%{opacity:1}85.94%{opacity:0}100%{opacity:0}}
+@keyframes gw{0%,4.69%{transform:scaleX(1)}7.19%,16.88%{transform:scaleX(0)}19.38%,40%{transform:scaleX(1)}41.88%,96.25%{transform:scaleX(0)}98.12%,100%{transform:scaleX(1)}}
+@keyframes gwt{0%,4.69%{opacity:1}6.25%,19.06%{opacity:0}20%,40%{opacity:1}40.94%,97.81%{opacity:0}98.75%,100%{opacity:1}}
+@keyframes gl{0%,4.69%{transform:scaleX(1)}7.19%,21.25%{transform:scaleX(0)}23.75%,30%{transform:scaleX(1)}32.5%,41.88%{transform:scaleX(0)}45%,48.12%{transform:scaleX(1.0584)}50.62%,57.5%{transform:scaleX(0)}60.62%,63.12%{transform:scaleX(1.0584)}65%,80.62%{transform:scaleX(1)}81.88%,93.12%{transform:scaleX(0)}95%,100%{transform:scaleX(1)}}
+@keyframes glt{0%,4.69%{opacity:1}6.25%,23.44%{opacity:0}24.38%,30%{opacity:1}30.94%,65%{opacity:0}65.94%,80.31%{opacity:1}80.94%,94.69%{opacity:0}95.62%,100%{opacity:1}}
+@keyframes gs1{0%,41.88%{opacity:1;transform:scaleX(0)}45%,48.12%{opacity:1;transform:scaleX(1)}50.62%,57.5%{opacity:1;transform:scaleX(0)}60.62%,63.12%{opacity:1;transform:scaleX(1)}65%,100%{opacity:1;transform:scaleX(0)}}
+@keyframes gsb{0%,44.38%{opacity:0}45.62%,48.12%{opacity:1}49.06%,60%{opacity:0}61.25%,63.12%{opacity:1}63.75%,100%{opacity:0}}
+@keyframes gst{0%,44.38%{opacity:0}45.62%,47.5%{opacity:1}48.44%,60.31%{opacity:0}61.56%,62.81%{opacity:1}63.59%,100%{opacity:0}}
+@keyframes gc{0%,32.5%{opacity:1;transform:scaleX(0)}35%,38.12%{opacity:1;transform:scaleX(1)}40%,86.88%{opacity:1;transform:scaleX(0)}88.75%,91.88%{opacity:1;transform:scaleX(1)}93.75%,100%{opacity:1;transform:scaleX(0)}}
+@keyframes gct{0%,34.69%{opacity:0}35.62%,37.5%{opacity:1}38.44%,88.44%{opacity:0}89.06%,91.56%{opacity:1}92.19%,100%{opacity:0}}
+@keyframes ga{0%,50.62%{opacity:1;transform:scaleX(0)}53.12%,55.62%{opacity:1;transform:scaleX(1)}57.5%,69.38%{opacity:1;transform:scaleX(0)}71.25%,73.12%{opacity:1;transform:scaleX(1)}75%,100%{opacity:1;transform:scaleX(0)}}
+@keyframes gat{0%,52.81%{opacity:0}53.75%,55.31%{opacity:1}56.09%,70.94%{opacity:0}71.88%,72.81%{opacity:1}73.59%,100%{opacity:0}}
+@keyframes gd{0%,65%{opacity:0;transform:scaleX(1)}66.25%,67.5%{opacity:1;transform:scaleX(1)}69.38%,74.38%{opacity:1;transform:scaleX(0)}75.62%,96.25%{opacity:1;transform:scaleX(1)}97.5%,100%{opacity:0;transform:scaleX(1)}}
+@keyframes gdt{0%,65%{opacity:0}66.25%,67.5%{opacity:1}68.44%,75.31%{opacity:0}76.25%,96.25%{opacity:1}97.19%,100%{opacity:0}}
+@keyframes gb{0%,81.88%{opacity:1;transform:scaleX(0)}83.12%,85.62%{opacity:1;transform:scaleX(1)}86.88%,100%{opacity:1;transform:scaleX(0)}}
+@keyframes gbt{0%,82.81%{opacity:0}83.44%,85.31%{opacity:1}85.94%,100%{opacity:0}}
+@keyframes ch{0%,88.44%{opacity:0;transform:translateX(-14px)}89.69%{opacity:1;transform:translateX(0)}90.62%{opacity:.45;transform:translateX(0)}91.56%{opacity:1;transform:translateX(0)}92.5%{opacity:.45;transform:translateX(0)}93.44%{opacity:1;transform:translateX(0)}94.38%,100%{opacity:0;transform:translateX(0)}}
+@keyframes chs{0%,93.75%{opacity:0;transform:translate(0,0)}94.53%{opacity:1;transform:translate(0,0)}96.09%{opacity:1;transform:translate(110px,40px)}96.72%,100%{opacity:0;transform:translate(110px,40px)}}
+@keyframes cap0{0%,39.22%{opacity:1}40%,96.25%{opacity:0}97.03%,100%{opacity:1}}
+@keyframes cap2{0%,40%{opacity:0}40.78%{opacity:1}62.34%{opacity:1}63.12%,100%{opacity:0}}
+@keyframes cap3{0%,63.12%{opacity:0}63.91%{opacity:1}74.22%{opacity:1}75%,100%{opacity:0}}
+@keyframes cap4{0%,75%{opacity:0}75.78%{opacity:1}84.84%{opacity:1}85.62%,100%{opacity:0}}
+@keyframes cap5{0%,85.62%{opacity:0}86.41%{opacity:1}95.47%{opacity:1}96.25%,100%{opacity:0}}
+@keyframes sl1{0%,4.69%{opacity:0}5.47%{opacity:1}39.22%{opacity:1}40%,100%{opacity:0}}
+@keyframes sl2{0%,40%{opacity:0}40.78%{opacity:1}62.34%{opacity:1}63.12%,100%{opacity:0}}
+@keyframes sl3{0%,63.12%{opacity:0}63.91%{opacity:1}74.22%{opacity:1}75%,100%{opacity:0}}
+@keyframes sl4{0%,75%{opacity:0}75.78%{opacity:1}84.84%{opacity:1}85.62%,100%{opacity:0}}
+@keyframes sl5{0%,85.62%{opacity:0}86.41%{opacity:1}95.47%{opacity:1}96.25%,100%{opacity:0}}
+@keyframes f1{0%{opacity:0;stroke-dashoffset:18}7.75%{opacity:0;stroke-dashoffset:18}7.81%{opacity:1;stroke-dashoffset:18}10.31%{opacity:1;stroke-dashoffset:-100}10.38%{opacity:0;stroke-dashoffset:-100}100%{opacity:0;stroke-dashoffset:-100}}
+@keyframes f2{0%{opacity:0;stroke-dashoffset:18}9.31%{opacity:0;stroke-dashoffset:18}9.38%{opacity:1;stroke-dashoffset:18}11.88%{opacity:1;stroke-dashoffset:-100}11.94%{opacity:0;stroke-dashoffset:-100}100%{opacity:0;stroke-dashoffset:-100}}
+@keyframes f3{0%{opacity:0;stroke-dashoffset:18}10.88%{opacity:0;stroke-dashoffset:18}10.94%{opacity:1;stroke-dashoffset:18}13.44%{opacity:1;stroke-dashoffset:-100}13.5%{opacity:0;stroke-dashoffset:-100}100%{opacity:0;stroke-dashoffset:-100}}
+@keyframes f4{0%{opacity:0;stroke-dashoffset:18}12.44%{opacity:0;stroke-dashoffset:18}12.5%{opacity:1;stroke-dashoffset:18}15%{opacity:1;stroke-dashoffset:-100}15.06%{opacity:0;stroke-dashoffset:-100}100%{opacity:0;stroke-dashoffset:-100}}
+@keyframes cw{0%{opacity:0;stroke-dashoffset:18}16.81%{opacity:0;stroke-dashoffset:18}16.88%{opacity:1;stroke-dashoffset:18}18.75%{opacity:1;stroke-dashoffset:-100}18.81%{opacity:0;stroke-dashoffset:-100}96.19%{opacity:0;stroke-dashoffset:18}96.25%{opacity:1;stroke-dashoffset:18}98.12%{opacity:1;stroke-dashoffset:-100}98.19%{opacity:0;stroke-dashoffset:-100}100%{opacity:0;stroke-dashoffset:-100}}
+@keyframes cl{0%{opacity:0;stroke-dashoffset:18}21.19%{opacity:0;stroke-dashoffset:18}21.25%{opacity:1;stroke-dashoffset:18}23.12%{opacity:1;stroke-dashoffset:-100}23.19%{opacity:0;stroke-dashoffset:-100}41.81%{opacity:0;stroke-dashoffset:18}41.88%{opacity:1;stroke-dashoffset:18}43.75%{opacity:1;stroke-dashoffset:-100}43.81%{opacity:0;stroke-dashoffset:-100}57.44%{opacity:0;stroke-dashoffset:18}57.5%{opacity:1;stroke-dashoffset:18}59.38%{opacity:1;stroke-dashoffset:-100}59.44%{opacity:0;stroke-dashoffset:-100}64.94%{opacity:0;stroke-dashoffset:18}65%{opacity:1;stroke-dashoffset:18}66.88%{opacity:1;stroke-dashoffset:-100}66.94%{opacity:0;stroke-dashoffset:-100}81.81%{opacity:0;stroke-dashoffset:18}81.88%{opacity:1;stroke-dashoffset:18}83.75%{opacity:1;stroke-dashoffset:-100}83.81%{opacity:0;stroke-dashoffset:-100}93.06%{opacity:0;stroke-dashoffset:18}93.12%{opacity:1;stroke-dashoffset:18}95%{opacity:1;stroke-dashoffset:-100}95.06%{opacity:0;stroke-dashoffset:-100}100%{opacity:0;stroke-dashoffset:-100}}
+@keyframes cc{0%{opacity:0;stroke-dashoffset:18}32.44%{opacity:0;stroke-dashoffset:18}32.5%{opacity:1;stroke-dashoffset:18}34.38%{opacity:1;stroke-dashoffset:-100}34.44%{opacity:0;stroke-dashoffset:-100}86.81%{opacity:0;stroke-dashoffset:18}86.88%{opacity:1;stroke-dashoffset:18}88.75%{opacity:1;stroke-dashoffset:-100}88.81%{opacity:0;stroke-dashoffset:-100}100%{opacity:0;stroke-dashoffset:-100}}
+@keyframes ca{0%{opacity:0;stroke-dashoffset:18}50.56%{opacity:0;stroke-dashoffset:18}50.62%{opacity:1;stroke-dashoffset:18}52.5%{opacity:1;stroke-dashoffset:-100}52.56%{opacity:0;stroke-dashoffset:-100}69.31%{opacity:0;stroke-dashoffset:18}69.38%{opacity:1;stroke-dashoffset:18}71.25%{opacity:1;stroke-dashoffset:-100}71.31%{opacity:0;stroke-dashoffset:-100}100%{opacity:0;stroke-dashoffset:-100}}
 @media (prefers-reduced-motion:reduce){.a{animation:none!important}}
 </style>
 <marker id="m" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#4a4a4a"/></marker>
@@ -60,35 +77,40 @@
 <rect x="356" y="12" width="632" height="316" rx="18" fill="#ffffff" stroke="#1f1f1f" stroke-width="1.2"/>
 </g>
 <text x="177" y="44" text-anchor="middle" font-size="17" font-weight="700" fill="#1f1f1f">Without gpuq</text>
+<text class="a sl1" x="972" y="44" text-anchor="end" font-size="11" font-weight="600" fill="#4a4a4a" opacity="0">1 sharing</text>
+<text class="a sl2" x="972" y="44" text-anchor="end" font-size="11" font-weight="600" fill="#4a4a4a" opacity="0">2 split LLM</text>
+<text class="a sl3" x="972" y="44" text-anchor="end" font-size="11" font-weight="600" fill="#4a4a4a" opacity="0">3 desktop</text>
+<text class="a sl4" x="972" y="44" text-anchor="end" font-size="11" font-weight="600" fill="#4a4a4a" opacity="0">4 model hold</text>
+<text class="a sl5" x="972" y="44" text-anchor="end" font-size="11" font-weight="600" fill="#4a4a4a" opacity="0">5 gate</text>
 <text x="672.0" y="44" text-anchor="middle" font-size="17" font-weight="700" fill="#1f1f1f">With gpuq</text>
-<g class="a lp1">
+<g class="a l lp1">
 <g filter="url(#sh)"><rect x="30" y="70" width="120" height="36" rx="14" fill="#a66cff" stroke="#1f1f1f" stroke-width="3"/></g>
 <text x="90.0" y="93.0" text-anchor="middle" font-size="14" font-weight="600" fill="#ffffff">LLM server</text>
 </g>
-<g class="a lp2">
+<g class="a l lp2">
 <g filter="url(#sh)"><rect x="30" y="120" width="120" height="36" rx="14" fill="#3d8bff" stroke="#1f1f1f" stroke-width="3"/></g>
 <text x="90.0" y="143.0" text-anchor="middle" font-size="14" font-weight="600" fill="#ffffff">ComfyUI</text>
 </g>
-<g class="a lp3">
+<g class="a l lp3">
 <g filter="url(#sh)"><rect x="30" y="170" width="120" height="36" rx="14" fill="#00b37e" stroke="#1f1f1f" stroke-width="3"/></g>
 <text x="90.0" y="193.0" text-anchor="middle" font-size="14" font-weight="600" fill="#ffffff">Whisper</text>
 </g>
-<g class="a lp4">
+<g class="a l lp4">
 <g filter="url(#sh)"><rect x="30" y="220" width="120" height="36" rx="14" fill="#ffb400" stroke="#1f1f1f" stroke-width="3"/></g>
 <text x="90.0" y="243.0" text-anchor="middle" font-size="14" font-weight="600" fill="#1f2328">API request</text>
 </g>
-<path class="a la1" d="M152,88 L192,138.75" stroke="#ff4d4d" stroke-width="1.8" marker-end="url(#b)" filter="none"/>
-<path class="a la2" d="M152,138 L192,156.25" stroke="#ff4d4d" stroke-width="1.8" marker-end="url(#b)" filter="none"/>
-<path class="a la3" d="M152,188 L192,173.75" stroke="#ff4d4d" stroke-width="1.8" marker-end="url(#b)" filter="none"/>
-<path class="a la4" d="M152,238 L192,191.25" stroke="#ff4d4d" stroke-width="1.8" marker-end="url(#b)" filter="none"/>
-<g filter="url(#sh)"><rect class="a lgpu" x="196" y="100" width="130" height="130" rx="16" fill="#ffffff" stroke="#ff4d4d" stroke-width="3.8"/></g>
+<path class="a l la1" d="M152,88 L192,138.75" stroke="#ff4d4d" stroke-width="1.8" marker-end="url(#b)" filter="none"/>
+<path class="a l la2" d="M152,138 L192,156.25" stroke="#ff4d4d" stroke-width="1.8" marker-end="url(#b)" filter="none"/>
+<path class="a l la3" d="M152,188 L192,173.75" stroke="#ff4d4d" stroke-width="1.8" marker-end="url(#b)" filter="none"/>
+<path class="a l la4" d="M152,238 L192,191.25" stroke="#ff4d4d" stroke-width="1.8" marker-end="url(#b)" filter="none"/>
+<g filter="url(#sh)"><rect class="a l lgpu" x="196" y="100" width="130" height="130" rx="16" fill="#ffffff" stroke="#ff4d4d" stroke-width="3.8"/></g>
 <text x="261.0" y="128" text-anchor="middle" font-size="16" font-weight="700" fill="#1f1f1f">GPU</text>
-<text class="a loom" x="261.0" y="216" text-anchor="middle" font-size="12" font-weight="600" fill="#ff4d4d">out of memory</text>
+<text class="a l loom" x="261.0" y="216" text-anchor="middle" font-size="12" font-weight="600" fill="#ff4d4d">out of memory</text>
 <rect x="208" y="146" width="106" height="22" rx="3" fill="#f0e6d8"/>
-<rect class="a sx lbp" x="208" y="146" width="75.08333333333333" height="22" fill="#a66cff"/>
-<rect class="a sx lbb" x="283.0833333333333" y="146" width="30.916666666666686" height="22" fill="#3d8bff"/>
-<rect class="a sx lov" x="314" y="143" width="22.083333333333314" height="28" fill="none" stroke="#ff4d4d" stroke-width="1.6" stroke-dasharray="3 2"/>
-<text class="a lask" x="261.0" y="190" text-anchor="middle" font-size="12" fill="#ff4d4d">29 GB asked</text>
+<rect class="a l sx lbp" x="208" y="146" width="75.08333333333333" height="22" fill="#a66cff"/>
+<rect class="a l sx lbb" x="283.0833333333333" y="146" width="30.916666666666686" height="22" fill="#3d8bff"/>
+<rect class="a l sx lov" x="314" y="143" width="22.083333333333314" height="28" fill="none" stroke="#ff4d4d" stroke-width="1.6" stroke-dasharray="3 2"/>
+<text class="a l lask" x="261.0" y="190" text-anchor="middle" font-size="12" fill="#ff4d4d">29 GB asked</text>
 <text x="177" y="296" text-anchor="middle" font-size="12.5" fill="#4a4a4a">Every program grabs the card.</text>
 <text x="177" y="314" text-anchor="middle" font-size="12.5" fill="#4a4a4a">One crashes, or everything crawls.</text>
 <g filter="url(#sh)"><rect x="372" y="70" width="160" height="36" rx="14" fill="#a66cff" stroke="#1f1f1f" stroke-width="3"/></g>
@@ -113,6 +135,8 @@
 <path class="a fl f4" d="M534,238 C550,238 545,165.0 561,165.0" pathLength="100" fill="none" stroke="#ffb400" stroke-width="3.5" opacity="0"/>
 <g filter="url(#sh)"><rect x="565" y="80" width="180" height="170" rx="18" fill="#1f1f1f" stroke="#1f1f1f" stroke-width="3"/></g>
 <text x="655.0" y="112" text-anchor="middle" font-size="22" font-weight="800" fill="#ffd400">gpuq</text>
+<g class="a ch" opacity="0"><rect x="693.5" y="97.5" width="45" height="15" rx="6" fill="none" stroke="#a66cff" stroke-width="1.3" stroke-dasharray="4 2"/>
+<text x="716" y="109" text-anchor="middle" font-size="10" font-weight="600" fill="#a66cff">chat</text></g>
 <text x="581" y="138" font-size="11" fill="#ffffff">queue, by priority</text>
 <g class="a rw0">
 <rect x="579" y="148" width="96" height="19" rx="5" fill="#00b37e"/>
@@ -168,6 +192,8 @@
 <text class="a glt" x="850.75" y="148.5" text-anchor="middle" font-size="12" font-weight="600" fill="#ffffff">LLM 17G</text>
 <rect class="a sx gc" x="793" y="132" width="135.8" height="24" rx="4" fill="#3d8bff" opacity="0"/>
 <text class="a gct" x="860.9" y="148.5" text-anchor="middle" font-size="12" font-weight="600" fill="#ffffff" opacity="0">ComfyUI 20G</text>
+<rect class="a sx gb" x="793" y="132" width="81.5" height="24" rx="4" fill="#a66cff" opacity="0"/>
+<text class="a gbt" x="833.8" y="148.5" text-anchor="middle" font-size="11" font-weight="600" fill="#ffffff" opacity="0">model B 12G</text>
 <text x="793" y="172" font-size="10" font-weight="600" fill="#4a4a4a">GPU 1 · 16 GB</text>
 <rect x="793" y="177" width="163" height="24" rx="4" fill="#f0e6d8"/>
 <rect class="a sx gw" x="793" y="177" width="30.6" height="24" rx="4" fill="#00b37e"/>
@@ -177,10 +203,32 @@
 <rect class="a gsb" x="899.25" y="154" width="16" height="25" fill="#a66cff" opacity="0"/>
 <text class="a gst" x="846.12" y="148.5" text-anchor="middle" font-size="11" font-weight="600" fill="#ffffff" opacity="0">LLM 30G, split</text>
 <text class="a gst" x="846.12" y="193.5" text-anchor="middle" font-size="11" font-weight="600" fill="#ffffff" opacity="0">LLM 30G, split</text>
+<rect class="a sx gd" x="793" y="177" width="20.4" height="24" rx="4" fill="#4a4a4a" opacity="0"/>
+<text class="a gdt" x="820.4" y="193.5" font-size="11" font-weight="600" fill="#1f1f1f" opacity="0">desktop 2G</text>
 <rect class="a sx ga" x="793" y="177" width="163" height="24" rx="4" fill="#ffb400" opacity="0"/>
 <text class="a gat" x="874.5" y="193.5" text-anchor="middle" font-size="11" font-weight="600" fill="#1f2328" opacity="0">API req., whole card</text>
+<g class="a cap0">
 <text x="874.5" y="222" text-anchor="middle" font-size="11" fill="#4a4a4a">Whisper takes the free card.</text>
 <text x="874.5" y="238" text-anchor="middle" font-size="11" fill="#4a4a4a">ComfyUI next: the LLM unloads.</text>
+</g>
+<g class="a cap2" opacity="0">
+<text x="874.5" y="222" text-anchor="middle" font-size="11" fill="#4a4a4a">One big LLM, split over 2 cards.</text>
+<text x="874.5" y="238" text-anchor="middle" font-size="11" fill="#4a4a4a">Both cards unload together.</text>
+</g>
+<g class="a cap3" opacity="0">
+<text x="874.5" y="222" text-anchor="middle" font-size="11" fill="#4a4a4a">Seat empty: the desktop stops</text>
+<text x="874.5" y="238" text-anchor="middle" font-size="11" fill="#4a4a4a">for the job, then comes back.</text>
+</g>
+<g class="a cap4" opacity="0">
+<text x="874.5" y="222" text-anchor="middle" font-size="11" fill="#4a4a4a">Class 3 asks for another model:</text>
+<text x="874.5" y="238" text-anchor="middle" font-size="11" fill="#4a4a4a">it waits until class 1 is quiet.</text>
+</g>
+<g class="a cap5" opacity="0">
+<text x="874.5" y="222" text-anchor="middle" font-size="11" fill="#4a4a4a">Chat while ComfyUI has the card:</text>
+<text x="874.5" y="238" text-anchor="middle" font-size="11" fill="#4a4a4a">held at the gate, then sent on.</text>
+</g>
+<g class="a chs" opacity="0"><rect x="693" y="97" width="46" height="16" rx="6" fill="#a66cff"/>
+<text x="716" y="109" text-anchor="middle" font-size="10" font-weight="600" fill="#ffffff">chat</text></g>
 <text x="672.0" y="305" text-anchor="middle" font-size="12.5" fill="#4a4a4a">gpuq hands out the GPUs by priority and free VRAM.</text>
 <g filter="url(#sh)"><rect x="12" y="342" width="976" height="116" rx="18" fill="#ffffff" stroke="#1f1f1f" stroke-width="1.2"/></g>
 <text x="32" y="372" font-size="15" font-weight="700" fill="#1f1f1f">Priority classes</text>
