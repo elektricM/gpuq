@@ -22,6 +22,8 @@ The gate listens on the port your clients already use and forwards to the real s
 you move to another port (`gate.backend`). Requests for models that need the GPU are held
 while a job has the card. Requests for CPU-only models, and anything without a model, pass.
 
+![While ComfyUI has the card, a chat request is held at the gate; once the LLM is back it is sent on to the server](gate.svg)
+
 | Backend | Unload / load | KV slots | Health | Needs `[llm.service]` |
 |---|---|---|---|---|
 | `llama-swap` | at runtime | save and restore for models started with `--slot-save-path` | `/upstream/<model>/health` | no |
