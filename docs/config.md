@@ -86,8 +86,11 @@ card:
 
 Only `ROCR_VISIBLE_DEVICES` is set for detected AMD cards. HIP numbers the cards it is given
 from 0 again, so setting `HIP_VISIBLE_DEVICES` to the same value as well would point at the
-wrong device. Vulkan programs (for example llama.cpp built with Vulkan) ignore both variables;
-pin them by hand.
+wrong device. Vulkan and OpenGL programs (for example llama.cpp built with Vulkan) ignore both
+variables, so a lease on a single AMD or Intel card also gets `DRI_PRIME=pci-<address>!`
+(`pci-0000_03_00_0!`), which makes Mesa show that card and no other. A lease on several cards
+gets no `DRI_PRIME`, since Mesa takes one device; services that gpuq starts do not get it
+either. NVIDIA's Vulkan driver does not read `DRI_PRIME`.
 
 An AMD GPU counts as integrated when sysfs has no `mem_info_vram_vendor` for it: amdgpu creates
 that file only for cards with their own memory chips, which an APU's GPU does not have.
@@ -184,7 +187,7 @@ means a different device to each stack. Every card of a multi-card lease needs a
 
 | Key | Default | Meaning |
 |---|---|---|
-| `offload` | `[]` | Argv run once per waiting job and card when the job does not fit on an otherwise idle card, for example to move a desktop session off the card. Run directly, not through a shell, with `GPUQ_CARD` set to the card name. Empty disables it. |
+| `offload` | `[]` | Argv run once per waiting job and card when the job does not fit on an otherwise idle card, for example to move a desktop session off the card ([desktop](#desktop) does that built in; with both, the desktop goes first). Run directly, not through a shell, with `GPUQ_CARD` set to the card name. Empty disables it. |
 | `offload_timeout_s` | `180` | Kill the hook after this long. |
 | `offload_settle_s` | `3` | Wait this long after the hook before measuring VRAM again. |
 
@@ -260,6 +263,21 @@ Per-class overrides, for a class that is often followed by another LLM request.
 |---|---|---|
 | `gap_s` | falls back to `llm.gap_s` | Silence required before other classes take the card after a request of this class. |
 | `reload_delay_s` | falls back to `llm.reload_delay_s` | Pause before reloading the resident model after a job of this class. |
+| `hold_other_models_s` | unset (off) | Keep the LLM server on this class's model: while the class has requests in flight, and this long after its last one, requests of less important classes for another model wait in the queue. Requests for the same model, and of this class or more important ones, are never held. |
+
+`hold_other_models_s` is for a server that holds one model at a time (llama-swap with an
+exclusive group, Ollama with one model): without it, two clients that use different models
+make the server swap at every request. Set it a bit longer than the pauses between the
+class's requests. Held requests do not time out in gpuq; `gpuq status` shows them on a
+`holding` line, and the log has one line when a hold starts and one when it ends.
+
+```toml
+[llm.model_classes]
+"qwen3.8-27b-rec" = "recorder"
+
+[llm.class_tuning.recorder]
+hold_other_models_s = 60   # other models wait while the recorder writes its notes
+```
 
 ### [llm.service]
 
@@ -334,6 +352,55 @@ for the setup and `examples/immich.toml`.
 
 The backlog is `waiting + active + delayed + paused` summed over `queues`. `gpuq check-config`
 prints one `immich:` line for the section.
+
+## [desktop]
+
+What gpuq does with the graphical desktop when its VRAM is needed: nothing, stop it, or move
+it to another card. How it works: [desktop.md](desktop.md). Example:
+`examples/desktop.toml`.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `policy` | `"off"` | `off`: never touch the desktop. `stop`: stop it while its VRAM is needed. `offload`: restart it on another card (see `[desktop.offload]`). |
+| `fallback` | `"off"` | What `offload` does when the desktop cannot leave the card: `stop` or `off`. |
+| `card` | the LLM's first card | The card to free. |
+| `seat` | `"seat0"` | logind seat. A `user` session on it blocks every release. |
+| `system_units` | `["display-manager.service"]` | Stopped on release (after `user_units`), started on restore. |
+| `user_units` | `[]` | Units of the user manager stopped on release, e.g. the compositor and the shell. Not started on restore: a login starts them. With no `system_units`, a restore starts these instead. |
+| `user` | the user gpuq runs as | Whose user manager `user_units` and `session_env` refer to. As root, gpuq uses `systemctl --user --machine=<user>@.host`. |
+| `elevate` | `[]` | argv prefix for commands that change system units, read the system journal and list the processes of other users on the card (`gpuq scan-drm`), e.g. `["sudo", "-n"]`. Not needed as root or with a polkit rule. |
+| `ignore` | `[]` | Processes never counted as the desktop: an exact process name, or a piece of the command line such as `"kwin_wayland --virtual"`. |
+| `models` | `[]` | LLM models that want the desktop off the card while loaded. `*` matches any text. |
+| `min_free_mib` | `0` | Release when an LLM model is loaded and less than this is free. The reason lasts while that model stays loaded. `0` = off. |
+| `leases` | `true` | A job waiting for the card that declares more VRAM than is free releases the desktop. |
+| `release_delay_s` | `30` | How long a reason must last before a release. Jobs that do not fit skip it. |
+| `restore_delay_s` | `600` | How long without any reason (and without a lease on the card) before a restore. |
+| `hold_s` | `1800` | After a restore by hand or by a key press, no automatic release for this long. |
+| `retry_s` | `900` | After a failed release or restore, wait this long before the next attempt. |
+| `poll_s` | `5` | Time between checks. |
+| `command_timeout_s` | `30` | Limit for each query command (`systemctl show`, `loginctl`, `busctl`, `journalctl`). |
+| `stop_timeout_s` | `60` | Limit for stopping or starting units, and for the desktop's processes to leave the card. |
+| `session_env` | `{ DISPLAY = "", WAYLAND_DISPLAY = "" }` | Set after a stop in the user manager and the D-Bus activation environment; an empty value removes the variable. A `WAYLAND_DISPLAY` whose socket is missing is removed. Setting the table replaces the default. |
+| `wake_on_input` | `false` | Restore on a key press at the seat; no release while there was input in the last `input_idle_s`. Needs read access to the input devices. |
+| `input_devices` | `["/dev/input/by-path/*-event-kbd", "/dev/input/by-id/*-event-kbd"]` | Devices watched; `*` in the file name matches any text. |
+| `input_idle_s` | `300` | See `wake_on_input`. |
+| `check_journal` | `true` | After each change, look for new errors, failed units and core dumps. |
+| `check_delay_s` | `20` | How long after a change the journal is checked. |
+| `state_file` | `$XDG_STATE_HOME/gpuq/desktop.json`, else `~/.local/state/gpuq/desktop.json` | Remembers that gpuq stopped or moved the desktop. |
+
+### [desktop.offload]
+
+| Key | Default | Meaning |
+|---|---|---|
+| `user_env` | `{}` | Set in the user manager before the restart, e.g. `KWIN_DRM_DEVICES = "/dev/dri/by-path/pci-0000:15:00.0-card"`. Removed when moving back. |
+| `system_env` | `{}` | The same in the system manager (with `elevate`), for the display manager. |
+| `commands` | `[]` | Commands (argv lists, no shell) run before the restart, e.g. to write a drop-in. |
+| `undo_commands` | `[]` | Commands run when moving back, before the restart. |
+| `move_back` | `false` | Move the desktop back on its own once nothing needs the VRAM. Off: only `gpuq desktop restore` does. |
+| `settle_s` | `15` | Wait after the restart for the session to come up before checking the card. |
+
+`policy = "offload"` needs at least one of `user_env`, `system_env` and `commands`.
+`gpuq check-config` prints one `desktop:` line.
 
 ## [[service]]
 

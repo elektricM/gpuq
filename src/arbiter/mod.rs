@@ -20,6 +20,10 @@
 //! its next safe point when something more important waits. Priority comes from the class
 //! table (lower number = more important).
 //!
+//! In the `llm` phase, a class with `hold_other_models` keeps the backend on its model: while
+//! it has requests in flight, or had one less than that long ago, requests of less important
+//! classes for another model wait, so the server does not swap models back and forth.
+//!
 //! A lease can hold several cards. It is granted all at once or not at all, so nothing ever
 //! holds one card while it waits for another. The LLM can also span several cards; it then
 //! gives all of them back together.
@@ -113,11 +117,15 @@ impl Classes {
     }
 }
 
-/// Per-class overrides for the quiet time after an LLM request and the reload delay.
+/// Per-class overrides for the quiet time after an LLM request and the reload delay, and
+/// how long the class keeps other models off the backend.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct ClassTuning {
     pub gap: Option<Duration>,
     pub reload_delay: Option<Duration>,
+    /// While requests of this class are in flight, and this long after the last one,
+    /// requests of less important classes for another model wait.
+    pub hold_other_models: Option<Duration>,
 }
 
 /// Scheduling knobs, from the `[llm]`, `[gpu]` and `[hooks]` config sections.
@@ -160,6 +168,13 @@ impl Tuning {
             .get(class)
             .and_then(|t| t.gap)
             .unwrap_or(self.gap)
+    }
+
+    /// Classes that hold other models off the backend, with their hold time.
+    pub fn model_holders(&self) -> impl Iterator<Item = (&str, Duration)> {
+        self.class_tuning
+            .iter()
+            .filter_map(|(c, t)| Some((c.as_str(), t.hold_other_models?)))
     }
 
     pub fn reload_delay_after(&self, class: &str) -> Duration {
@@ -241,6 +256,9 @@ pub struct Card {
     /// Vendor, e.g. "amd" or "nvidia". Two cards of different vendors may share a lease only
     /// when their env uses different variables, see [`merge_env`].
     pub vendor: String,
+    /// Environment that pins graphics APIs (Vulkan, OpenGL) to this card alone. Only a lease
+    /// on this one card gets it, see [`lease_env`].
+    pub pin_env: Vec<(String, String)>,
 }
 
 impl fmt::Debug for Card {
@@ -250,6 +268,7 @@ impl fmt::Debug for Card {
             .field("device", &self.probe.device())
             .field("env", &self.env)
             .field("vendor", &self.vendor)
+            .field("pin_env", &self.pin_env)
             .finish()
     }
 }
@@ -343,6 +362,25 @@ pub fn merge_env<'a>(
         }
     }
     Ok(out.into_iter().map(|(k, v, _, _)| (k, v)).collect())
+}
+
+/// The env a lease hands its job: the merged env of its cards, plus the graphics pin of its
+/// card when it holds exactly one. Mesa takes a single device, so a lease on several cards
+/// gets no pin and its Vulkan program sees every card. A variable the card's own env already
+/// sets (`visible_devices_env = ["DRI_PRIME"]`) is left as configured.
+pub fn lease_env(
+    merged: Vec<(String, String)>,
+    pins: &[&[(String, String)]],
+) -> Vec<(String, String)> {
+    let mut env = merged;
+    if let [pin] = pins {
+        for (k, v) in pin.iter() {
+            if !env.iter().any(|(e, _)| e == k) {
+                env.push((k.clone(), v.clone()));
+            }
+        }
+    }
+    env
 }
 
 /// A job asking for the card.
@@ -460,6 +498,21 @@ pub struct Status {
     pub cards: Vec<CardStatus>,
     /// The cards the LLM backend holds now; empty while it is unloaded.
     pub llm_cards: Vec<String>,
+    /// LLM requests waiting because a more important class is using another model.
+    pub model_hold: Option<ModelHold>,
+}
+
+/// Requests held so the backend stays on the model a more important class uses.
+#[derive(Clone, Debug, Serialize)]
+pub struct ModelHold {
+    /// The class being served, and its model.
+    pub behind_class: String,
+    pub behind_model: String,
+    /// How many requests wait, and for which models.
+    pub held: usize,
+    pub models: Vec<String>,
+    /// Since the hold began.
+    pub since_s: u64,
 }
 
 // ------------------------------------------------------------------------ handle
@@ -473,7 +526,10 @@ enum Msg {
         class: String,
         reply: oneshot::Sender<()>,
     },
-    ExitLlm,
+    ExitLlm {
+        class: String,
+        model: String,
+    },
     Acquire {
         id: u64,
         req: LeaseRequest,
@@ -531,6 +587,7 @@ pub fn spawn(
         whole_card_baseline_mib: settings.tuning.whole_card_baseline_mib,
         env: Vec::new(),
         vendor: String::new(),
+        pin_env: Vec::new(),
     };
     spawn_cards(settings, vec![card], 0, backend, offload)
 }
@@ -657,6 +714,8 @@ impl Handle {
         cancel.disarm();
         Ok(LlmGuard {
             tx: self.tx.clone(),
+            class: class.to_owned(),
+            model: model.to_owned(),
         })
     }
 
@@ -725,11 +784,16 @@ impl Drop for CancelOnDrop {
 #[must_use = "the request counts as in flight until the guard is dropped"]
 pub struct LlmGuard {
     tx: mpsc::UnboundedSender<Msg>,
+    class: String,
+    model: String,
 }
 
 impl Drop for LlmGuard {
     fn drop(&mut self) {
-        let _ = self.tx.send(Msg::ExitLlm);
+        let _ = self.tx.send(Msg::ExitLlm {
+            class: std::mem::take(&mut self.class),
+            model: std::mem::take(&mut self.model),
+        });
     }
 }
 
@@ -807,5 +871,35 @@ impl fmt::Debug for Lease {
             .field("class", &self.class)
             .field("vram", &self.vram)
             .finish()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::lease_env;
+
+    fn kv(k: &str, v: &str) -> (String, String) {
+        (k.to_owned(), v.to_owned())
+    }
+
+    #[test]
+    fn a_one_card_lease_gets_the_pin_of_its_card() {
+        let merged = vec![kv("ROCR_VISIBLE_DEVICES", "GPU-1")];
+        let pin = [kv("DRI_PRIME", "pci-0000_03_00_0!")];
+        assert_eq!(
+            lease_env(merged.clone(), &[&pin]),
+            [
+                kv("ROCR_VISIBLE_DEVICES", "GPU-1"),
+                kv("DRI_PRIME", "pci-0000_03_00_0!")
+            ]
+        );
+        // Two cards: Mesa takes one device, so no pin at all.
+        let other = [kv("DRI_PRIME", "pci-0000_07_00_0!")];
+        assert_eq!(lease_env(merged.clone(), &[&pin, &other]), merged);
+        // A card without a pin (NVIDIA) changes nothing.
+        assert_eq!(lease_env(merged.clone(), &[&[]]), merged);
+        // The card's own DRI_PRIME wins over the pin.
+        let own = vec![kv("DRI_PRIME", "1")];
+        assert_eq!(lease_env(own.clone(), &[&pin]), own);
     }
 }

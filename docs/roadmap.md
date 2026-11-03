@@ -2,11 +2,12 @@
 
 Nothing here is implemented. It is the order I would do it in, and what works today instead.
 
-## Desktop and game detection
+## Foreground and game detection
 
 Taking the card back for the desktop (a game, a video call, a compositor that needs VRAM)
 should be automatic: detect the foreground GPU user, ask everything to yield, hand the card
-back afterwards.
+back afterwards. (The other direction, freeing the VRAM an idle desktop holds, is
+`[desktop]`, see `desktop.md`.)
 
 Today it is manual. The `interactive` class outranks `background` and `batch`, and
 `gpuq hold --class interactive --vram all` takes the whole card until you press Ctrl-C.
@@ -21,8 +22,9 @@ do:
 
 - Several LLM servers, one per card, each behind its own gate. Today there is one LLM backend;
   it can span several cards (`llm.card` as a list) but not run twice.
-- Vulkan device numbers. Detected cards get `CUDA_VISIBLE_DEVICES` or `ROCR_VISIBLE_DEVICES`;
-  Vulkan programs (`GGML_VK_VISIBLE_DEVICES`) are still pinned by hand.
+- Vulkan on several cards and on NVIDIA. A lease on one AMD or Intel card gets `DRI_PRIME`;
+  a lease on several cards, NVIDIA Vulkan and services gpuq starts are still pinned by hand
+  (`GGML_VK_VISIBLE_DEVICES`).
 - Reading llama-swap's device options. gpuq takes a model's cards from `[llm.models]` or from
   its estimated size; it could read `-dev`, `--tensor-split` and the `*_VISIBLE_DEVICES` of each
   model's command instead.

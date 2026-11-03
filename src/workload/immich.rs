@@ -212,11 +212,22 @@ pub async fn run(
 ) -> anyhow::Result<()> {
     let a = Adapter::new(cfg, arbiter, shutdown, view)?;
     a.stop_orphan().await;
+    // The last error logged: a down Immich is logged once, not on every poll.
+    let mut failing: Option<String> = None;
     while !a.stopping() {
         match a.tick().await {
-            Ok(note) => a.view.update(|s| s.error = note),
+            Ok(note) => {
+                if failing.take().is_some() {
+                    tracing::info!("immich: reachable again");
+                }
+                a.view.update(|s| s.error = note)
+            }
             Err(e) => {
-                tracing::warn!("immich: {e:#}");
+                let msg = format!("{e:#}");
+                if failing.as_deref() != Some(msg.as_str()) {
+                    tracing::warn!("immich: {msg} (logged again only when this changes)");
+                    failing = Some(msg);
+                }
                 a.view.update(|s| {
                     s.error = Some(format!("{e:#}"));
                     s.state = State::Idle;

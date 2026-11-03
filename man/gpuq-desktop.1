@@ -1,0 +1,41 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH gpuq-desktop 1  "gpuq 0.3.1" 
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH NAME
+gpuq\-desktop \- Show or change what gpuq does with the desktop ([desktop] in the config)
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH SYNOPSIS
+\fBgpuq desktop\fR [\fB\-\-api\fR] [\fB\-h\fR|\fB\-\-help\fR] [\fIsubcommands\fR]
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH DESCRIPTION
+Show or change what gpuq does with the desktop ([desktop] in the config)
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH OPTIONS
+.TP
+\fB\-\-api\fR \fI<HOST:PORT>\fR
+Address of the gpuq control API (default: $GPUQ_API, else 127.0.0.1:9390)
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH SUBCOMMANDS
+.TP
+gpuq\-desktop\-status(1)
+Show the state, why, and the processes on the card (the default)
+.TP
+gpuq\-desktop\-release(1)
+Free the card now: move or stop the desktop as the policy says
+.TP
+gpuq\-desktop\-restore(1)
+Give the desktop back now, and hold off automatic releases
+.TP
+gpuq\-desktop\-help(1)
+Print this message or the help of the given subcommand(s)
+.SH SEE ALSO
+\fBgpuq\fR(1)

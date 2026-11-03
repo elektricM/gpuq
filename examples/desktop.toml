@@ -1,0 +1,39 @@
+# [desktop]: free the VRAM the graphical desktop holds on the GPU while a model or a job
+# needs it. See docs/desktop.md. Merge into /etc/gpuq/config.toml.
+
+[desktop]
+# "off" (default), "stop" or "offload".
+policy = "stop"
+# The card to free; default the LLM's first card.
+# card = "gpu0"
+seat = "seat0"
+# The display manager. display-manager.service is the alias most distributions set up.
+system_units = ["display-manager.service"]
+# Session units that outlive the display manager while the user manager stays up. KDE Plasma:
+user_units = [
+    "graphical-session.target",
+    "plasma-plasmashell.service",
+    "plasma-kwin_wayland.service",
+    "plasma-krunner.service",
+    "plasma-ksmserver.service",
+]
+# gpuq not running as root: how it may stop and start the display manager.
+# elevate = ["sudo", "-n"]
+# Never the desktop, e.g. a headless compositor used by browser automation.
+ignore = ["kwin_wayland --virtual"]
+# Release while one of these LLM models is loaded...
+models = ["qwen3-32b*"]
+# ...or while any model is loaded and less than this is free.
+min_free_mib = 1024
+release_delay_s = 30
+restore_delay_s = 600
+
+# After a release, point services started later away from the display that is gone.
+[desktop.session_env]
+DISPLAY = ""
+WAYLAND_DISPLAY = ""
+
+# For policy = "offload": monitors on the integrated GPU (here 0000:15:00.0), KWin.
+# [desktop.offload]
+# user_env = { KWIN_DRM_DEVICES = "/dev/dri/by-path/pci-0000:15:00.0-card" }
+# move_back = false
