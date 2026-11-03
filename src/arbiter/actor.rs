@@ -1009,7 +1009,7 @@ impl Actor {
                     card.floor = card.baseline;
                 }
                 self.event(format!(
-                    "start: card empty, waiting {}s for leases to resume",
+                    "start: nothing loaded, LLM reload waits {}s for leases to resume",
                     grace.as_secs_f64()
                 ));
             }
@@ -2177,7 +2177,7 @@ impl Actor {
                 }
                 self.place(&cards);
                 self.last_llm = Instant::now();
-                self.event("llm state (0.0s)");
+                self.event("llm state, nothing to reload");
             }
         }
     }
