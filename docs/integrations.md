@@ -220,6 +220,41 @@ calls to `/predict` on the ML container. gpuq sits in front of it:
   second: Immich falls back to the CPU one when the GPU one is unavailable or still starting.
   This setup does not pause the queues, so a reindex goes on whichever container answers.
 
+### Model unload over HTTP
+
+Some servers can drop their model from the GPU and load it again while they keep running. For
+those, `[service.control] kind = "http"` replaces stopping the service: releasing the lease
+POSTs to `unload_url`, and the next lease POSTs to `load_url` before the held request goes
+through. Requests outside `gpu_paths` always pass, since the server stays up.
+
+| Software | Unload | Load | Example |
+|---|---|---|---|
+| AUTOMATIC1111 web UI | `POST /sdapi/v1/unload-checkpoint` (model to system RAM) | `POST /sdapi/v1/reload-checkpoint` | `stable-diffusion-webui.toml` |
+| Stable Diffusion WebUI Forge | `POST /sdapi/v1/unload-checkpoint` | none needed: the route exists but does nothing, the model loads with the next generation | `stable-diffusion-webui.toml` |
+| SD.Next | `POST /sdapi/v1/unload-checkpoint` (model and refiner) | `POST /sdapi/v1/reload-checkpoint` | `stable-diffusion-webui.toml` |
+| LM Studio | `POST /api/v1/models/unload` `{"instance_id": ...}` | `POST /api/v1/models/load` `{"model": ...}` | `lm-studio.toml` |
+| text-generation-webui | `POST /v1/internal/model/unload` | `POST /v1/internal/model/load` `{"model_name": ...}` | `text-generation-webui.toml` |
+
+Sources: `modules/api/api.py` in
+[AUTOMATIC1111](https://github.com/AUTOMATIC1111/stable-diffusion-webui/blob/master/modules/api/api.py),
+[Forge](https://github.com/lllyasviel/stable-diffusion-webui-forge/blob/main/modules/api/api.py)
+and [SD.Next](https://github.com/vladmandic/sdnext/blob/master/modules/api/api.py); the
+[LM Studio REST API](https://lmstudio.ai/docs/developer/rest/unload);
+[text-generation-webui](https://github.com/oobabooga/text-generation-webui/blob/main/modules/api/script.py).
+
+A1111 and Forge serve the API only when started with `--api`; SD.Next always does;
+text-generation-webui needs `--api` and no `--api-key` or `--admin-key`, since gpuq sends no
+key. Only API requests are scheduled: generations started from these programs' browser UIs go
+through Gradio and are not held by the gate.
+
+With LM Studio and several models, `kind = "command"` with `lms unload --all`
+([docs](https://lmstudio.ai/docs/cli/unload)) unloads whatever is loaded.
+
+**KoboldCpp** has no plain unload call. In admin mode (`--admin --admindir DIR`),
+`POST /api/admin/reload_config {"filename": "unload_model"}` restarts it without a model
+([koboldcpp.py](https://github.com/LostRuins/koboldcpp/blob/concedo/koboldcpp.py)). Since
+that is a restart anyway, `examples/koboldcpp.toml` stops and starts its systemd unit instead.
+
 ### Other CUDA or ROCm services
 
 `examples/cuda-service.toml`: a TTS or ASR HTTP server, an image API, a custom daemon. Pick the

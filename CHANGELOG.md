@@ -7,6 +7,16 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `[service.control] kind = "http"`: for servers that unload their model through their own
+  API and keep running. Releasing the lease POSTs to `unload_url`, the next lease POSTs to
+  `load_url`, each with an optional JSON body. Requests outside `gpu_paths` keep passing while
+  the model is unloaded.
+- Examples for the AUTOMATIC1111, Forge and SD.Next web UIs (`/sdapi/v1/unload-checkpoint`),
+  LM Studio (`/api/v1/models/unload`), text-generation-webui (`/v1/internal/model/unload`) and
+  KoboldCpp (systemd stop and start).
+
 ## [0.4.0] - 2026-11-03
 
 ### Added

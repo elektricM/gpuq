@@ -1,0 +1,41 @@
+# text-generation-webui (oobabooga) behind gpuq, through its OpenAI-compatible API.
+# Install as /etc/gpuq/config.toml, or ~/.config/gpuq/config.toml for a user instance.
+#
+# The web UI keeps running. When gpuq gives the card to something else it unloads the model
+# through the API, and loads it again before the next request:
+#   POST /v1/internal/model/unload
+#   POST /v1/internal/model/load    {"model_name": "..."}
+# Source: https://github.com/oobabooga/text-generation-webui/blob/main/modules/api/script.py
+#
+# What else to change:
+#   * Start it with the API on 5001 so gpuq can take 5000, the default API port:
+#       ./start_linux.sh --api --api-port 5001
+#     These calls need the admin key when --api-key or --admin-key is set; gpuq sends none,
+#     so leave both unset and keep the API on 127.0.0.1.
+#   * The model name (a folder or file in user_data/models) and vram.
+#
+# Only API requests wait for the card. Generations started in the browser UI (port 7860) go
+# to the model directly and are not scheduled by gpuq.
+
+[llm]
+backend = "none"
+
+[[service]]
+name = "textgen"
+class = "interactive"
+vram = "12G"
+yieldable = true
+stop_on_release = true
+idle_release_s = 300
+
+[service.control]
+kind = "http"
+unload_url = "http://127.0.0.1:5001/v1/internal/model/unload"
+load_url = "http://127.0.0.1:5001/v1/internal/model/load"
+load_body = '{"model_name": "Qwen2.5-14B-Instruct-Q4_K_M.gguf"}'
+start_timeout_s = 300
+
+[service.gate]
+listen = "127.0.0.1:5000"
+backend = "http://127.0.0.1:5001"
+gpu_paths = ["/v1/chat/completions", "/v1/completions", "/v1/embeddings"]

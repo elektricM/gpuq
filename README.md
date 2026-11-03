@@ -69,7 +69,8 @@ How the scheduler works inside: [docs/how-it-works.md](docs/how-it-works.md).
 - Leases tied to a client connection, released when the client exits
 - VRAM accounting, so jobs that fit can share the card
 - Cooperative preemption: jobs receive a signal and exit on their own
-- Service control through systemd, Docker, Podman or custom commands
+- Service control through systemd, Docker, Podman, custom commands, or the server's own model
+  unload API
 - HTTP gate in front of LLM servers and services, holding requests while the GPU is busy
 - Resident LLM model, reloaded with its KV cache after other jobs
 - Every AMD and NVIDIA GPU detected and scheduled from one queue, with device ids worked out
@@ -90,6 +91,9 @@ How the scheduler works inside: [docs/how-it-works.md](docs/how-it-works.md).
 - Programs that integrate directly, through the [lease API](docs/lease-api.md)
 - LLM servers, with model unloading: llama-swap, Ollama, llama.cpp `llama-server`, vLLM, SGLang
 - ComfyUI, with request gating
+- Stable Diffusion web UIs (AUTOMATIC1111, Forge, SD.Next), LM Studio and text-generation-webui,
+  with request gating and model unloading through their APIs
+- KoboldCpp, with request gating, stopped and started as a service
 - Immich ML, by pausing its job queues until the GPU is free, or with request gating
 
 Example configurations are in [examples/](examples/).

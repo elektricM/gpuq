@@ -1,0 +1,45 @@
+# LM Studio's server behind gpuq.
+# Install as ~/.config/gpuq/config.toml and run gpuq as a user service
+# (packaging/systemd/gpuq.user.service), next to the LM Studio server.
+#
+# LM Studio keeps running. When gpuq gives the card to something else it unloads the model
+# through LM Studio's REST API, and loads it again before the next request:
+#   POST /api/v1/models/unload   {"instance_id": "..."}
+#   POST /api/v1/models/load     {"model": "..."}
+# Docs: https://lmstudio.ai/docs/developer/rest/unload
+#       https://lmstudio.ai/docs/developer/rest/load
+# A model loaded once without a custom identifier has its model key as instance id.
+#
+# What else to change:
+#   * Start the server on 1235 so gpuq can take 1234, the port clients already use:
+#       lms server start --port 1235
+#   * The model key (as `lms ls` prints it) in both bodies, and vram.
+#   * Several models: one [[service]] per model is not possible on one port; use
+#     kind = "command" with `lms unload --all` (https://lmstudio.ai/docs/cli/unload) instead:
+#       kind = "command"
+#       stop = ["lms", "unload", "--all"]
+#       start = ["lms", "load", "qwen2.5-7b-instruct"]
+
+[llm]
+backend = "none"                     # LM Studio is gated as a service below
+
+[[service]]
+name = "lm-studio"
+class = "interactive"
+vram = "8G"
+yieldable = true
+stop_on_release = true               # unload the model when the lease ends
+idle_release_s = 300
+
+[service.control]
+kind = "http"
+unload_url = "http://127.0.0.1:1235/api/v1/models/unload"
+unload_body = '{"instance_id": "qwen2.5-7b-instruct"}'
+load_url = "http://127.0.0.1:1235/api/v1/models/load"
+load_body = '{"model": "qwen2.5-7b-instruct"}'
+start_timeout_s = 300
+
+[service.gate]
+listen = "127.0.0.1:1234"
+backend = "http://127.0.0.1:1235"
+gpu_paths = ["/v1/chat/completions", "/v1/completions", "/v1/embeddings", "/v1/responses", "/api/v1/chat"]

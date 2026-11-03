@@ -1,0 +1,36 @@
+# KoboldCpp behind gpuq, stopped and started as a systemd unit.
+# Install as /etc/gpuq/config.toml.
+#
+# KoboldCpp has no plain unload call. In admin mode (--admin --admindir DIR) it accepts
+# POST /api/admin/reload_config {"filename": "unload_model"}, which restarts KoboldCpp without
+# a model (https://github.com/LostRuins/koboldcpp, koboldcpp.py). Since that is a restart
+# anyway, this example stops and starts the whole server instead, which needs no admin mode.
+#
+# What else to change:
+#   * A unit for KoboldCpp on port 5002, so gpuq can take 5001, the port clients use:
+#       ExecStart=/opt/koboldcpp/koboldcpp --model /models/model.gguf --port 5002 \
+#         --host 127.0.0.1 --gpulayers 99 --quiet
+#   * Do not enable koboldcpp.service at boot: gpuq starts it on the first request.
+#   * vram: the model with its context.
+
+[llm]
+backend = "none"
+
+[[service]]
+name = "koboldcpp"
+class = "interactive"
+vram = "10G"
+yieldable = true
+stop_on_release = true
+idle_release_s = 300
+
+[service.control]
+kind = "systemd"
+unit = "koboldcpp.service"
+health_url = "http://127.0.0.1:5002/api/v1/model"
+start_timeout_s = 300
+
+[service.gate]
+listen = "127.0.0.1:5001"
+backend = "http://127.0.0.1:5002"
+gpu_paths = ["/api/v1/generate", "/api/extra/generate", "/v1/chat/completions", "/v1/completions"]

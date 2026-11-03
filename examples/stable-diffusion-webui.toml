@@ -1,0 +1,48 @@
+# AUTOMATIC1111 Stable Diffusion web UI, Stable Diffusion WebUI Forge or SD.Next behind gpuq.
+# Install as /etc/gpuq/config.toml, or ~/.config/gpuq/config.toml for a user instance.
+#
+# The web UI keeps running. When gpuq gives the card to something else, it frees the
+# checkpoint's VRAM through the web UI's own API, and before the next generation it asks for
+# the checkpoint back:
+#   POST /sdapi/v1/unload-checkpoint   A1111 moves the model to system RAM; Forge and SD.Next
+#                                      unload it
+#   POST /sdapi/v1/reload-checkpoint   A1111 and SD.Next put it back on the GPU; in Forge the
+#                                      call does nothing and the model loads with the next
+#                                      generation
+# Sources: modules/api/api.py in each project:
+#   https://github.com/AUTOMATIC1111/stable-diffusion-webui/blob/master/modules/api/api.py
+#   https://github.com/lllyasviel/stable-diffusion-webui-forge/blob/main/modules/api/api.py
+#   https://github.com/vladmandic/sdnext/blob/master/modules/api/api.py
+#
+# What else to change:
+#   * A1111 and Forge serve the API only with --api (SD.Next always does). Move the web UI to
+#     7861 so gpuq can take 7860, the port clients already use:
+#       ./webui.sh --api --port 7861
+#   * vram below: the checkpoint plus what a generation needs at your resolution.
+#
+# Only API generations (/sdapi/v1/txt2img and img2img, used by Open WebUI, SillyTavern and
+# scripts) wait for the card. The Generate button in the browser goes through Gradio's queue,
+# which gpuq passes through without scheduling it. Other requests always pass, since the web UI
+# stays up while its checkpoint is unloaded.
+
+[llm]
+backend = "none"                     # no LLM server here; see ollama.toml to add one
+
+[[service]]
+name = "sd-webui"
+class = "interactive"
+vram = "10G"
+yieldable = true                     # a higher class can take the card back between images
+stop_on_release = true               # unload the checkpoint when the lease ends
+idle_release_s = 120                 # no generation for this long: release the card
+
+[service.control]
+kind = "http"
+unload_url = "http://127.0.0.1:7861/sdapi/v1/unload-checkpoint"
+load_url = "http://127.0.0.1:7861/sdapi/v1/reload-checkpoint"
+start_timeout_s = 300
+
+[service.gate]
+listen = "127.0.0.1:7860"            # what clients use
+backend = "http://127.0.0.1:7861"    # the web UI after --port 7861
+gpu_paths = ["/sdapi/v1/txt2img", "/sdapi/v1/img2img"]

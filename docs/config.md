@@ -286,17 +286,28 @@ service's `[service.control]`.
 
 | Key | Applies to | Meaning |
 |---|---|---|
-| `kind` | all | `systemd`, `docker`, `podman` or `command`. Required. |
+| `kind` | all | `systemd`, `docker`, `podman`, `command`, or `http` (`[service.control]` only). Required. |
 | `unit` | systemd | Unit name. Required. |
 | `user` | systemd | `true` for a `systemctl --user` unit. Default `false`. |
 | `container` | docker, podman | Container name. Required. The container must already exist. |
 | `start` | command | Argv. Required. |
 | `stop` | command | Argv. Required. |
 | `status` | command | Argv, optional. Exit 0 = running. |
+| `unload_url` | http | "Stop" is a POST here; the server keeps running. Required. |
+| `unload_body` | http | JSON text sent with it, e.g. `'{"instance_id": "m"}'`. Optional. |
+| `load_url` | http | "Start" is a POST here. Without it, start does nothing (servers that load on the next request). |
+| `load_body` | http | JSON text sent with it. Optional. |
 | `health_url` | all | Polled after a start; up when it answers 2xx. Without it gpuq only checks that the service is running. |
 | `start_timeout_s` | all | Default `120`. |
 
 Keys that do not belong to the chosen `kind` are an error.
+
+`kind = "http"` is for servers that free their VRAM through their own API and stay up:
+Stable Diffusion web UIs, LM Studio, text-generation-webui (see
+[integrations.md](integrations.md#model-unload-over-http)). A call fails on a non-2xx answer
+or a JSON answer with `"success": false`. Since the server stays up, its gate passes requests
+outside `gpu_paths` even while the model is unloaded. `[llm.service]` does not take it: the
+LLM backends wait for the server to go down after a stop.
 
 ## [classes]
 
