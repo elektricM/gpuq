@@ -183,7 +183,11 @@ impl LeaseStream {
             }
             match self.resp.body.frame().await {
                 None => return Ok(None),
-                Some(Err(e)) => return Err(ClientError::Other(e.to_string())),
+                Some(Err(e)) => {
+                    return Err(ClientError::Other(format!(
+                        "lost the connection to gpuq: {e}"
+                    )))
+                }
                 Some(Ok(frame)) => {
                     if let Some(data) = frame.data_ref() {
                         self.buf.extend_from_slice(data);
