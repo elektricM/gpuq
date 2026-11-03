@@ -1,25 +1,25 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1000" height="470" viewBox="0 0 1000 470" font-family="Inter, Helvetica, Arial, sans-serif">
 <defs>
 <style>
-.a{animation-duration:32s;animation-iteration-count:infinite;animation-timing-function:cubic-bezier(.45,0,.25,1);animation-fill-mode:both}
-.l{animation-duration:16s}
+.a{animation-duration:20s;animation-iteration-count:infinite;animation-timing-function:cubic-bezier(.45,0,.25,1);animation-fill-mode:both}
+.l{animation-duration:20s}
 .sx{transform-box:fill-box;transform-origin:0 50%}
 .fl{stroke-dasharray:18 200;stroke-linecap:round}
 .lbp{animation-name:lbp}.lbb{animation-name:lbb}.lov{animation-name:lov}.lask{animation-name:lask}.loom{animation-name:loom}.lgpu{animation-name:lgpu}.la1{animation-name:la1}.lp1{animation-name:lp1}.la2{animation-name:la2}.lp2{animation-name:lp2}.la3{animation-name:la3}.lp3{animation-name:lp3}.la4{animation-name:la4}.lp4{animation-name:lp4}.rw0{animation-name:rw0}.rw1{animation-name:rw1}.rw2{animation-name:rw2}.rw3{animation-name:rw3}.r1o{animation-name:r1o}.r1a{animation-name:r1a}.r2o{animation-name:r2o}.r2a{animation-name:r2a}.r3o{animation-name:r3o}.r3a{animation-name:r3a}.gw{animation-name:gw}.gwt{animation-name:gwt}.gl{animation-name:gl}.glt{animation-name:glt}.gs1{animation-name:gs1}.gsb{animation-name:gsb}.gst{animation-name:gst}.gc{animation-name:gc}.gct{animation-name:gct}.ga{animation-name:ga}.gat{animation-name:gat}.gd{animation-name:gd}.gdt{animation-name:gdt}.gb{animation-name:gb}.gbt{animation-name:gbt}.ch{animation-name:ch}.chs{animation-name:chs}.cap0{animation-name:cap0}.cap2{animation-name:cap2}.cap3{animation-name:cap3}.cap4{animation-name:cap4}.cap5{animation-name:cap5}.sl1{animation-name:sl1}.sl2{animation-name:sl2}.sl3{animation-name:sl3}.sl4{animation-name:sl4}.sl5{animation-name:sl5}.f1{animation-name:f1}.f2{animation-name:f2}.f3{animation-name:f3}.f4{animation-name:f4}.cw{animation-name:cw}.cl{animation-name:cl}.cc{animation-name:cc}.ca{animation-name:ca}
-@keyframes lbp{0%,9.38%{transform:scaleX(1)}14.37%,18.75%{transform:scaleX(0)}25%,100%{transform:scaleX(1)}}
-@keyframes lbb{0%,9.38%{transform:scaleX(1)}14.37%,28.5%{transform:scaleX(0)}33.5%,100%{transform:scaleX(1)}}
-@keyframes lov{0%,9.38%{opacity:1;transform:scaleX(1)}12.5%{opacity:0;transform:scaleX(1)}12.62%,37.38%{opacity:0;transform:scaleX(0)}37.5%{opacity:1;transform:scaleX(0)}40.5%,43.75%{opacity:1;transform:scaleX(.45)}46.81%,100%{opacity:1;transform:scaleX(1)}}
-@keyframes lask{0%,9.38%{opacity:1}12.5%,44%{opacity:0}47%,100%{opacity:1}}
-@keyframes loom{0%,9.38%{opacity:1}12.5%,46%{opacity:0}48%{opacity:1}50.5%{opacity:0.15}53%{opacity:1}55.5%{opacity:0.15}58%,100%{opacity:1}}
-@keyframes lgpu{0%,9.38%{stroke:#ff4d4d}13%,44%{stroke:#1f1f1f}47%,100%{stroke:#ff4d4d}}
-@keyframes la1{0%,9.38%{opacity:1}12.5%,16.25%{opacity:0}18.75%,100%{opacity:1}}
-@keyframes lp1{0%,16.25%,19.5%,100%{transform:translateX(0)}17.81%{transform:translateX(5px)}}
-@keyframes la2{0%,9.38%{opacity:1}12.5%,26%{opacity:0}28.5%,100%{opacity:1}}
-@keyframes lp2{0%,26%,29.25%,100%{transform:translateX(0)}27.56%{transform:translateX(5px)}}
-@keyframes la3{0%,9.38%{opacity:1}12.5%,35%{opacity:0}37.5%,100%{opacity:1}}
-@keyframes lp3{0%,35%,38.25%,100%{transform:translateX(0)}36.56%{transform:translateX(5px)}}
-@keyframes la4{0%,9.38%{opacity:1}12.5%,41.25%{opacity:0}43.75%,100%{opacity:1}}
-@keyframes lp4{0%,41.25%,44.5%,100%{transform:translateX(0)}42.81%{transform:translateX(5px)}}
+@keyframes lbp{0%,7.5%{transform:scaleX(1)}11.5%,15%{transform:scaleX(0)}20%,100%{transform:scaleX(1)}}
+@keyframes lbb{0%,7.5%{transform:scaleX(1)}11.5%,22.8%{transform:scaleX(0)}26.8%,100%{transform:scaleX(1)}}
+@keyframes lov{0%,7.5%{opacity:1;transform:scaleX(1)}10%{opacity:0;transform:scaleX(1)}10.1%,29.9%{opacity:0;transform:scaleX(0)}30%{opacity:1;transform:scaleX(0)}32.4%,35%{opacity:1;transform:scaleX(.45)}37.45%,100%{opacity:1;transform:scaleX(1)}}
+@keyframes lask{0%,7.5%{opacity:1}10%,35.2%{opacity:0}37.6%,100%{opacity:1}}
+@keyframes loom{0%,7.5%{opacity:1}10%,36.8%{opacity:0}38.4%{opacity:1}40.4%{opacity:0.15}42.4%{opacity:1}44.4%{opacity:0.15}46.4%,100%{opacity:1}}
+@keyframes lgpu{0%,7.5%{stroke:#ff4d4d}10.4%,35.2%{stroke:#1f1f1f}37.6%,100%{stroke:#ff4d4d}}
+@keyframes la1{0%,7.5%{opacity:1}10%,13%{opacity:0}15%,100%{opacity:1}}
+@keyframes lp1{0%,13%,15.6%,100%{transform:translateX(0)}14.25%{transform:translateX(5px)}}
+@keyframes la2{0%,7.5%{opacity:1}10%,20.8%{opacity:0}22.8%,100%{opacity:1}}
+@keyframes lp2{0%,20.8%,23.4%,100%{transform:translateX(0)}22.05%{transform:translateX(5px)}}
+@keyframes la3{0%,7.5%{opacity:1}10%,28%{opacity:0}30%,100%{opacity:1}}
+@keyframes lp3{0%,28%,30.6%,100%{transform:translateX(0)}29.25%{transform:translateX(5px)}}
+@keyframes la4{0%,7.5%{opacity:1}10%,33%{opacity:0}35%,100%{opacity:1}}
+@keyframes lp4{0%,33%,35.6%,100%{transform:translateX(0)}34.25%{transform:translateX(5px)}}
 @keyframes rw0{0%,4.69%{opacity:1}7.19%,15.62%{opacity:0.25}16.88%,40%{opacity:1}41.88%,96.25%{opacity:0.25}98.12%,100%{opacity:1}}
 @keyframes rw1{0%,4.69%{opacity:1}7.19%,20%{opacity:0.25}21.25%,100%{opacity:1}}
 @keyframes rw2{0%,4.69%{opacity:1}7.19%,24.38%{opacity:0.25}25.62%,100%{opacity:1}}
