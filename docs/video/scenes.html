@@ -82,6 +82,10 @@ function ring(x, y, w, h, t, a, col = C.ink, rx = 16) {
   const e = 4 + 16 * out(k);
   return `<rect x="${x - e}" y="${y - e}" width="${w + 2 * e}" height="${h + 2 * e}" rx="${rx + e}" fill="none" stroke="${col}" stroke-width="${(6 * (1 - k) + 1).toFixed(2)}" opacity="${(1 - k).toFixed(3)}"/>`;
 }
+// Crossfade between two drawings (k 0 -> a, 1 -> b), and a label shown inside a window of scene time:
+// state changes blend over a few frames instead of switching on one.
+const xf = (a, b, k) => g(a, { op: 1 - clamp(k) }) + g(b, { op: clamp(k) });
+const win = (t, a, b = 1e9, f = .15) => P(t, a, a + f) * (1 - P(t, b - f, b));
 const status = (x, y, s) => text(x, y, s, { size: 24, weight: 600, fill: '#ffffff', anchor: 'start' });
 function check(cx, cy, r = 20) {
   return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${C.whisper}"/><path d="M${cx - 10},${cy + 1} L${cx - 2},${cy + 9} L${cx + 11},${cy - 8}" stroke="#ffffff" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
@@ -122,14 +126,15 @@ function s2(t) {   // the same two programs through gpuq: one runs, the other wa
   s += g(pill(0, 140, 290, 80, C.llm, 'Chat model', { sub: '17 GB', size: 28 }) + pill(0, 330, 290, 80, C.comfy, 'Image job', { sub: '12 GB', size: 28 }), { tx: L(-400, 0, kin), op: kin * 3 });
   const kq1 = P(t, .35, .65), kgo = P(t, .7, 1.0), kq2 = P(t, 1.05, 1.35), kun = P(t, 1.85, 2.15), kimg = P(t, 2.25, 2.55);
   let b = box(360, 100, 360, 340) + text(540, 202, 'queue, by priority', { size: 22, weight: 500, fill: '#ffffff' });
-  if (kq1 >= 1) b += chip(385, 226, 200, 52, C.llm, '1 chat', kun < .5) + status(600, 261, kun < .5 ? '▶ runs' : '· idle');
-  if (kq2 >= 1) b += chip(385, 304, 200, 52, C.comfy, '2 image', kimg > 0) + status(600, 339, kimg > 0 ? '▶ runs' : '· waits') + ring(385, 304, 200, 52, t, 1.45, C.yellow, 12);
+  if (kq1 >= 1) b += xf(chip(385, 226, 200, 52, C.llm, '1 chat', true) + status(600, 261, '▶ runs'), chip(385, 226, 200, 52, C.llm, '1 chat', false) + status(600, 261, '· idle'), kun);
+  if (kq2 >= 1) b += xf(chip(385, 304, 200, 52, C.comfy, '2 image', false) + status(600, 339, '· waits'), chip(385, 304, 200, 52, C.comfy, '2 image', true) + status(600, 339, '▶ runs'), kimg) + ring(385, 304, 200, 52, t, 1.45, C.yellow, 12);
   s += g(b, { op: kin * 2, s: L(.9, 1, kin), cx: 540, cy: 270 });
   // 11.67 px per GB on a 280 px bar
   let c = card(790, 120, 330, 310, 'GPU · 24 GB') + track(815, 215, 280, 72);
   c += seg(815, 215, 198 * kgo * (1 - kun), 72, C.llm, 'chat 17G', { size: 26 }) + seg(815, 215, 140 * kimg, 72, C.comfy, 'image 12G', { size: 24 });
-  const note = kq2 >= 1 && kun <= 0 ? ['7 GB free', C.muted] : kun > 0 && kimg <= 0 ? ['chat model unloaded', C.muted] : kimg > 0 ? ['no crash', C.whisper] : ['', C.muted];
-  c += text(955, 345, note[0], { size: 26, weight: 700, fill: note[1] }) + ring(815, 215, 280, 72, t, 1.85, C.ink, 8);
+  c += text(955, 345, '7 GB free', { size: 26, weight: 700, fill: C.muted, op: win(t, 1.35, 1.85) })
+     + text(955, 345, 'chat model unloaded', { size: 26, weight: 700, fill: C.muted, op: win(t, 1.85, 2.25) })
+     + text(955, 345, 'no crash', { size: 26, weight: 700, fill: C.whisper, op: win(t, 2.25) }) + ring(815, 215, 280, 72, t, 1.85, C.ink, 8);
   s += g(c, { op: kin * 2, s: L(.9, 1, kin), cx: 955, cy: 270 });
   const fly = (k, x1, y1, x2, y2, col, label) => k > 0 && k < 1 ? chip(L(x1, x2, k), L(y1, y2, k), 200, 52, col, label, true) : '';
   s += fly(kq1, 300, 154, 385, 226, C.llm, '1 chat') + fly(kq2, 300, 344, 385, 304, C.comfy, '2 image');
@@ -141,8 +146,9 @@ function s3(t) {   // a 30 GB model split 18 + 12 over two cards, unloaded from 
   const kin = P(t, 0, .35, back), kload = P(t, .35, .8), kq = P(t, .9, 1.2), kun = P(t, 1.4, 1.7), kgo = P(t, 1.8, 2.1), kdone = P(t, 2.25, 2.45), kre = P(t, 2.55, 2.9);
   const up = kload - kun + kre;
   let b = box(0, 120, 300, 320) + text(150, 226, 'queue', { size: 22, weight: 500, fill: '#ffffff' });
-  b += chip(22, 252, 160, 52, C.llm, 'chat', up > .5) + status(194, 287, up > .5 ? '▶ runs' : '· waits');
-  if (kq > 0 && kdone < 1) b += g(chip(22, 330, 160, 52, C.api, 'render', kgo > 0, { tc: C.dark }) + status(194, 365, kgo > 0 ? '▶ runs' : '· waits'), { op: kq * (1 - kdone), tx: L(-60, 0, kq) });
+  b += xf(chip(22, 252, 160, 52, C.llm, 'chat', false) + status(194, 287, '· waits'), chip(22, 252, 160, 52, C.llm, 'chat', true) + status(194, 287, '▶ runs'), up);
+  if (kq > 0 && kdone < 1) b += g(xf(chip(22, 330, 160, 52, C.api, 'render', false, { tc: C.dark }) + status(194, 365, '· waits'),
+                                     chip(22, 330, 160, 52, C.api, 'render', true, { tc: C.dark }) + status(194, 365, '▶ runs'), kgo * 3), { op: kq * (1 - kdone), tx: L(-60, 0, kq) });
   b += ring(22, 330, 160, 52, t, 1.2, C.yellow, 12);
   s += g(b, { op: kin * 2, s: L(.9, 1, kin), cx: 150, cy: 280 });
   s += g(arrow(306, 280, 392, 150, 1) + arrow(306, 280, 392, 410, 1), { op: kin });
@@ -151,7 +157,7 @@ function s3(t) {   // a 30 GB model split 18 + 12 over two cards, unloaded from 
   c += track(440, 110, 600, 72) + track(440, 390, 400, 72);
   if (up > 0) c += `<rect x="452" y="176" width="40" height="220" fill="${C.llm}" opacity="${clamp(up * 1.5 - .5).toFixed(3)}"/>`;
   c += seg(440, 110, 450 * up, 72, C.llm, 'chat model 18G') + seg(440, 390, 300 * up, 72, C.llm, 'chat model 12G');
-  c += text(510, 286, up > .9 ? 'one 30 GB model' : '', { size: 28, weight: 800, fill: C.llm, anchor: 'start' });
+  c += text(510, 286, 'one 30 GB model', { size: 28, weight: 800, fill: C.llm, anchor: 'start', op: clamp((up - .75) / .25) });
   c += seg(440, 390, 400 * (kgo - kdone), 72, C.api, 'render 16G', { tc: C.dark });
   c += ring(440, 110, 600, 72, t, 1.4, C.ink, 8) + ring(440, 390, 400, 72, t, 1.4, C.ink, 8);
   s += g(c, { op: kin * 2, s: L(.92, 1, kin), cx: 750, cy: 275 });
@@ -163,16 +169,18 @@ function s4(t) {   // the desktop frees its VRAM for a job, then comes back
   const kin = P(t, 0, .35, back), kseat = P(t, .6, .9, back), kstop = P(t, 1.05, 1.35), kgo = P(t, 1.5, 1.85), kdone = P(t, 2.05, 2.3), kback = P(t, 2.4, 2.7, back);
   s += g(pill(0, 100, 450, 84, '#ffffff', '') + check(48, 142) + text(84, 153, 'nobody at the screen', { size: 30, weight: 700, anchor: 'start' }),
          { op: kseat * 2, s: L(.85, 1, kseat), cx: 225, cy: 142 });
-  if (kgo < 1) s += g(chip(0, 330, 380, 76, C.comfy, kgo > 0 ? 'image job 15 GB' : 'image job 15 GB · waits', kgo > 0, { size: 28 }) + (kgo > 0 ? '' : ring(0, 330, 380, 76, t, .45, C.comfy, 12)),
-                      { tx: L(-440, 0, kin) + L(0, 540, kgo), ty: L(0, -110, kgo), op: kin * 3 });
+  const ksolid = clamp(kgo / .3);  // the waiting chip turns solid as it starts to move
+  if (kgo < 1) s += g(g(chip(0, 330, 380, 76, C.comfy, 'image job 15 GB · waits', false, { size: 28 }) + ring(0, 330, 380, 76, t, .45, C.comfy, 12), { op: 1 - ksolid }) +
+                      g(chip(0, 330, 380, 76, C.comfy, 'image job 15 GB', true, { size: 28 }), { op: ksolid }),
+                      { tx: L(-440, 0, kin) + L(0, 540, kgo), ty: L(0, -110, kgo), op: clamp(kin * 3) * (1 - P(kgo, .85, 1, x => x)) });
   // 33.75 px per GB on a 540 px bar
   let c = card(500, 100, 620, 360, 'GPU 1 · 16 GB') + track(540, 220, 540, 80);
   const kd = 1 - kstop + kback;
   c += seg(540, 220, 67.5 * kd, 80, C.grey, '');
-  const dl = kstop <= 0 ? ['your desktop 2G', C.ink, 1] : kback <= 0 ? ['desktop stopped', C.muted, 1 - P(t, 1.3, 1.5)] : ['desktop back', C.ink, kback];
-  c += text(540 + 67.5 * clamp(kd) + 18, 271, dl[0], { size: 28, weight: 700, anchor: 'start', fill: dl[1], op: clamp(dl[2]) });
+  const dx = 540 + 67.5 * clamp(kd) + 18, dt = (s, fill, op) => text(dx, 271, s, { size: 28, weight: 700, anchor: 'start', fill, op: clamp(op) });
+  c += dt('your desktop 2G', C.ink, 1 - P(t, 1.05, 1.2)) + dt('desktop stopped', C.muted, win(t, 1.15, 1.55)) + dt('desktop back', C.ink, kback);
   c += seg(540, 220, 506 * (kgo - kdone), 80, C.comfy, 'image job 15G');
-  const free = kstop <= 0 ? '14 GB free' : kgo <= 0 ? '16 GB free' : kdone <= 0 ? '1 GB free' : '';
+  const free = `${Math.round(16 - 2 * clamp(kd) - 15 * clamp(kgo - kdone))} GB free`;  // counts with the bars
   c += text(810, 380, free, { size: 28, weight: 700, fill: C.muted }) + ring(540, 220, 67.5, 80, t, 1.05, C.ink, 8);
   s += g(c, { op: kin * 2, s: L(.9, 1, kin), cx: 810, cy: 280 });
   return s;
@@ -187,13 +195,14 @@ function s5(t) {   // the gate holds a chat request; a request for another model
   let c = card(640, 120, 480, 320, 'GPU · 24 GB') + track(670, 215, 420, 72);
   c += seg(670, 215, 210 * (1 - kfree), 72, C.comfy, 'image job 12G');
   c += seg(670, 215, 297.5 * kload * (1 - kun), 72, C.llm, 'chat model 17G') + seg(670, 215, 210 * kol, 72, C.api, 'other model 12G', { tc: C.dark, size: 23 });
-  const note = kfree <= 0 ? ['GPU busy', C.muted] : kcgo >= 1 && ko <= 0 ? ['chat answered', C.whisper] : ko > 0 && kun <= 0 ? ['chat still in use', C.muted] : kol >= 1 ? ['one swap, when quiet', C.whisper] : ['', C.muted];
-  c += text(880, 360, note[0], { size: 26, weight: 700, fill: note[1] }) + ring(670, 215, 420, 72, t, 2.65, C.ink, 8);
+  const nt = (s, fill, op) => text(880, 360, s, { size: 26, weight: 700, fill, op: clamp(op) });
+  c += nt('GPU busy', C.muted, 1 - P(t, .9, 1.05)) + nt('chat answered', C.whisper, win(t, 1.85, 2.0)) + nt('chat still in use', C.muted, win(t, 2.0, 2.65))
+     + nt('one swap, when quiet', C.whisper, win(t, 3.2)) + ring(670, 215, 420, 72, t, 2.65, C.ink, 8);
   s += g(c, { op: kin * 2, s: L(.92, 1, kin), cx: 880, cy: 280 });
-  if (kc > 0 && kcgo < 1) s += g(chip(150, 226, 340, 58, C.llm, kcgo > 0 ? 'chat' : 'chat · held', true) + (kcgo > 0 ? '' : ring(150, 226, 340, 58, t, .6, C.yellow, 12)),
-                                 { tx: L(-560, 0, kc) + L(0, 530, kcgo), ty: L(0, -15, kcgo), op: kcgo > .8 ? (1 - kcgo) * 5 : 1 });
-  if (ko > 0 && kol < 1) s += g(chip(150, 310, 340, 58, C.api, kun > 0 ? 'other model' : 'other model · waits', true, { tc: C.dark }) + (kun > 0 ? '' : ring(150, 310, 340, 58, t, 2.3, C.yellow, 12)),
-                                { tx: L(-560, 0, ko) + L(0, 530, kol), ty: L(0, -99, kol), op: kol > .8 ? (1 - kol) * 5 : 1 });
+  if (kc > 0 && kcgo < 1) s += g(xf(chip(150, 226, 340, 58, C.llm, 'chat · held', true) + ring(150, 226, 340, 58, t, .6, C.yellow, 12), chip(150, 226, 340, 58, C.llm, 'chat', true), kcgo * 4),
+                                 { tx: L(-560, 0, kc) + L(0, 530, kcgo), ty: L(0, -15, kcgo), op: 1 - P(kcgo, .8, 1, x => x) });
+  if (ko > 0 && kol < 1) s += g(xf(chip(150, 310, 340, 58, C.api, 'other model · waits', true, { tc: C.dark }) + ring(150, 310, 340, 58, t, 2.3, C.yellow, 12), chip(150, 310, 340, 58, C.api, 'other model', true, { tc: C.dark }), kun),
+                                { tx: L(-560, 0, ko) + L(0, 530, kol), ty: L(0, -99, kol), op: 1 - P(kol, .8, 1, x => x) });
   return s;
 }
 function s6(t) {   // end card
@@ -219,7 +228,7 @@ const SCENES = [
 // Pace: each scene is slowed so that it shows about RATE animation steps per second (STEPS = the P(t, ...) steps
 // in its function), never faster than its own timings; then it holds HOLD s on its last frame so the caption can be read.
 // The end card holds END_HOLD s so the install command can be read.
-const RATE = 2.6, HOLD = 0.7, END_HOLD = 2.6;
+const RATE = 2.6, HOLD = 0.7, END_HOLD = 2.6, FADE = .32;
 const STEPS = { s1: 6, s2: 8, s3: 8, s4: 7, s5: 9, s6: 4 };
 const slow = s => Math.max(1.4, STEPS[s[0].name] / (RATE * s[1]));
 const len = s => s[1] * slow(s) + (s[2] ? HOLD : END_HOLD);
@@ -242,7 +251,7 @@ function draw(t) {
   const lt = t - at;
   const st = Math.min((t - at) / slow(SCENES[i]), d0 - .15);  // scene time, frozen near its end during the hold
   const last = i === SCENES.length - 1;
-  const fade = P(lt, 0, .14) * (last ? 1 : 1 - P(lt, d - .14, d));
+  const fade = P(lt, 0, FADE) * (last ? 1 : 1 - P(lt, d - FADE, d));  // fade in and out over FADE s; 0.14 s read as a cut
   const square = H >= W;
   const k = square ? .9 : 1;
   // the sub-caption shown now, and how far it has faded in
