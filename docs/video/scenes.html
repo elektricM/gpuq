@@ -241,9 +241,9 @@ const SCENES = [
 // Pace: each scene is slowed so that it shows about RATE animation steps per second (STEPS = the P(t, ...) steps
 // in its function), never faster than its own timings; then it holds HOLD s on its last frame so the caption can be read.
 // The end card holds END_HOLD s so the install command can be read.
-const RATE = 2.6, HOLD = 0.7, END_HOLD = 2.6, FADE = .32;
+const RATE = 2.0, HOLD = 0.55, END_HOLD = 2.0, FADE = .3;
 const STEPS = { s1: 6, s2: 8, s3: 8, s4: 7, s5: 9, s6: 4 };
-const slow = s => Math.max(1.4, STEPS[s[0].name] / (RATE * s[1]));
+const slow = s => Math.max(1.6, STEPS[s[0].name] / (RATE * s[1]));
 const len = s => s[1] * slow(s) + (s[2] ? HOLD : END_HOLD);
 const TOTAL = SCENES.reduce((a, s) => a + len(s), 0);
 
