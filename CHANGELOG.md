@@ -7,6 +7,8 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-03
+
 ### Added
 
 - `[desktop]`: free the VRAM the graphical desktop holds on a card. `policy = "stop"` stops the
@@ -38,8 +40,16 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   OpenGL programs see that card and no other. `HIP_VISIBLE_DEVICES` and `ROCR_VISIBLE_DEVICES`
   only steer ROCm: a Vulkan build of whisper.cpp took Vulkan device 0, the integrated GPU,
   while gpuq had unloaded the LLM from the card it leased. Leases on several cards get no pin,
-  since Mesa takes a single device.
+  since Mesa takes a single device. A `DRI_PRIME` set in the card's own env is kept.
 - An unreachable Immich is logged once, and again when it is back, instead of on every poll.
+- `gpuq check-config` no longer shows a gate address when `backend = "none"`, where no gate
+  runs.
+- A `gpuq run` or `gpuq hold` whose connection to gpuq breaks says so instead of printing the
+  bare HTTP error.
+
+### Changed
+
+- CI runs on pushes to every branch, not only `main`.
 
 ## [0.3.1] - 2026-10-17
 
@@ -163,7 +173,8 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Control API and the `daemon`, `check-config`, `status`, `run` and `hold` commands.
 - Static musl binaries, `.deb` and `.rpm` packages, and a PKGBUILD.
 
-[Unreleased]: https://github.com/elektricM/gpuq/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/elektricM/gpuq/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/elektricM/gpuq/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/elektricM/gpuq/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/elektricM/gpuq/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/elektricM/gpuq/compare/v0.1.1...v0.2.0
