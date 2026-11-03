@@ -19,6 +19,6 @@ backend = "http://127.0.0.1:11435"   # where Ollama listens after the drop-in
 
 [llm]
 backend = "ollama"
-resident = "llama3.1:8b"             # reloaded when the card goes idle; empty = load on demand
+resident = "qwen3.8:27b"              # reloaded when the card goes idle; empty = load on demand
 idle_s = 300
 gap_s = 10

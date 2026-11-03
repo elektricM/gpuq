@@ -18,7 +18,7 @@
 #     kind = "command" with `lms unload --all` (https://lmstudio.ai/docs/cli/unload) instead:
 #       kind = "command"
 #       stop = ["lms", "unload", "--all"]
-#       start = ["lms", "load", "qwen2.5-7b-instruct"]
+#       start = ["lms", "load", "qwen3.8-27b"]
 
 [llm]
 backend = "none"                     # LM Studio is gated as a service below
@@ -26,7 +26,7 @@ backend = "none"                     # LM Studio is gated as a service below
 [[service]]
 name = "lm-studio"
 class = "interactive"
-vram = "8G"
+vram = "18G"
 yieldable = true
 stop_on_release = true               # unload the model when the lease ends
 idle_release_s = 300
@@ -34,9 +34,9 @@ idle_release_s = 300
 [service.control]
 kind = "http"
 unload_url = "http://127.0.0.1:1235/api/v1/models/unload"
-unload_body = '{"instance_id": "qwen2.5-7b-instruct"}'
+unload_body = '{"instance_id": "qwen3.8-27b"}'
 load_url = "http://127.0.0.1:1235/api/v1/models/load"
-load_body = '{"model": "qwen2.5-7b-instruct"}'
+load_body = '{"model": "qwen3.8-27b"}'
 start_timeout_s = 300
 
 [service.gate]

@@ -23,7 +23,7 @@ backend = "none"
 [[service]]
 name = "textgen"
 class = "interactive"
-vram = "12G"
+vram = "18G"
 yieldable = true
 stop_on_release = true
 idle_release_s = 300
@@ -32,7 +32,7 @@ idle_release_s = 300
 kind = "http"
 unload_url = "http://127.0.0.1:5001/v1/internal/model/unload"
 load_url = "http://127.0.0.1:5001/v1/internal/model/load"
-load_body = '{"model_name": "Qwen2.5-14B-Instruct-Q4_K_M.gguf"}'
+load_body = '{"model_name": "Qwen3.8-27B-Q4_K_M.gguf"}'
 start_timeout_s = 300
 
 [service.gate]

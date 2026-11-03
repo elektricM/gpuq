@@ -9,7 +9,7 @@ backend = "http://127.0.0.1:11435"   # the ollama container
 
 [llm]
 backend = "ollama"
-resident = "llama3.1:8b"             # loaded when the card is idle; empty = load on demand
+resident = "qwen3.8:27b"              # loaded when the card is idle; empty = load on demand
 idle_s = 300                         # batch jobs wait this long after the last chat request
 
 [[service]]

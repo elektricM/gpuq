@@ -22,7 +22,7 @@ user_units = [
 # Never the desktop, e.g. a headless compositor used by browser automation.
 ignore = ["kwin_wayland --virtual"]
 # Release while one of these LLM models is loaded...
-models = ["qwen3-32b*"]
+models = ["qwen3.8-27b*"]
 # ...or while any model is loaded and less than this is free.
 min_free_mib = 1024
 release_delay_s = 30
