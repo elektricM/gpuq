@@ -4,6 +4,8 @@ A graphical session holds VRAM on the card it runs on: the compositor, Xwayland,
 On a machine that is mostly used remotely, that VRAM is better spent on a model or a job.
 With `[desktop]` gpuq frees it while something needs it and gives the desktop back after.
 
+![A job does not fit next to the desktop; with nobody at the seat gpuq stops the display manager, the job runs, and the desktop comes back when nothing needs the card](desktop.svg)
+
 It is off by default. Three policies:
 
 | `policy` | What a release does | What a restore does |
