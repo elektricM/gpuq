@@ -366,7 +366,8 @@ pub fn merge_env<'a>(
 
 /// The env a lease hands its job: the merged env of its cards, plus the graphics pin of its
 /// card when it holds exactly one. Mesa takes a single device, so a lease on several cards
-/// gets no pin and its Vulkan program sees every card.
+/// gets no pin and its Vulkan program sees every card. A variable the card's own env already
+/// sets (`visible_devices_env = ["DRI_PRIME"]`) is left as configured.
 pub fn lease_env(
     merged: Vec<(String, String)>,
     pins: &[&[(String, String)]],
@@ -374,8 +375,9 @@ pub fn lease_env(
     let mut env = merged;
     if let [pin] = pins {
         for (k, v) in pin.iter() {
-            env.retain(|(e, _)| e != k);
-            env.push((k.clone(), v.clone()));
+            if !env.iter().any(|(e, _)| e == k) {
+                env.push((k.clone(), v.clone()));
+            }
         }
     }
     env
@@ -896,5 +898,8 @@ mod tests {
         assert_eq!(lease_env(merged.clone(), &[&pin, &other]), merged);
         // A card without a pin (NVIDIA) changes nothing.
         assert_eq!(lease_env(merged.clone(), &[&[]]), merged);
+        // The card's own DRI_PRIME wins over the pin.
+        let own = vec![kv("DRI_PRIME", "1")];
+        assert_eq!(lease_env(own.clone(), &[&pin]), own);
     }
 }
