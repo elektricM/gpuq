@@ -11,7 +11,8 @@
 //!   the card. Without a lease it is held until the lease is granted and the service is up;
 //!   with one it goes straight through and counts as in flight until its response is done.
 //! - Other requests pass untouched while the service is up, and get a 503 while it is stopped,
-//!   so a status page never wakes the GPU.
+//!   so a status page never wakes the GPU. A `kind = "http"` service only unloads its model
+//!   and stays up, so they always pass.
 //! - After `idle_release_s` without in-flight GPU requests (and with `busy_url`, if set, not
 //!   reporting work) the service is stopped (`stop_on_release` and a `control`) and the lease
 //!   dropped. When the arbiter asks the lease to yield, new GPU requests are held, running
@@ -40,11 +41,11 @@ use tokio::sync::{mpsc, watch};
 use tokio::task::JoinSet;
 
 use crate::arbiter::{CardSel, Handle, Vram};
-use crate::config::{CardList, Flavor, Service, ServiceKind as Kind, ServiceSpec};
+use crate::config::{CardList, Flavor, Service, ServiceKind, ServiceSpec};
 use crate::gate::proxy::{
     full, is_upgrade, read_body, serve_fn, BodyError, Keepalive, Proxy, ProxyBody, MAX_BODY,
 };
-use crate::workload::service::{Engine, ServiceControl};
+use crate::workload::service::ServiceControl;
 use machine::{Msg, View};
 
 /// Everything the machine and the gate need from a `[[service]]` entry.
@@ -112,17 +113,7 @@ impl Cfg {
 }
 
 fn control_of(spec: &ServiceSpec) -> ServiceControl {
-    let c = match &spec.kind {
-        Kind::Systemd { unit, user } => ServiceControl::systemd(unit.clone(), *user),
-        Kind::Docker { container } => ServiceControl::container(Engine::Docker, container.clone()),
-        Kind::Podman { container } => ServiceControl::container(Engine::Podman, container.clone()),
-        Kind::Command {
-            start,
-            stop,
-            status,
-        } => ServiceControl::commands(start.clone(), stop.clone(), status.clone()),
-    };
-    c.with_poll_interval(Duration::from_millis(250))
+    ServiceControl::from_spec(spec).with_poll_interval(Duration::from_millis(250))
 }
 
 /// Run every configured service until `shutdown` turns true.
@@ -149,6 +140,10 @@ pub async fn run(
                 name: svc.name.clone(),
                 paths: gate.gpu_paths.clone(),
                 comfy: cfg.comfy,
+                stays_up: matches!(
+                    svc.control.as_ref().map(|c| &c.kind),
+                    Some(ServiceKind::Http { .. })
+                ),
                 backend: gate.backend.trim_end_matches('/').to_owned(),
                 proxy: Proxy::new(&gate.backend),
                 http: reqwest::Client::builder()
@@ -200,6 +195,9 @@ struct GateCtx {
     name: String,
     paths: Vec<String>,
     comfy: bool,
+    /// The server keeps running while its model is unloaded (`kind = "http"`), so requests
+    /// that do not need the card always pass.
+    stays_up: bool,
     backend: String,
     proxy: Proxy,
     http: reqwest::Client,
@@ -220,7 +218,7 @@ impl GateCtx {
     }
 
     fn up(&self) -> bool {
-        self.view.borrow().up
+        self.stays_up || self.view.borrow().up
     }
 
     fn stopped(&self) -> Response<ProxyBody> {

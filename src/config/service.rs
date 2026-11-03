@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use serde::{Deserialize, Deserializer};
 
-use super::secs;
+use super::{is_http_url, secs};
 use crate::arbiter::Vram;
 use crate::config::{parse_vram, CardList, VramParseError};
 
@@ -28,6 +28,15 @@ pub enum ServiceKind {
         start: Vec<String>,
         stop: Vec<String>,
         status: Option<Vec<String>>,
+    },
+    /// A server that stays up and frees its VRAM through its own API: "stop" is a POST to
+    /// `unload_url`, "start" a POST to `load_url` (or nothing, for servers that load on the
+    /// next request). Bodies are JSON text.
+    Http {
+        unload_url: String,
+        unload_body: Option<String>,
+        load_url: Option<String>,
+        load_body: Option<String>,
     },
 }
 
@@ -53,6 +62,10 @@ struct RawSpec {
     start: Option<Vec<String>>,
     stop: Option<Vec<String>>,
     status: Option<Vec<String>>,
+    unload_url: Option<String>,
+    unload_body: Option<String>,
+    load_url: Option<String>,
+    load_body: Option<String>,
     health_url: Option<String>,
     #[serde(deserialize_with = "secs::option")]
     start_timeout_s: Option<Duration>,
@@ -70,6 +83,10 @@ impl<'de> Deserialize<'de> for ServiceSpec {
             ("start", raw.start.is_some()),
             ("stop", raw.stop.is_some()),
             ("status", raw.status.is_some()),
+            ("unload_url", raw.unload_url.is_some()),
+            ("unload_body", raw.unload_body.is_some()),
+            ("load_url", raw.load_url.is_some()),
+            ("load_body", raw.load_body.is_some()),
         ];
         let (allowed, kind): (&[&str], ServiceKind) = match raw.kind.as_str() {
             "systemd" => (
@@ -114,10 +131,22 @@ impl<'de> Deserialize<'de> for ServiceSpec {
                     status: raw.status.clone(),
                 },
             ),
+            "http" => (
+                &["unload_url", "unload_body", "load_url", "load_body"],
+                ServiceKind::Http {
+                    unload_url: raw
+                        .unload_url
+                        .clone()
+                        .ok_or_else(|| Error::missing_field("unload_url"))?,
+                    unload_body: raw.unload_body.clone(),
+                    load_url: raw.load_url.clone(),
+                    load_body: raw.load_body.clone(),
+                },
+            ),
             "" => return Err(Error::missing_field("kind")),
             other => {
                 return Err(Error::custom(format!(
-                    "unknown service kind {other:?}; use systemd, docker, podman or command"
+                    "unknown service kind {other:?}; use systemd, docker, podman, command or http"
                 )))
             }
         };
@@ -167,10 +196,36 @@ impl ServiceSpec {
                     p.push(format!("{at}: status argv is empty (omit it instead)"));
                 }
             }
+            ServiceKind::Http {
+                unload_url,
+                unload_body,
+                load_url,
+                load_body,
+            } => {
+                for (name, url) in [
+                    ("unload_url", Some(unload_url)),
+                    ("load_url", load_url.as_ref()),
+                ] {
+                    if let Some(u) = url.filter(|u| !is_http_url(u)) {
+                        p.push(format!("{at}: {name} must be an http(s) URL, not {u:?}"));
+                    }
+                }
+                if load_body.is_some() && load_url.is_none() {
+                    p.push(format!("{at}: load_body without load_url"));
+                }
+                for (name, body) in [("unload_body", unload_body), ("load_body", load_body)] {
+                    if let Some(Err(e)) = body
+                        .as_deref()
+                        .map(serde_json::from_str::<serde_json::Value>)
+                    {
+                        p.push(format!("{at}: {name} is not valid JSON: {e}"));
+                    }
+                }
+            }
             _ => {}
         }
         if let Some(u) = &self.health_url {
-            if !(u.starts_with("http://") || u.starts_with("https://")) {
+            if !is_http_url(u) {
                 p.push(format!(
                     "{at}: health_url must be an http(s) URL, not {u:?}"
                 ));
@@ -190,6 +245,7 @@ impl ServiceSpec {
             ServiceKind::Command { start, .. } => {
                 format!("command {}", start.first().map_or("", String::as_str))
             }
+            ServiceKind::Http { unload_url, .. } => format!("http unload {unload_url}"),
         }
     }
 }

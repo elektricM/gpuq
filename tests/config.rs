@@ -779,3 +779,58 @@ fn hold_other_models_parses_per_class() {
         0
     );
 }
+
+const HTTP_SERVICE: &str = "[llm]\nbackend = \"none\"\n[[service]]\nname = \"sd\"\nvram = \"8G\"\n[service.control]\nkind = \"http\"\n";
+
+#[test]
+fn http_service_control_parses_and_is_checked() {
+    let cfg = parse(&format!(
+        "{HTTP_SERVICE}unload_url = \"http://127.0.0.1:7861/sdapi/v1/unload-checkpoint\"\nload_url = \"http://127.0.0.1:7861/sdapi/v1/reload-checkpoint\"\nunload_body = '{{\"a\": 1}}'\n"
+    ))
+    .unwrap();
+    let spec = cfg.service[0].control.as_ref().unwrap();
+    assert_eq!(
+        spec.kind,
+        ServiceKind::Http {
+            unload_url: "http://127.0.0.1:7861/sdapi/v1/unload-checkpoint".into(),
+            unload_body: Some("{\"a\": 1}".into()),
+            load_url: Some("http://127.0.0.1:7861/sdapi/v1/reload-checkpoint".into()),
+            load_body: None,
+        }
+    );
+    assert!(cfg
+        .describe()
+        .contains("http unload http://127.0.0.1:7861/sdapi/v1/unload-checkpoint"));
+
+    let bad = |extra: &str| err_text(&format!("{HTTP_SERVICE}{extra}"));
+    assert!(bad("").contains("unload_url"));
+    assert!(bad("unload_url = \"localhost:1/x\"\n").contains("unload_url must be an http(s) URL"));
+    let e = bad("unload_url = \"http://h/u\"\nunload_body = '{nope'\n");
+    assert!(e.contains("unload_body is not valid JSON"), "{e}");
+    let e = bad("unload_url = \"http://h/u\"\nload_body = '{}'\n");
+    assert!(e.contains("load_body without load_url"), "{e}");
+    let e = bad("unload_url = \"http://h/u\"\nunit = \"x.service\"\n");
+    assert!(e.contains("`unit` does not apply to kind \"http\""), "{e}");
+    let e = err_text(
+        "[llm]\nbackend = \"vllm\"\n[llm.service]\nkind = \"http\"\nunload_url = \"http://h/u\"\n",
+    );
+    assert!(e.contains("kind \"http\" is for [[service]] tables"), "{e}");
+}
+
+#[test]
+fn service_examples_are_valid() {
+    for name in [
+        "stable-diffusion-webui.toml",
+        "lm-studio.toml",
+        "text-generation-webui.toml",
+        "koboldcpp.toml",
+        "comfyui.toml",
+    ] {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("examples")
+            .join(name);
+        let cfg = Config::load(Some(&path)).unwrap_or_else(|e| panic!("{name}: {e}"));
+        assert_eq!(cfg.service.len(), 1, "{name}");
+        assert!(cfg.service[0].gate.is_some(), "{name}");
+    }
+}

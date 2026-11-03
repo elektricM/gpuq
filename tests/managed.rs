@@ -202,3 +202,64 @@ async fn a_service_without_a_gate_holds_its_lease_and_yields_when_asked() {
     eventually("service up again", || fake.is_up()).await;
     assert_eq!(fake.starts(), 2);
 }
+
+/// A server that stays up and loads or unloads its model on POST /load and /unload, like the
+/// Stable Diffusion web UIs or LM Studio behind `kind = "http"`.
+#[tokio::test]
+async fn an_http_service_stays_up_and_unloads_through_its_api() {
+    use std::sync::atomic::{AtomicBool, AtomicUsize};
+    use std::sync::Arc;
+
+    let loaded = Arc::new(AtomicBool::new(true));
+    let unloads = Arc::new(AtomicUsize::new(0));
+    let (l, u) = (loaded.clone(), unloads.clone());
+    let addr = support::serve(move |method, pq, _body| {
+        let (l, u) = (l.clone(), u.clone());
+        async move {
+            match (method.as_str(), pq.as_str()) {
+                ("POST", "/unload") => {
+                    l.store(false, Ordering::SeqCst);
+                    u.fetch_add(1, Ordering::SeqCst);
+                    (200, "{}".into())
+                }
+                ("POST", "/load") => {
+                    l.store(true, Ordering::SeqCst);
+                    (200, "{}".into())
+                }
+                (_, "/work") if l.load(Ordering::SeqCst) => (200, "done".into()),
+                (_, "/work") => (500, "no model".into()),
+                _ => (200, "ok".into()),
+            }
+        }
+    })
+    .await;
+    let base = format!("http://{addr}");
+    let mut svc = service("sd", &base, VRAM);
+    svc.idle_release = Duration::from_millis(300);
+    svc.gate.as_mut().unwrap().gpu_paths = vec!["/work".into()];
+    svc.control = Some(gpuq::config::ServiceSpec {
+        kind: gpuq::config::ServiceKind::Http {
+            unload_url: format!("{base}/unload"),
+            unload_body: None,
+            load_url: Some(format!("{base}/load")),
+            load_body: None,
+        },
+        health_url: None,
+        start_timeout: Duration::from_secs(3),
+    });
+    let m = Managed::start(rig().await, svc).await;
+
+    // Unloaded at startup like any service, yet still reachable for non-GPU requests.
+    eventually("unload at startup", || unloads.load(Ordering::SeqCst) >= 1).await;
+    assert_eq!(m.get("/status").await, (200, "ok".into()));
+    assert!(m.lease_names().await.is_empty());
+
+    // A GPU request takes the lease and loads the model first.
+    assert_eq!(m.get("/work").await, (200, "done".into()));
+    assert_eq!(m.lease_names().await, ["sd"]);
+
+    // Idle: the model is unloaded and the card released.
+    m.wait_lease("sd", false).await;
+    assert!(!loaded.load(Ordering::SeqCst));
+    assert!(unloads.load(Ordering::SeqCst) >= 2);
+}

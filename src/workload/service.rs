@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Martin Dolez
 
-//! Start, stop and check a GPU service: a systemd unit, a container, or plain commands.
+//! Start, stop and check a GPU service: a systemd unit, a container, plain commands, or a
+//! server that unloads and loads its model through HTTP calls.
 
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
@@ -35,6 +36,8 @@ pub enum ServiceError {
     NoStatus,
     #[error("empty command")]
     EmptyCommand,
+    #[error("POST {url}: {msg}")]
+    Http { url: String, msg: String },
 }
 
 pub type Result<T> = std::result::Result<T, ServiceError>;
@@ -69,6 +72,13 @@ pub enum ServiceKind {
         start: Vec<String>,
         stop: Vec<String>,
         status: Option<Vec<String>>,
+    },
+    /// Stays up; stop POSTs to `unload_url`, start to `load_url` when there is one.
+    Http {
+        unload_url: String,
+        unload_body: Option<String>,
+        load_url: Option<String>,
+        load_body: Option<String>,
     },
 }
 
@@ -130,6 +140,17 @@ impl ServiceControl {
                 stop,
                 status,
             } => Self::commands(start.clone(), stop.clone(), status.clone()),
+            cfg::ServiceKind::Http {
+                unload_url,
+                unload_body,
+                load_url,
+                load_body,
+            } => Self::new(ServiceKind::Http {
+                unload_url: unload_url.clone(),
+                unload_body: unload_body.clone(),
+                load_url: load_url.clone(),
+                load_body: load_body.clone(),
+            }),
         }
     }
 
@@ -147,7 +168,7 @@ impl ServiceControl {
         self
     }
 
-    /// Limit for a single start, stop or status command.
+    /// Limit for a single start, stop or status command, or HTTP call.
     pub fn with_command_timeout(mut self, t: Duration) -> Self {
         self.cmd_timeout = t;
         self
@@ -220,6 +241,7 @@ impl ServiceControl {
                 Op::Stop => Some(stop.clone()),
                 Op::Status => status.clone(),
             },
+            ServiceKind::Http { .. } => None,
         }
     }
 
@@ -274,11 +296,67 @@ impl ServiceControl {
         })
     }
 
+    /// POST `body` (JSON text, or nothing) to `url`. Fails on a non-2xx answer, and on a
+    /// JSON answer with `"success": false`, which KoboldCpp's admin API returns when it
+    /// refuses.
+    async fn post(&self, url: &str, body: Option<&str>) -> Result<()> {
+        let fail = |msg: String| ServiceError::Http {
+            url: url.to_owned(),
+            msg,
+        };
+        let client = reqwest::Client::builder()
+            .no_proxy()
+            .timeout(self.cmd_timeout)
+            .build()
+            .unwrap_or_default();
+        let mut req = client.post(url);
+        req = match body {
+            Some(b) => req
+                .header(reqwest::header::CONTENT_TYPE, "application/json")
+                .body(b.to_owned()),
+            None => req.body(""),
+        };
+        let resp = req.send().await.map_err(|e| fail(e.to_string()))?;
+        let status = resp.status();
+        let text = resp.text().await.unwrap_or_default();
+        let short: String = text.trim().chars().take(200).collect();
+        if !status.is_success() {
+            return Err(fail(format!("HTTP {status} {short}")));
+        }
+        let refused = serde_json::from_str::<serde_json::Value>(&text)
+            .ok()
+            .and_then(|v| v.get("success").and_then(serde_json::Value::as_bool))
+            == Some(false);
+        if refused {
+            return Err(fail(format!("refused: {short}")));
+        }
+        Ok(())
+    }
+
     pub async fn start(&self) -> Result<()> {
+        if let ServiceKind::Http {
+            load_url,
+            load_body,
+            ..
+        } = &self.kind
+        {
+            return match load_url {
+                Some(url) => self.post(url, load_body.as_deref()).await,
+                None => Ok(()),
+            };
+        }
         self.run_checked(Op::Start).await
     }
 
     pub async fn stop(&self) -> Result<()> {
+        if let ServiceKind::Http {
+            unload_url,
+            unload_body,
+            ..
+        } = &self.kind
+        {
+            return self.post(unload_url, unload_body.as_deref()).await;
+        }
         self.run_checked(Op::Stop).await
     }
 

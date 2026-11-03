@@ -190,3 +190,67 @@ async fn wait_ready_times_out() {
     assert!(matches!(err, ServiceError::NotReady(_)), "{err}");
     assert!(started.elapsed() < Duration::from_secs(2));
 }
+
+fn http_control(base: &str, load: bool) -> ServiceControl {
+    use gpuq::workload::service::ServiceKind;
+    ServiceControl::new(ServiceKind::Http {
+        unload_url: format!("{base}/unload"),
+        unload_body: Some(r#"{"instance_id":"m"}"#.into()),
+        load_url: load.then(|| format!("{base}/load")),
+        load_body: load.then(|| r#"{"model":"m"}"#.into()),
+    })
+}
+
+#[tokio::test]
+async fn http_control_posts_unload_and_load() {
+    let srv = FakeServer::start(|_| (200, "{}".into())).await;
+    let ctl = http_control(&srv.url(), true);
+    ctl.stop().await.unwrap();
+    ctl.start().await.unwrap();
+    let seen = srv.requests();
+    let calls: Vec<_> = seen
+        .iter()
+        .map(|s| format!("{} {} {}", s.method, s.target, s.body))
+        .collect();
+    assert_eq!(
+        calls,
+        [
+            r#"POST /unload {"instance_id":"m"}"#,
+            r#"POST /load {"model":"m"}"#
+        ]
+    );
+    // No status command: the gate keeps passing requests, start always runs.
+    assert!(matches!(
+        ctl.is_running().await,
+        Err(ServiceError::NoStatus)
+    ));
+}
+
+#[tokio::test]
+async fn http_control_without_load_url_starts_with_no_call() {
+    let srv = FakeServer::start(|_| (200, "{}".into())).await;
+    let ctl = http_control(&srv.url(), false);
+    ctl.start().await.unwrap();
+    ctl.wait_ready(None, FAST).await.unwrap();
+    assert!(srv.requests().is_empty());
+}
+
+#[tokio::test]
+async fn http_control_fails_on_error_status_refusal_and_dead_server() {
+    let srv = FakeServer::start(|s| match s.target.as_str() {
+        "/unload" => (500, "boom".into()),
+        _ => (200, r#"{"success": false}"#.into()),
+    })
+    .await;
+    let ctl = http_control(&srv.url(), true);
+    let e = ctl.stop().await.unwrap_err().to_string();
+    assert!(
+        e.contains("/unload") && e.contains("500") && e.contains("boom"),
+        "{e}"
+    );
+    let e = ctl.start().await.unwrap_err().to_string();
+    assert!(e.contains("refused"), "{e}");
+
+    let ctl = http_control(&dead_url().await, true).with_command_timeout(Duration::from_secs(2));
+    assert!(matches!(ctl.stop().await, Err(ServiceError::Http { .. })));
+}

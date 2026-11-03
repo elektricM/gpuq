@@ -584,6 +584,13 @@ impl Config {
             (Some(spec), _) => p.extend(spec.problems("llm.service")),
             (None, false) => {}
         }
+        if let Some(ServiceKind::Http { .. }) = self.llm.service.as_ref().map(|s| &s.kind) {
+            p.push(
+                "llm.service: kind \"http\" is for [[service]] tables; the LLM backends wait \
+                 for the server to go down"
+                    .into(),
+            );
+        }
 
         // Listen addresses: gate, api and every service gate must be distinct.
         let mut listens: Vec<(String, String, u16)> = vec![
