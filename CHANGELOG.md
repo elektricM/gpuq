@@ -16,6 +16,12 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Examples for the AUTOMATIC1111, Forge and SD.Next web UIs (`/sdapi/v1/unload-checkpoint`),
   LM Studio (`/api/v1/models/unload`), text-generation-webui (`/v1/internal/model/unload`) and
   KoboldCpp (systemd stop and start).
+- `examples/compose/`: Ollama, Open WebUI and ComfyUI in Docker Compose, with gpuq on the
+  host gating Ollama and starting and stopping the ComfyUI container.
+- `install.sh`: downloads the release binary for x86_64 or aarch64, checks it against
+  `SHA256SUMS` and installs it to `~/.local/bin` or, with `--system`, `/usr/local/bin`.
+- README: the out-of-memory errors gpuq prevents, who it is for, and a demo of two cards
+  (`docs/demo.gif`, recorded by `docs/demo/record.sh` with pretend cards).
 
 ## [0.4.0] - 2026-11-03
 

@@ -1,0 +1,60 @@
+# Ollama, Open WebUI and ComfyUI on one NVIDIA card, with gpuq on the host in front of Ollama
+# and ComfyUI. See README.md next to this file.
+#
+# Ports: gpuq takes the ports clients know (11434 for Ollama, 8188 for ComfyUI) and the
+# containers publish theirs one higher, on 127.0.0.1 only, so every request goes through gpuq.
+
+services:
+  ollama:
+    image: ollama/ollama
+    container_name: ollama
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:11435:11434"
+    volumes:
+      - ollama:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  comfyui:
+    # Community image, https://github.com/YanWenKun/ComfyUI-Docker
+    image: yanwk/comfyui-boot:cu126-slim
+    container_name: comfyui            # gpuq starts and stops it by this name
+    restart: "no"                      # gpuq starts it on the first prompt
+    ports:
+      - "127.0.0.1:8189:8188"
+    volumes:
+      - ./storage:/root
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: open-webui
+    restart: unless-stopped
+    ports:
+      - "3000:8080"
+    environment:
+      # Both point at gpuq's gates on the host, not at the containers.
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
+      ENABLE_IMAGE_GENERATION: "true"
+      IMAGE_GENERATION_ENGINE: comfyui
+      COMFYUI_BASE_URL: http://host.docker.internal:8188
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - open-webui:/app/backend/data
+
+volumes:
+  ollama:
+  open-webui:

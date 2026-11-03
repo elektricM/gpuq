@@ -96,7 +96,8 @@ How the scheduler works inside: [docs/how-it-works.md](docs/how-it-works.md).
 - KoboldCpp, with request gating, stopped and started as a service
 - Immich ML, by pausing its job queues until the GPU is free, or with request gating
 
-Example configurations are in [examples/](examples/).
+Example configurations are in [examples/](examples/), including a Docker Compose stack of
+Ollama, Open WebUI and ComfyUI ([examples/compose](examples/compose/)).
 
 ## Installation
 
