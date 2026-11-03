@@ -716,11 +716,15 @@ impl Config {
             &self.llm.resident
         };
         let _ = writeln!(s, "  resident model: {resident}");
-        let _ = writeln!(
-            s,
-            "gate: {}:{} -> {}",
-            self.gate.host, self.gate.port, self.gate.backend
-        );
+        if self.llm.backend == LlmBackend::None {
+            let _ = writeln!(s, "gate: none (backend none)");
+        } else {
+            let _ = writeln!(
+                s,
+                "gate: {}:{} -> {}",
+                self.gate.host, self.gate.port, self.gate.backend
+            );
+        }
         let _ = writeln!(s, "api: {}:{}", self.api.host, self.api.port);
         self.describe_cards(&mut s, found);
         let mut ordered: Vec<_> = self.classes.iter().collect();
