@@ -86,6 +86,17 @@ function ring(x, y, w, h, t, a, col = C.ink, rx = 16) {
 // state changes blend over a few frames instead of switching on one.
 const xf = (a, b, k) => g(a, { op: 1 - clamp(k) }) + g(b, { op: clamp(k) });
 const win = (t, a, b = 1e9, f = .15) => P(t, a, a + f) * (1 - P(t, b - f, b));
+// A chip that becomes a VRAM bar segment: its rectangle moves and resizes from a = [x, y, w, h] to b, its label
+// crossfades, and at k = 1 it is exactly the segment that seg() then draws in its place.
+function morph(k, a, b, col, la, lb, o = {}) {
+  if (k <= 0 || k >= 1) return '';
+  const { tc = '#ffffff', sa = 26, sb = 26, op = 1 } = o;
+  const [x, y, w, h] = a.map((v, i) => L(v, b[i], k));
+  const sz = L(sa, sb, k), cy = y + h / 2 + sz * .36;
+  return g(`<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${L(12, 8, k)}" fill="${col}"/>`
+    + text(x + w / 2, cy, la, { size: sz, weight: 700, fill: tc, op: clamp((.5 - k) / .15) })
+    + text(x + w / 2, cy, lb, { size: sz, weight: 700, fill: tc, op: clamp((k - .5) / .15) }), { op });
+}
 const status = (x, y, s) => text(x, y, s, { size: 24, weight: 600, fill: '#ffffff', anchor: 'start' });
 function check(cx, cy, r = 20) {
   return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${C.whisper}"/><path d="M${cx - 10},${cy + 1} L${cx - 2},${cy + 9} L${cx + 11},${cy - 8}" stroke="#ffffff" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
@@ -131,14 +142,14 @@ function s2(t) {   // the same two programs through gpuq: one runs, the other wa
   s += g(b, { op: kin * 2, s: L(.9, 1, kin), cx: 540, cy: 270 });
   // 11.67 px per GB on a 280 px bar
   let c = card(790, 120, 330, 310, 'GPU · 24 GB') + track(815, 215, 280, 72);
-  c += seg(815, 215, 198 * kgo * (1 - kun), 72, C.llm, 'chat 17G', { size: 26 }) + seg(815, 215, 140 * kimg, 72, C.comfy, 'image 12G', { size: 24 });
+  c += seg(815, 215, kgo >= 1 ? 198 * (1 - kun) : 0, 72, C.llm, 'chat 17G', { size: 26 }) + seg(815, 215, kimg >= 1 ? 140 : 0, 72, C.comfy, 'image 12G', { size: 24 });
   c += text(955, 345, '7 GB free', { size: 26, weight: 700, fill: C.muted, op: win(t, 1.35, 1.85) })
      + text(955, 345, 'chat model unloaded', { size: 26, weight: 700, fill: C.muted, op: win(t, 1.85, 2.25) })
      + text(955, 345, 'no crash', { size: 26, weight: 700, fill: C.whisper, op: win(t, 2.25) }) + ring(815, 215, 280, 72, t, 1.85, C.ink, 8);
   s += g(c, { op: kin * 2, s: L(.9, 1, kin), cx: 955, cy: 270 });
   const fly = (k, x1, y1, x2, y2, col, label) => k > 0 && k < 1 ? chip(L(x1, x2, k), L(y1, y2, k), 200, 52, col, label, true) : '';
   s += fly(kq1, 300, 154, 385, 226, C.llm, '1 chat') + fly(kq2, 300, 344, 385, 304, C.comfy, '2 image');
-  s += fly(kgo, 385, 226, 840, 225, C.llm, '1 chat') + fly(kimg, 385, 304, 840, 225, C.comfy, '2 image');
+  s += morph(kgo, [385, 226, 200, 52], [815, 215, 198, 72], C.llm, '1 chat', 'chat 17G') + morph(kimg, [385, 304, 200, 52], [815, 215, 140, 72], C.comfy, '2 image', 'image 12G', { sb: 24 });
   return s;
 }
 function s3(t) {   // a 30 GB model split 18 + 12 over two cards, unloaded from both for a render
@@ -158,10 +169,10 @@ function s3(t) {   // a 30 GB model split 18 + 12 over two cards, unloaded from 
   if (up > 0) c += `<rect x="452" y="176" width="40" height="220" fill="${C.llm}" opacity="${clamp(up * 1.5 - .5).toFixed(3)}"/>`;
   c += seg(440, 110, 450 * up, 72, C.llm, 'chat model 18G') + seg(440, 390, 300 * up, 72, C.llm, 'chat model 12G');
   c += text(510, 286, 'one 30 GB model', { size: 28, weight: 800, fill: C.llm, anchor: 'start', op: clamp((up - .75) / .25) });
-  c += seg(440, 390, 400 * (kgo - kdone), 72, C.api, 'render 16G', { tc: C.dark });
+  c += seg(440, 390, kgo >= 1 ? 400 * (1 - kdone) : 0, 72, C.api, 'render 16G', { tc: C.dark });
   c += ring(440, 110, 600, 72, t, 1.4, C.ink, 8) + ring(440, 390, 400, 72, t, 1.4, C.ink, 8);
   s += g(c, { op: kin * 2, s: L(.92, 1, kin), cx: 750, cy: 275 });
-  if (kgo > 0 && kgo < 1) s += chip(L(22, 450, kgo), L(330, 400, kgo), 160, 52, C.api, 'render', true, { tc: C.dark });
+  s += morph(kgo, [22, 330, 160, 52], [440, 390, 400, 72], C.api, 'render', 'render 16G', { tc: C.dark, sb: 28 });
   return s;
 }
 function s4(t) {   // the desktop frees its VRAM for a job, then comes back
@@ -170,19 +181,20 @@ function s4(t) {   // the desktop frees its VRAM for a job, then comes back
   s += g(pill(0, 100, 450, 84, '#ffffff', '') + check(48, 142) + text(84, 153, 'nobody at the screen', { size: 30, weight: 700, anchor: 'start' }),
          { op: kseat * 2, s: L(.85, 1, kseat), cx: 225, cy: 142 });
   const ksolid = clamp(kgo / .3);  // the waiting chip turns solid as it starts to move
-  if (kgo < 1) s += g(g(chip(0, 330, 380, 76, C.comfy, 'image job 15 GB · waits', false, { size: 28 }) + ring(0, 330, 380, 76, t, .45, C.comfy, 12), { op: 1 - ksolid }) +
-                      g(chip(0, 330, 380, 76, C.comfy, 'image job 15 GB', true, { size: 28 }), { op: ksolid }),
-                      { tx: L(-440, 0, kin) + L(0, 540, kgo), ty: L(0, -110, kgo), op: clamp(kin * 3) * (1 - P(kgo, .85, 1, x => x)) });
+  if (kgo <= 0) s += g(chip(0, 330, 380, 76, C.comfy, 'image job 15 GB · waits', false, { size: 28 }) + ring(0, 330, 380, 76, t, .45, C.comfy, 12),
+                       { tx: L(-440, 0, kin), op: clamp(kin * 3) });
+  s += g(chip(0, 330, 380, 76, C.comfy, 'image job 15 GB · waits', false, { size: 28 }), { op: kgo > 0 ? 1 - ksolid : 0 });
   // 33.75 px per GB on a 540 px bar
   let c = card(500, 100, 620, 360, 'GPU 1 · 16 GB') + track(540, 220, 540, 80);
   const kd = 1 - kstop + kback;
   c += seg(540, 220, 67.5 * kd, 80, C.grey, '');
   const dx = 540 + 67.5 * clamp(kd) + 18, dt = (s, fill, op) => text(dx, 271, s, { size: 28, weight: 700, anchor: 'start', fill, op: clamp(op) });
   c += dt('your desktop 2G', C.ink, 1 - P(t, 1.05, 1.2)) + dt('desktop stopped', C.muted, win(t, 1.15, 1.55)) + dt('desktop back', C.ink, kback);
-  c += seg(540, 220, 506 * (kgo - kdone), 80, C.comfy, 'image job 15G');
+  c += seg(540, 220, kgo >= 1 ? 506 * (1 - kdone) : 0, 80, C.comfy, 'image job 15G');
   const free = `${Math.round(16 - 2 * clamp(kd) - 15 * clamp(kgo - kdone))} GB free`;  // counts with the bars
   c += text(810, 380, free, { size: 28, weight: 700, fill: C.muted }) + ring(540, 220, 67.5, 80, t, 1.05, C.ink, 8);
   s += g(c, { op: kin * 2, s: L(.9, 1, kin), cx: 810, cy: 280 });
+  s += morph(kgo, [0, 330, 380, 76], [540, 220, 506, 80], C.comfy, 'image job 15 GB', 'image job 15G', { sa: 28, sb: 28, op: ksolid });
   return s;
 }
 function s5(t) {   // the gate holds a chat request; a request for another model waits for chat to be quiet
@@ -194,15 +206,16 @@ function s5(t) {   // the gate holds a chat request; a request for another model
   // 17.5 px per GB on a 420 px bar
   let c = card(640, 120, 480, 320, 'GPU · 24 GB') + track(670, 215, 420, 72);
   c += seg(670, 215, 210 * (1 - kfree), 72, C.comfy, 'image job 12G');
-  c += seg(670, 215, 297.5 * kload * (1 - kun), 72, C.llm, 'chat model 17G') + seg(670, 215, 210 * kol, 72, C.api, 'other model 12G', { tc: C.dark, size: 23 });
+  c += seg(670, 215, 297.5 * kload * (1 - kun), 72, C.llm, 'chat model 17G') + seg(670, 215, kol >= 1 ? 210 : 0, 72, C.api, 'other model 12G', { tc: C.dark, size: 23 });
   const nt = (s, fill, op) => text(880, 360, s, { size: 26, weight: 700, fill, op: clamp(op) });
   c += nt('GPU busy', C.muted, 1 - P(t, .9, 1.05)) + nt('chat answered', C.whisper, win(t, 1.85, 2.0)) + nt('chat still in use', C.muted, win(t, 2.0, 2.65))
      + nt('one swap, when quiet', C.whisper, win(t, 3.2)) + ring(670, 215, 420, 72, t, 2.65, C.ink, 8);
   s += g(c, { op: kin * 2, s: L(.92, 1, kin), cx: 880, cy: 280 });
-  if (kc > 0 && kcgo < 1) s += g(xf(chip(150, 226, 340, 58, C.llm, 'chat · held', true) + ring(150, 226, 340, 58, t, .6, C.yellow, 12), chip(150, 226, 340, 58, C.llm, 'chat', true), kcgo * 4),
-                                 { tx: L(-560, 0, kc) + L(0, 530, kcgo), ty: L(0, -15, kcgo), op: 1 - P(kcgo, .8, 1, x => x) });
-  if (ko > 0 && kol < 1) s += g(xf(chip(150, 310, 340, 58, C.api, 'other model · waits', true, { tc: C.dark }) + ring(150, 310, 340, 58, t, 2.3, C.yellow, 12), chip(150, 310, 340, 58, C.api, 'other model', true, { tc: C.dark }), kun),
-                                { tx: L(-560, 0, ko) + L(0, 530, kol), ty: L(0, -99, kol), op: 1 - P(kol, .8, 1, x => x) });
+  if (kc > 0 && kcgo <= 0) s += g(chip(150, 226, 340, 58, C.llm, 'chat · held', true) + ring(150, 226, 340, 58, t, .6, C.yellow, 12), { tx: L(-560, 0, kc) });
+  s += morph(kcgo, [150, 226, 340, 58], [670, 215, 297.5, 72], C.llm, 'chat', '', { op: 1 - P(kcgo, .6, 1, x => x) });
+  if (ko > 0 && kol <= 0) s += g(xf(chip(150, 310, 340, 58, C.api, 'other model · waits', true, { tc: C.dark }) + ring(150, 310, 340, 58, t, 2.3, C.yellow, 12),
+                                    chip(150, 310, 340, 58, C.api, 'other model', true, { tc: C.dark }), kun), { tx: L(-560, 0, ko) });
+  s += morph(kol, [150, 310, 340, 58], [670, 215, 210, 72], C.api, 'other model', 'other model 12G', { tc: C.dark, sb: 23 });
   return s;
 }
 function s6(t) {   // end card
