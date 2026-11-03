@@ -6,12 +6,10 @@
 gpuq lets several programs share your GPUs without running out of VRAM: it queues jobs,
 unloads LLM models and stops services until there is room.
 
-![Demo: two 24 GB GPUs. A model split over both is unloaded for three jobs, a fourth job waits for room, a chat request is held, and the model comes back on both cards.](docs/demo.gif)
-
-*Two 24 GB cards. A model split over both is unloaded for three jobs and a fourth waits for
-room. A chat request outranks the batch jobs, so the model comes back for it first, then for
-good. Pretend cards and stand-in programs ([docs/demo](docs/demo/)); the scheduling and every
-number shown come from gpuq.*
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/diagrams/sharing-dark.svg">
+  <img alt="Without gpuq, Ollama with qwen3.8:27b (18 GB) and a ComfyUI workflow (12 GB) load on one 24 GB GPU and ComfyUI crashes with CUDA out of memory. With gpuq they take turns: ComfyUI waits, the model is unloaded while ComfyUI runs, then reloaded." src="docs/diagrams/sharing.svg">
+</picture>
 
 ```
 torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 2.00 GiB. GPU 0 has a total
@@ -63,9 +61,14 @@ gpuq works with any program that uses the GPU, not only AI tools: renders, video
 simulations and compute jobs go through `gpuq run`. It is in early development; the
 configuration format may change before 1.0.
 
-![Without gpuq, every program grabs the GPU and one runs out of memory. With gpuq, programs queue by priority class and each gets a card when there is room.](docs/overview.svg)
+## How it works
 
-How the scheduler works inside: [docs/how-it-works.md](docs/how-it-works.md).
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/diagrams/request-dark.svg">
+  <img alt="A program asks for a lease with a class, VRAM and card. If it fits next to what runs, it is granted. If not, gpuq unloads the LLM model once the chat is quiet, stops a lower-priority service or signals a lower-priority job, or the request waits in the queue. The lease ends when the client disconnects, and the model is reloaded when the card is idle." src="docs/diagrams/request.svg">
+</picture>
+
+The scheduler in detail: [docs/how-it-works.md](docs/how-it-works.md).
 
 ## Features
 
@@ -99,6 +102,13 @@ How the scheduler works inside: [docs/how-it-works.md](docs/how-it-works.md).
   with request gating and model unloading through their APIs
 - KoboldCpp, with request gating, stopped and started as a service
 - Immich ML, by pausing its job queues until the GPU is free, or with request gating
+
+Servers with an HTTP API are put behind a gate, so their clients do not change:
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/diagrams/gate-dark.svg">
+  <img alt="Open WebUI and scripts talk to gpuq's LLM gate, which forwards to Ollama or llama-swap; a browser talks to the service gate in front of ComfyUI. A chat request that arrives while a job has the GPU is held, and passed through once the job ends and the model is reloaded." src="docs/diagrams/gate.svg">
+</picture>
 
 Example configurations are in [examples/](examples/), including a Docker Compose stack of
 Ollama, Open WebUI and ComfyUI ([examples/compose](examples/compose/)).
@@ -157,6 +167,11 @@ gpuq run --class batch --vram 8G -- blender -b scene.blend -a
 A job goes to any card with room. With several GPUs, `--card NAME` pins it to one card,
 `--card gpu0,gpu1` or `--card all` gives it several cards at once, and `--cards 2` any two
 cards with room. `--vram` applies to each card.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/diagrams/two-gpus-dark.svg">
+  <img alt="Two 24 GB cards. A model split over both is unloaded from both together for a job that takes both cards at once; single-card jobs go to whichever card has room; the model is reloaded on both when they are idle. A job never shares a card with the loaded model." src="docs/diagrams/two-gpus.svg">
+</picture>
 
 Other commands:
 

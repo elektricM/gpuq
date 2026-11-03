@@ -7,6 +7,14 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- README and docs: diagrams in `docs/diagrams/`, each in a light and a dark variant, show the
+  problem, what happens to a request, two GPUs and the HTTP gate. They replace
+  `docs/demo.gif`, `docs/overview.svg` and `docs/architecture.svg`; the demo recording
+  scripts in `docs/demo/` are removed.
+- Examples use current model names (`qwen3.8`).
+
 ## [0.4.1] - 2026-11-03
 
 ### Added

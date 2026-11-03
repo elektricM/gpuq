@@ -3,6 +3,11 @@
 "I run X. How do I plug it in?" Find X below, copy the matching file from `examples/`, change
 the names and ports, run `gpuq check-config -c FILE`.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="diagrams/gate-dark.svg">
+  <img alt="Open WebUI and scripts talk to gpuq's LLM gate, which forwards to Ollama or llama-swap; a browser talks to the service gate in front of ComfyUI. A chat request that arrives while a job has the GPU is held, and passed through once the job ends and the model is reloaded." src="diagrams/gate.svg">
+</picture>
+
 ## Kinds of workload
 
 | Kind | Use it for | You write | gpuq does |

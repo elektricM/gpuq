@@ -1,6 +1,9 @@
 # How gpuq works
 
-![Clients go through the gate and control API to the arbiter, which places work on gpu0 and gpu1; the LLM backend spans both cards and the integrated GPU is excluded](architecture.svg)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="diagrams/architecture-dark.svg">
+  <img alt="gpuq run, HTTP clients, managed services and lease API programs reach the gpuq daemon through its gates and control API. The arbiter keeps one queue, tracks VRAM per card and makes room. It places work on gpu0 and gpu1; the LLM server is split over both and the integrated GPU is excluded." src="diagrams/architecture.svg">
+</picture>
 
 gpuq rests on four ideas.
 
@@ -13,6 +16,11 @@ gpuq rests on four ideas.
 - **Resident.** One program can be kept loaded whenever the card is idle, usually an LLM so
   chat answers right away. gpuq unloads it for other work and reloads it after, KV cache
   included where the server supports it. This is optional.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="diagrams/request-dark.svg">
+  <img alt="A program asks for a lease with a class, VRAM and card. If it fits next to what runs, it is granted. If not, gpuq unloads the LLM model once the chat is quiet, stops a lower-priority service or signals a lower-priority job, or the request waits in the queue. The lease ends when the client disconnects, and the model is reloaded when the card is idle." src="diagrams/request.svg">
+</picture>
 
 ## An evening with gpuq
 
@@ -31,6 +39,11 @@ All the timings are settings.
 gpuq finds every GPU on the machine and manages all of them from one queue, unless you leave
 some out (`gpu.exclude`, `gpu.skip_integrated`) or list the cards yourself. Every card has its
 own state, its own VRAM accounting and its own yields.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="diagrams/two-gpus-dark.svg">
+  <img alt="Two 24 GB cards. A model split over both is unloaded from both together for a job that takes both cards at once; single-card jobs go to whichever card has room; the model is reloaded on both when they are idle. A job never shares a card with the loaded model." src="diagrams/two-gpus.svg">
+</picture>
 
 - A job that names no card goes to any card with room. `--card NAME` pins it to one card.
 - A waiter only blocks on the cards it can use. A job pinned to one card never holds up a
