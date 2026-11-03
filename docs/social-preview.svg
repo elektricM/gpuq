@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640">
+  <!-- Social preview for github.com/elektricM/gpuq. Render: rsvg-convert -o social-preview.png social-preview.svg -->
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7d8594"/>
+    </marker>
+  </defs>
+  <rect width="1280" height="640" fill="#161b22"/>
+
+  <!-- Name and problem -->
+  <text x="80" y="150" font-family="JetBrains Mono" font-weight="800" font-size="112" fill="#e6e9ef">gpuq</text>
+  <text x="80" y="232" font-family="Inter" font-weight="700" font-size="50" fill="#ffcb6b">Stop "CUDA out of memory"</text>
+  <text x="80" y="292" font-family="Inter" font-weight="500" font-size="36" fill="#c4cad4">when Ollama, ComfyUI and your jobs share a GPU.</text>
+
+  <!-- Programs asking for the GPUs: three placed, one waiting -->
+  <g font-family="Inter" font-weight="600" font-size="24" fill="#161b22">
+    <rect x="80" y="364" width="180" height="48" rx="10" fill="#c792ea"/>
+    <text x="170" y="396" text-anchor="middle">Ollama</text>
+    <rect x="80" y="422" width="180" height="48" rx="10" fill="#61afef"/>
+    <text x="170" y="454" text-anchor="middle">ComfyUI</text>
+    <rect x="80" y="480" width="180" height="48" rx="10" fill="#f08c5a"/>
+    <text x="170" y="512" text-anchor="middle">training</text>
+    <rect x="82" y="540" width="176" height="44" rx="10" fill="none" stroke="#7d8594" stroke-width="3" stroke-dasharray="8 6"/>
+    <text x="170" y="570" text-anchor="middle" fill="#9aa2b1">render: waits</text>
+  </g>
+  <!-- gpuq in the middle -->
+  <line x1="276" y1="474" x2="352" y2="474" stroke="#7d8594" stroke-width="4" marker-end="url(#arrow)"/>
+  <rect x="364" y="428" width="150" height="100" rx="14" fill="none" stroke="#e6e9ef" stroke-width="4"/>
+  <text x="439" y="490" text-anchor="middle" font-family="JetBrains Mono" font-weight="800" font-size="36" fill="#e6e9ef">gpuq</text>
+  <line x1="520" y1="460" x2="596" y2="420" stroke="#7d8594" stroke-width="4" marker-end="url(#arrow)"/>
+  <line x1="520" y1="496" x2="596" y2="536" stroke="#7d8594" stroke-width="4" marker-end="url(#arrow)"/>
+
+  <!-- Two GPUs as VRAM bars -->
+  <g font-family="Inter" font-weight="700" font-size="28" fill="#e6e9ef">
+    <text x="612" y="398">GPU 0</text>
+    <text x="612" y="514">GPU 1</text>
+  </g>
+  <g font-family="Inter" font-weight="500" font-size="22" fill="#7d8594">
+    <text x="1200" y="398" text-anchor="end">24 GB</text>
+    <text x="1200" y="514" text-anchor="end">24 GB</text>
+  </g>
+  <!-- GPU 0: an LLM and a ComfyUI job -->
+  <rect x="612" y="412" width="588" height="52" rx="8" fill="#303642"/>
+  <rect x="612" y="412" width="250" height="52" rx="8" fill="#c792ea"/>
+  <rect x="854" y="412" width="8" height="52" fill="#c792ea"/>
+  <rect x="866" y="412" width="196" height="52" fill="#61afef"/>
+  <!-- GPU 1: a training run -->
+  <rect x="612" y="528" width="588" height="52" rx="8" fill="#303642"/>
+  <rect x="612" y="528" width="480" height="52" rx="8" fill="#f08c5a"/>
+  <rect x="1084" y="528" width="8" height="52" fill="#f08c5a"/>
+
+  <!-- Footer -->
+  <text x="1200" y="150" text-anchor="end" font-family="Inter" font-weight="500" font-size="26" fill="#7d8594">github.com/elektricM/gpuq</text>
+</svg>
