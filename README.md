@@ -3,26 +3,41 @@
 [![ci](https://github.com/elektricM/gpuq/actions/workflows/ci.yml/badge.svg)](https://github.com/elektricM/gpuq/actions/workflows/ci.yml)
 [![license](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
 
-gpuq is a GPU scheduler for Linux machines with one or more GPUs. Programs request the GPU
-through gpuq, which grants it by priority and available VRAM. To free the card, gpuq can
-signal running jobs, stop and start services, and unload models from LLM servers.
+```
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 2.00 GiB. GPU 0 has a total
+capacity of 23.57 GiB of which 1.06 GiB is free.
+```
 
-AI programs fight over the GPU: an LLM, ComfyUI, Whisper and your own tools each assume they
-own the card, and whichever starts second runs out of memory. gpuq gives each one the card in
-turn, by priority and free VRAM.
+```
+ggml_backend_cuda_buffer_type_alloc_buffer: allocating 9216.00 MiB on device 0: cudaMalloc
+failed: out of memory
+```
 
-![gpuq overview](docs/overview.svg)
+This is what you get when several programs share a GPU. Ollama keeps a model loaded, ComfyUI
+starts a workflow, a training script starts, and whichever asks for VRAM last fails. Each one
+assumes it has the card to itself.
 
-It is meant for a home server or workstation where several programs share the GPUs. It works
-with any program that uses the GPU: renders, video encodes, simulations, games, compute jobs,
-and AI tools such as LLM servers and image generators.
+gpuq is a scheduler for Linux machines with one or more GPUs that hands the cards out in turn,
+by priority and free VRAM. Programs that fit run side by side. When one does not fit, it
+waits, or gpuq makes room: it unloads the model from the LLM server, stops a service, or
+signals a lower-priority job so it can exit cleanly. HTTP requests to Ollama, ComfyUI and
+similar servers are held until the card is free, so their clients do not need to know about
+gpuq.
 
-gpuq is in early development. The configuration format may change before 1.0.
+It is for a home server where Ollama, ComfyUI, Whisper and Immich share one card, a gaming PC
+whose card also runs local AI, or a lab machine where several people run jobs on the same
+GPUs.
+
+![gpuq scheduling two cards](docs/demo.gif)
+
+*Two 24 GB cards. A model split over both is unloaded for three jobs, a fourth job waits for
+room, and the model comes back on both cards when the jobs are done. Recorded with pretend
+cards and stand-in programs ([docs/demo](docs/demo/)); the scheduling is gpuq's own.*
 
 ## Quick start
 
 ```sh
-cargo install gpuq
+curl -fsSL https://raw.githubusercontent.com/elektricM/gpuq/main/install.sh | sh
 mkdir -p ~/.config/gpuq
 printf '[llm]\nbackend = "none"\n' > ~/.config/gpuq/config.toml
 gpuq check-config        # lists the GPUs gpuq found
@@ -37,10 +52,16 @@ gpuq status              # the lease, the queue and each card's VRAM
 ```
 
 A second `gpuq run` that does not fit next to the first waits in the queue until the card has
-room. To put an LLM server or a service behind gpuq, see
-[docs/integrations.md](docs/integrations.md).
+room. To put Ollama, ComfyUI or another server behind gpuq, see
+[docs/integrations.md](docs/integrations.md) and the configs in [examples/](examples/).
 
-How the scheduler works inside, with a diagram: [docs/how-it-works.md](docs/how-it-works.md).
+gpuq works with any program that uses the GPU, not only AI tools: renders, video encodes,
+simulations and compute jobs go through `gpuq run`. It is in early development; the
+configuration format may change before 1.0.
+
+![gpuq overview](docs/overview.svg)
+
+How the scheduler works inside: [docs/how-it-works.md](docs/how-it-works.md).
 
 ## Features
 
@@ -76,7 +97,13 @@ Example configurations are in [examples/](examples/).
 ## Installation
 
 Static binaries for x86_64 and aarch64, and `.deb` and `.rpm` packages, are available on the
-[releases page](https://github.com/elektricM/gpuq/releases/latest).
+[releases page](https://github.com/elektricM/gpuq/releases/latest). `install.sh` downloads the
+binary for your machine, checks it against the release's `SHA256SUMS` and installs it to
+`~/.local/bin`, or to `/usr/local/bin` with `--system`:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/elektricM/gpuq/main/install.sh | sh
+```
 
 Building from source requires Rust 1.80 or later:
 
