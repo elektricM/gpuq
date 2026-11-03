@@ -75,153 +75,169 @@ function arrow(x1, y1, x2, y2, k, col = C.muted, w = 4) {
 const blink = (t, a, n = 3, p = .12) => (t < a ? 0 : t > a + n * 2 * p ? 1 : (Math.floor((t - a) / p) % 2 ? .25 : 1));
 const pulse = (t, a, b) => (t < a || t > b ? 1 : .6 + .4 * Math.cos((t - a) * 9));
 
-// ---- scenes, in a 1120 x 560 stage ----
-function s1(t) {   // the problem
+// A brief outline pulse around the thing that changes, starting at scene time a.
+function ring(x, y, w, h, t, a, col = C.ink, rx = 16) {
+  const k = clamp((t - a) / .4);
+  if (k <= 0 || k >= 1) return '';
+  const e = 4 + 16 * out(k);
+  return `<rect x="${x - e}" y="${y - e}" width="${w + 2 * e}" height="${h + 2 * e}" rx="${rx + e}" fill="none" stroke="${col}" stroke-width="${(6 * (1 - k) + 1).toFixed(2)}" opacity="${(1 - k).toFixed(3)}"/>`;
+}
+const status = (x, y, s) => text(x, y, s, { size: 24, weight: 600, fill: '#ffffff', anchor: 'start' });
+function check(cx, cy, r = 20) {
+  return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${C.whisper}"/><path d="M${cx - 10},${cy + 1} L${cx - 2},${cy + 9} L${cx + 11},${cy - 8}" stroke="#ffffff" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
+}
+
+// ---- scenes, in a 1120 x 560 stage; each has a main caption and at most two sub-captions ----
+function s1(t) {   // the problem: 17 + 12 GB asked of a 24 GB card
   let s = '';
-  const oom = t > 1.4;
-  const shake = t > 1.4 && t < 1.7 ? 9 * Math.sin((t - 1.4) * 70) * (1 - (t - 1.4) / .3) : 0;
-  s += arrow(345, 190, 606, 262, P(t, .3, .5), C.red, 5) + arrow(345, 370, 606, 318, P(t, .8, 1.0), C.red, 5);
-  const k1 = P(t, 0, .4, back), k2 = P(t, .12, .52, back);
-  s += g(pill(40, 150, 300, 80, C.llm, 'LLM server'), { tx: L(-420, 0, k1), op: k1 * 3 });
-  s += g(pill(40, 330, 300, 80, C.comfy, 'ComfyUI'), { tx: L(-420, 0, k2), op: k2 * 3 });
-  const kc = P(t, .05, .4, back);
-  let c = card(620, 110, 440, 340, 'GPU · 24 GB', { stroke: oom ? C.red : C.ink, sw: oom ? 6 : 4.5 });
-  c += track(660, 220, 360, 70);
-  const wp = 255 * P(t, .45, .85), wb = 180 * P(t, .95, 1.35);
-  c += seg(660, 220, wp, 70, C.llm, 'LLM 17G') + seg(915, 220, wb, 70, C.comfy, '12G');
-  if (wb > 105) c += `<rect x="1020" y="212" width="${wb - 105}" height="86" fill="none" stroke="${C.red}" stroke-width="3" stroke-dasharray="7 5"/>`;
-  c += text(840, 340, '29 GB asked', { size: 28, weight: 600, fill: C.red, op: P(t, 1.2, 1.4) });
-  c += text(840, 405, 'CUDA out of memory', { size: 38, weight: 800, fill: C.red, op: blink(t, 1.4) });
-  s += g(c, { op: kc * 2, s: L(.88, 1, kc), cx: 840, cy: 280, tx: shake });
+  const kin = P(t, 0, .4, back), kchat = P(t, .4, .8), kimg = P(t, .9, 1.35), crash = t > 1.45;
+  const shake = crash && t < 1.75 ? 10 * Math.sin((t - 1.45) * 70) * (1 - (t - 1.45) / .3) : 0;
+  s += arrow(355, 182, 586, 228, clamp(kchat * 2), C.red, 5) + arrow(355, 362, 586, 262, clamp(kimg * 2), C.red, 5);
+  s += g(pill(30, 140, 320, 84, C.llm, 'Chat model', { sub: '17 GB' }), { tx: L(-420, 0, kin), op: kin * 3 });
+  let img = pill(30, 320, 320, 84, C.comfy, 'Image job', { sub: '12 GB' });
+  if (crash) img += `<circle cx="344" cy="324" r="24" fill="${C.red}" stroke="${C.ink}" stroke-width="3"/><path d="M335,315 L353,333 M353,315 L335,333" stroke="#ffffff" stroke-width="5" stroke-linecap="round"/>`
+                  + text(190, 452, 'crashed', { size: 30, weight: 800, fill: C.red, op: blink(t, 1.45, 2, .08) });
+  s += g(img, { tx: L(-420, 0, kin), op: kin * 3 });
+  // the card: 15 px per GB, so the 24 GB bar ends at x 1000 and the overflow sticks out of the card
+  let c = card(600, 90, 440, 380, 'GPU · 24 GB', { stroke: crash ? C.red : C.ink, sw: crash ? 6 : 4.5 });
+  c += track(640, 200, 360, 76);
+  c += seg(640, 200, 255 * kchat, 76, C.llm, 'chat 17G');
+  const wi = 180 * kimg, inside = Math.min(wi, 105);
+  c += seg(895, 200, inside, 76, C.comfy, '');
+  if (wi > 105) c += `<rect x="1000" y="194" width="${wi - 105}" height="88" rx="6" fill="${C.red}" stroke="${C.ink}" stroke-width="3"/>`
+                   + text(1037.5, 247, '+5G', { size: 24, weight: 800, fill: '#ffffff', op: P(t, 1.2, 1.35) });
+  c += `<line x1="1000" y1="186" x2="1000" y2="290" stroke="${C.ink}" stroke-width="3"/>`;
+  s += g(c, { op: kin * 2, s: L(.88, 1, kin), cx: 820, cy: 280, tx: shake });
+  // the crash, as a stamp across the card
+  const ks = P(t, 1.45, 1.75, back);
+  if (ks > 0) s += g(`<g filter="url(#sh)"><rect x="590" y="352" width="460" height="82" rx="14" fill="${C.red}" stroke="${C.ink}" stroke-width="4"/></g>`
+                     + text(820, 406, 'CUDA out of memory', { size: 38, weight: 800, fill: '#ffffff' }),
+                     { op: ks * 2, s: L(1.4, 1, ks), cx: 820, cy: 393 });
   return s;
 }
-function s2(t) {   // queued by priority, the card takes turns
+function s2(t) {   // the same two programs through gpuq: one runs, the other waits, then they swap
   let s = '';
-  const ka = P(t, 0, .35, back);
-  s += g(arrow(285, 178, 362, 230, 1) + arrow(285, 368, 362, 320, 1) + arrow(718, 280, 792, 280, 1), { op: P(t, .15, .35) });
-  s += g(pill(0, 140, 280, 76, C.llm, 'LLM', { sub: 'class 1' }), { tx: L(-400, 0, ka), op: ka * 3 });
-  s += g(pill(0, 330, 280, 76, C.comfy, 'ComfyUI', { sub: 'class 2' }), { tx: L(-400, 0, P(t, .08, .43, back)), op: 3 * P(t, .08, .43) });
-  const kb = P(t, .05, .35, back);
-  let b = box(370, 110, 340, 340) + text(540, 214, 'queue, by priority', { size: 22, weight: 500, fill: '#ffffff' });
-  const llmRuns = t > .65 && t < 1.6, comfyRuns = t > 1.75;
-  if (t > .65) b += chip(395, 240, 190, 50, C.llm, '1 LLM', llmRuns) + text(600, 274, llmRuns ? '▶ runs' : '· waits', { size: 24, weight: 600, fill: '#ffffff', anchor: 'start' });
-  if (t > .85) b += g(chip(395, 310, 190, 50, C.comfy, '2 ComfyUI', comfyRuns) + text(600, 344, comfyRuns ? '▶ runs' : '· waits', { size: 24, weight: 600, fill: '#ffffff', anchor: 'start' }), { op: comfyRuns ? 1 : pulse(t, .9, 1.75) });
-  s += g(b, { op: kb * 2, s: L(.9, 1, kb), cx: 540, cy: 280 });
-  let c = card(800, 140, 300, 280, 'GPU · 24 GB') + track(830, 240, 240, 64);
-  const wl = 170 * (P(t, .95, 1.3) - P(t, 1.5, 1.75)), wc = 200 * P(t, 1.95, 2.3);
-  c += seg(830, 240, wl, 64, C.llm, 'LLM 17G') + seg(830, 240, wc, 64, C.comfy, 'ComfyUI 20G');
-  c += text(950, 360, t > 1.5 && t < 1.95 ? 'LLM unloads' : '', { size: 24, weight: 600, fill: C.muted });
-  s += g(c, { op: 2 * P(t, .1, .4, back), s: L(.9, 1, P(t, .1, .4, back)), cx: 950, cy: 280 });
-  // chips on their way: pill -> queue -> card
-  const fly = (a, b, x1, y1, x2, y2, col, label) => { const k = P(t, a, b); return k > 0 && k < 1 ? chip(L(x1, x2, k), L(y1, y2, k), 190, 50, col, label, true) : ''; };
-  s += fly(.3, .65, 90, 153, 395, 240, C.llm, '1 LLM') + fly(.5, .85, 90, 343, 395, 310, C.comfy, '2 ComfyUI');
-  s += fly(.72, .98, 395, 240, 840, 247, C.llm, '1 LLM') + fly(1.72, 1.98, 395, 310, 840, 247, C.comfy, '2 ComfyUI');
+  const kin = P(t, 0, .35, back);
+  s += g(arrow(295, 180, 352, 236, 1) + arrow(295, 370, 352, 318, 1) + arrow(728, 270, 782, 270, 1), { op: kin });
+  s += g(pill(0, 140, 290, 80, C.llm, 'Chat model', { sub: '17 GB', size: 28 }) + pill(0, 330, 290, 80, C.comfy, 'Image job', { sub: '12 GB', size: 28 }), { tx: L(-400, 0, kin), op: kin * 3 });
+  const kq1 = P(t, .35, .65), kgo = P(t, .7, 1.0), kq2 = P(t, 1.05, 1.35), kun = P(t, 1.85, 2.15), kimg = P(t, 2.25, 2.55);
+  let b = box(360, 100, 360, 340) + text(540, 202, 'queue, by priority', { size: 22, weight: 500, fill: '#ffffff' });
+  if (kq1 >= 1) b += chip(385, 226, 200, 52, C.llm, '1 chat', kun < .5) + status(600, 261, kun < .5 ? '▶ runs' : '· idle');
+  if (kq2 >= 1) b += chip(385, 304, 200, 52, C.comfy, '2 image', kimg > 0) + status(600, 339, kimg > 0 ? '▶ runs' : '· waits') + ring(385, 304, 200, 52, t, 1.45, C.yellow, 12);
+  s += g(b, { op: kin * 2, s: L(.9, 1, kin), cx: 540, cy: 270 });
+  // 11.67 px per GB on a 280 px bar
+  let c = card(790, 120, 330, 310, 'GPU · 24 GB') + track(815, 215, 280, 72);
+  c += seg(815, 215, 198 * kgo * (1 - kun), 72, C.llm, 'chat 17G', { size: 26 }) + seg(815, 215, 140 * kimg, 72, C.comfy, 'image 12G', { size: 24 });
+  const note = kq2 >= 1 && kun <= 0 ? ['7 GB free', C.muted] : kun > 0 && kimg <= 0 ? ['chat model unloaded', C.muted] : kimg > 0 ? ['no crash', C.whisper] : ['', C.muted];
+  c += text(955, 345, note[0], { size: 26, weight: 700, fill: note[1] }) + ring(815, 215, 280, 72, t, 1.85, C.ink, 8);
+  s += g(c, { op: kin * 2, s: L(.9, 1, kin), cx: 955, cy: 270 });
+  const fly = (k, x1, y1, x2, y2, col, label) => k > 0 && k < 1 ? chip(L(x1, x2, k), L(y1, y2, k), 200, 52, col, label, true) : '';
+  s += fly(kq1, 300, 154, 385, 226, C.llm, '1 chat') + fly(kq2, 300, 344, 385, 304, C.comfy, '2 image');
+  s += fly(kgo, 385, 226, 840, 225, C.llm, '1 chat') + fly(kimg, 385, 304, 840, 225, C.comfy, '2 image');
   return s;
 }
-function s3(t) {   // a big LLM split over two GPUs
+function s3(t) {   // a 30 GB model split 18 + 12 over two cards, unloaded from both for a render
   let s = '';
-  const kb = P(t, 0, .3, back);
-  const llmUp = t < 1.3 || t > 2.25;
-  let b = box(0, 130, 300, 300) + text(150, 236, 'queue', { size: 22, weight: 500, fill: '#ffffff' });
-  b += chip(22, 262, 170, 50, C.llm, '1 LLM', llmUp) + text(206, 296, llmUp ? '▶ runs' : '· waits', { size: 22, weight: 600, fill: '#ffffff', anchor: 'start' });
-  const jobIn = P(t, .85, 1.15, out), jobRuns = t > 1.6;
-  if (jobIn > 0 && t < 2.2) b += g(chip(22, 342, 170, 50, C.api, '3 job', jobRuns, { tc: C.dark }) + text(206, 376, jobRuns ? '▶ runs' : '· waits', { size: 22, weight: 600, fill: '#ffffff', anchor: 'start' }),
-                                  { op: jobIn * (1 - P(t, 2.05, 2.2)), tx: L(-60, 0, jobIn) });
-  s += g(b, { op: kb * 2, s: L(.9, 1, kb), cx: 150, cy: 280 });
-  s += g(arrow(306, 280, 410, 150, 1) + arrow(306, 280, 410, 410, 1), { op: P(t, .15, .35) });
-  let c = card(420, 30, 700, 230, 'GPU 0 · 24 GB') + card(420, 300, 700, 230, 'GPU 1 · 16 GB');
-  c += track(460, 120, 620, 76) + track(460, 390, 620, 76);
-  const k = P(t, .3, .75) - P(t, 1.3, 1.6) + P(t, 2.25, 2.6);
-  const ws = 465 * k;
-  c += seg(460, 120, ws, 76, C.llm, 'LLM 30G, split') + seg(460, 390, ws, 76, C.llm, 'LLM 30G, split');
-  const kbr = P(t, .6, .8) - P(t, 1.25, 1.4) + P(t, 2.5, 2.65);
-  if (kbr > 0) c += `<rect x="${460 + 465 - 30}" y="190" width="30" height="206" fill="${C.llm}" opacity="${kbr.toFixed(3)}"/>`;
-  const wj = 620 * (P(t, 1.72, 1.98) - P(t, 2.05, 2.25));
-  c += seg(460, 390, wj, 76, C.api, 'job, whole card', { tc: C.dark });
-  c += text(770, 290, t > 1.3 && t < 1.75 ? 'unloaded from both cards' : '', { size: 26, weight: 700, fill: C.muted });
-  s += g(c, { op: 2 * P(t, .05, .35, back), s: L(.92, 1, P(t, .05, .35, back)), cx: 770, cy: 280 });
-  const kf = P(t, 1.58, 1.8);
-  if (kf > 0 && kf < 1) s += chip(L(22, 470, kf), L(342, 403, kf), 170, 50, C.api, '3 job', true, { tc: C.dark });
+  const kin = P(t, 0, .35, back), kload = P(t, .35, .8), kq = P(t, .9, 1.2), kun = P(t, 1.4, 1.7), kgo = P(t, 1.8, 2.1), kdone = P(t, 2.25, 2.45), kre = P(t, 2.55, 2.9);
+  const up = kload - kun + kre;
+  let b = box(0, 120, 300, 320) + text(150, 226, 'queue', { size: 22, weight: 500, fill: '#ffffff' });
+  b += chip(22, 252, 160, 52, C.llm, 'chat', up > .5) + status(194, 287, up > .5 ? '▶ runs' : '· waits');
+  if (kq > 0 && kdone < 1) b += g(chip(22, 330, 160, 52, C.api, 'render', kgo > 0, { tc: C.dark }) + status(194, 365, kgo > 0 ? '▶ runs' : '· waits'), { op: kq * (1 - kdone), tx: L(-60, 0, kq) });
+  b += ring(22, 330, 160, 52, t, 1.2, C.yellow, 12);
+  s += g(b, { op: kin * 2, s: L(.9, 1, kin), cx: 150, cy: 280 });
+  s += g(arrow(306, 280, 392, 150, 1) + arrow(306, 280, 392, 410, 1), { op: kin });
+  // 25 px per GB: GPU 0 has a 600 px bar, GPU 1 a 400 px one
+  let c = card(400, 20, 700, 230, 'GPU 0 · 24 GB') + card(400, 300, 480, 230, 'GPU 1 · 16 GB');
+  c += track(440, 110, 600, 72) + track(440, 390, 400, 72);
+  if (up > 0) c += `<rect x="452" y="176" width="40" height="220" fill="${C.llm}" opacity="${clamp(up * 1.5 - .5).toFixed(3)}"/>`;
+  c += seg(440, 110, 450 * up, 72, C.llm, 'chat model 18G') + seg(440, 390, 300 * up, 72, C.llm, 'chat model 12G');
+  c += text(510, 286, up > .9 ? 'one 30 GB model' : '', { size: 28, weight: 800, fill: C.llm, anchor: 'start' });
+  c += seg(440, 390, 400 * (kgo - kdone), 72, C.api, 'render 16G', { tc: C.dark });
+  c += ring(440, 110, 600, 72, t, 1.4, C.ink, 8) + ring(440, 390, 400, 72, t, 1.4, C.ink, 8);
+  s += g(c, { op: kin * 2, s: L(.92, 1, kin), cx: 750, cy: 275 });
+  if (kgo > 0 && kgo < 1) s += chip(L(22, 450, kgo), L(330, 400, kgo), 160, 52, C.api, 'render', true, { tc: C.dark });
   return s;
 }
-function s4(t) {   // the desktop steps aside
+function s4(t) {   // the desktop frees its VRAM for a job, then comes back
   let s = '';
-  const ks = P(t, .35, .6, back);
-  let seat = pill(0, 110, 420, 80, '#ffffff', '', {}) + `<circle cx="48" cy="150" r="20" fill="${C.whisper}"/><path d="M38,151 L46,159 L59,142" stroke="#ffffff" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`
-    + text(84, 161, 'nobody at the seat', { size: 30, weight: 700, anchor: 'start' });
-  s += g(seat, { op: ks * 2, s: L(.85, 1, ks), cx: 210, cy: 150 });
-  const kj = P(t, .12, .45, back), kfly = P(t, .95, 1.2);
-  if (kfly < 1) s += g(chip(0, 330, 340, 70, C.comfy, kfly > 0 ? 'ComfyUI 15G' : 'ComfyUI 15G · waits', kfly > 0, { size: 28 }),
-                        { tx: L(-420, 0, kj) + L(0, 530, kfly), ty: L(0, -95, kfly), op: kj * 3 });
-  const kc = P(t, 0, .3, back);
-  let c = card(480, 110, 640, 330, 'GPU 1 · 16 GB') + track(520, 230, 560, 80);
-  const kd = 1 - P(t, .7, .95) + P(t, 1.8, 2.1, back);
-  c += seg(520, 230, 70 * kd, 80, C.grey, '');
-  const dl = t < .7 ? 'desktop' : t < 1.1 ? 'desktop stopped' : t > 1.85 ? 'desktop back' : '';
-  const dop = t < .7 ? 1 : t < 1.1 ? 1 - P(t, .9, 1.1) : P(t, 1.85, 2.05);
-  c += text(520 + 70 * clamp(kd) + 18, 280, dl, { size: 28, weight: 700, anchor: 'start', fill: t > .7 && t < 1.1 ? C.muted : C.ink, op: dop });
-  c += seg(520, 230, 525 * (P(t, 1.08, 1.4) - P(t, 1.55, 1.75)), 80, C.comfy, 'ComfyUI 15G', { size: 28 });
-  c += text(800, 390, t > 1.55 && t < 1.9 ? 'job done' : '', { size: 26, weight: 600, fill: C.muted });
-  s += g(c, { op: kc * 2, s: L(.9, 1, kc), cx: 800, cy: 275 });
+  const kin = P(t, 0, .35, back), kseat = P(t, .6, .9, back), kstop = P(t, 1.05, 1.35), kgo = P(t, 1.5, 1.85), kdone = P(t, 2.05, 2.3), kback = P(t, 2.4, 2.7, back);
+  s += g(pill(0, 100, 450, 84, '#ffffff', '') + check(48, 142) + text(84, 153, 'nobody at the screen', { size: 30, weight: 700, anchor: 'start' }),
+         { op: kseat * 2, s: L(.85, 1, kseat), cx: 225, cy: 142 });
+  if (kgo < 1) s += g(chip(0, 330, 380, 76, C.comfy, kgo > 0 ? 'image job 15 GB' : 'image job 15 GB · waits', kgo > 0, { size: 28 }) + (kgo > 0 ? '' : ring(0, 330, 380, 76, t, .45, C.comfy, 12)),
+                      { tx: L(-440, 0, kin) + L(0, 540, kgo), ty: L(0, -110, kgo), op: kin * 3 });
+  // 33.75 px per GB on a 540 px bar
+  let c = card(500, 100, 620, 360, 'GPU 1 · 16 GB') + track(540, 220, 540, 80);
+  const kd = 1 - kstop + kback;
+  c += seg(540, 220, 67.5 * kd, 80, C.grey, '');
+  const dl = kstop <= 0 ? ['your desktop 2G', C.ink, 1] : kback <= 0 ? ['desktop stopped', C.muted, 1 - P(t, 1.3, 1.5)] : ['desktop back', C.ink, kback];
+  c += text(540 + 67.5 * clamp(kd) + 18, 271, dl[0], { size: 28, weight: 700, anchor: 'start', fill: dl[1], op: clamp(dl[2]) });
+  c += seg(540, 220, 506 * (kgo - kdone), 80, C.comfy, 'image job 15G');
+  const free = kstop <= 0 ? '14 GB free' : kgo <= 0 ? '16 GB free' : kdone <= 0 ? '1 GB free' : '';
+  c += text(810, 380, free, { size: 28, weight: 700, fill: C.muted }) + ring(540, 220, 67.5, 80, t, 1.05, C.ink, 8);
+  s += g(c, { op: kin * 2, s: L(.9, 1, kin), cx: 810, cy: 280 });
   return s;
 }
-function s5(t) {   // the gate holds a chat request, the model hold keeps the model
+function s5(t) {   // the gate holds a chat request; a request for another model waits for chat to be quiet
   let s = '';
-  const kb = P(t, 0, .3, back);
-  let b = box(330, 100, 360, 360) + text(510, 200, 'gate and queue', { size: 22, weight: 500, fill: '#ffffff' });
-  s += g(b, { op: kb * 2, s: L(.9, 1, kb), cx: 510, cy: 280 });
-  s += g(arrow(698, 280, 792, 280, 1), { op: P(t, .15, .35) });
-  let c = card(800, 130, 320, 300, 'GPU 0 · 24 GB') + track(830, 240, 260, 72);
-  c += seg(830, 240, 217 * (1 - P(t, .8, 1.0)), 72, C.comfy, 'ComfyUI');
-  c += seg(830, 240, 184 * (P(t, 1.0, 1.3) - P(t, 2.15, 2.35)), 72, C.llm, 'model A');
-  c += seg(830, 240, 130 * P(t, 2.35, 2.65), 72, C.llm, 'model B', { size: 26 });
-  const note = t < .8 ? 'a job has the card' : t < 2.15 ? 'class 1 chatting' : 'class 1 quiet';
-  c += text(960, 380, note, { size: 24, weight: 600, fill: C.muted });
-  s += g(c, { op: 2 * P(t, .05, .35, back), s: L(.92, 1, P(t, .05, .35, back)), cx: 960, cy: 280 });
-  // chat request: held at the gate while the job runs, sent on once the model is back
-  const kin = P(t, .25, .55, out), kgo = P(t, 1.3, 1.6);
-  if (kin > 0 && kgo < 1) s += g(chip(355, 220, 310, 56, C.llm, kgo > 0 ? 'chat' : 'chat · held', kgo > 0),
-                                  { tx: L(-560, 0, kin) + L(0, 480, kgo), ty: L(0, 28, kgo), op: kgo > 0 ? 1 - P(t, 1.5, 1.6) : pulse(t, .6, 1.3) });
-  // class 3 asks for model B: it waits while class 1 holds model A
-  const kin2 = P(t, 1.55, 1.85, out), kgo2 = P(t, 2.35, 2.65);
-  if (kin2 > 0 && kgo2 < 1) s += g(chip(355, 310, 310, 56, C.api, kgo2 > 0 ? 'model B' : 'model B · waits', kgo2 > 0, { tc: C.dark }),
-                                    { tx: L(-560, 0, kin2) + L(0, 480, kgo2), ty: L(0, -62, kgo2), op: kgo2 > 0 ? 1 - P(t, 2.55, 2.65) : pulse(t, 1.9, 2.35) });
+  const kin = P(t, 0, .35, back), kc = P(t, .3, .6, out), kfree = P(t, .9, 1.15), kload = P(t, 1.2, 1.5), kcgo = P(t, 1.6, 1.85);
+  const ko = P(t, 2.0, 2.3, out), kun = P(t, 2.65, 2.9), kol = P(t, 2.95, 3.2);
+  s += g(box(120, 100, 400, 360) + text(320, 202, 'holds requests', { size: 22, weight: 500, fill: '#ffffff' }), { op: kin * 2, s: L(.9, 1, kin), cx: 320, cy: 280 });
+  s += g(arrow(528, 280, 632, 280, 1), { op: kin });
+  // 17.5 px per GB on a 420 px bar
+  let c = card(640, 120, 480, 320, 'GPU · 24 GB') + track(670, 215, 420, 72);
+  c += seg(670, 215, 210 * (1 - kfree), 72, C.comfy, 'image job 12G');
+  c += seg(670, 215, 297.5 * kload * (1 - kun), 72, C.llm, 'chat model 17G') + seg(670, 215, 210 * kol, 72, C.api, 'other model 12G', { tc: C.dark, size: 23 });
+  const note = kfree <= 0 ? ['GPU busy', C.muted] : kcgo >= 1 && ko <= 0 ? ['chat answered', C.whisper] : ko > 0 && kun <= 0 ? ['chat still in use', C.muted] : kol >= 1 ? ['one swap, when quiet', C.whisper] : ['', C.muted];
+  c += text(880, 360, note[0], { size: 26, weight: 700, fill: note[1] }) + ring(670, 215, 420, 72, t, 2.65, C.ink, 8);
+  s += g(c, { op: kin * 2, s: L(.92, 1, kin), cx: 880, cy: 280 });
+  if (kc > 0 && kcgo < 1) s += g(chip(150, 226, 340, 58, C.llm, kcgo > 0 ? 'chat' : 'chat · held', true) + (kcgo > 0 ? '' : ring(150, 226, 340, 58, t, .6, C.yellow, 12)),
+                                 { tx: L(-560, 0, kc) + L(0, 530, kcgo), ty: L(0, -15, kcgo), op: kcgo > .8 ? (1 - kcgo) * 5 : 1 });
+  if (ko > 0 && kol < 1) s += g(chip(150, 310, 340, 58, C.api, kun > 0 ? 'other model' : 'other model · waits', true, { tc: C.dark }) + (kun > 0 ? '' : ring(150, 310, 340, 58, t, 2.3, C.yellow, 12)),
+                                { tx: L(-560, 0, ko) + L(0, 530, kol), ty: L(0, -99, kol), op: kol > .8 ? (1 - kol) * 5 : 1 });
   return s;
 }
 function s6(t) {   // end card
   let s = '';
-  const k = P(t, 0, .35, back);
+  const k = P(t, 0, .35, back), kp = P(t, .2, .5, out), kc = P(t, .4, .7, back), ku = P(t, .55, .85, out);
   s += g(box(300, 20, 520, 200, { size: 150, ty: 152 }), { op: k * 2, s: L(.8, 1, k), cx: 560, cy: 120 });
-  const kp = P(t, .2, .5, out);
   s += g(text(560, 300, 'Stop CUDA out of memory when Ollama,', { size: 36, weight: 700 }) + text(560, 346, 'ComfyUI and your jobs share a GPU.', { size: 36, weight: 700 }), { op: kp, ty: L(18, 0, kp) });
-  const kc = P(t, .4, .7, back);
-  s += g(`<g filter="url(#sh)"><rect x="350" y="390" width="420" height="72" rx="18" fill="#ffffff" stroke="${C.ink}" stroke-width="4"/></g>` + text(560, 437, 'cargo install gpuq', { size: 32, weight: 700, font: MONO }),
+  s += g(`<g filter="url(#sh)"><rect x="330" y="386" width="460" height="80" rx="18" fill="#ffffff" stroke="${C.ink}" stroke-width="4"/></g>` + text(560, 438, 'cargo install gpuq', { size: 36, weight: 700, font: MONO }),
          { op: kc * 2, s: L(.85, 1, kc), cx: 560, cy: 426 });
-  const ku = P(t, .55, .85, out);
-  s += g(text(560, 530, 'github.com/elektricM/gpuq', { size: 30, weight: 700, fill: C.muted }), { op: ku, ty: L(14, 0, ku) });
+  s += g(text(560, 530, 'github.com/elektricM/gpuq', { size: 32, weight: 700, fill: C.muted }), { op: ku, ty: L(14, 0, ku) });
   return s;
 }
 
+// [scene, length in scene time, caption, sub-captions as [scene time, text]]
 const SCENES = [
-  [s1, 2.2, 'Two programs, one card.'],
-  [s2, 2.6, 'Queued by priority, the card takes turns.'],
-  [s3, 2.8, 'A big LLM, split over two GPUs.'],
-  [s4, 2.3, 'The desktop steps aside, then comes back.'],
-  [s5, 3.0, 'Requests wait at gpuq, then go through.'],
-  [s6, 1.9, ''],
+  [s1, 2.3, 'Ollama and ComfyUI share one GPU.', [[1.45, '17 + 12 = 29 GB asked of a 24 GB card.']]],
+  [s2, 2.8, 'gpuq gives the GPU out by turns.', [[1.45, 'Not enough free VRAM: the image job waits its turn.']]],
+  [s3, 3.1, 'One big model, split over two GPUs.', [[1.2, 'A render needs all of GPU 1: the model leaves both cards.']]],
+  [s4, 2.9, 'Your desktop steps aside for a job.', [[.6, 'The job needs 15 GB, 14 are free, nobody is at the screen.']]],
+  [s5, 3.45, 'Requests wait instead of failing.', [[.3, 'GPU busy: the chat request is held, not refused.'], [2.0, 'Another model waits until chat is quiet: no swapping.']]],
+  [s6, 1.0, '', []],
 ];
 // Pace: each scene is slowed so that it shows about RATE animation steps per second (STEPS = the P(t, ...) steps
 // in its function), never faster than its own timings; then it holds HOLD s on its last frame so the caption can be read.
-const RATE = 2.6, HOLD = 0.7;
-const STEPS = { s1: 8, s2: 10, s3: 15, s4: 10, s5: 14, s6: 4 };
+// The end card holds END_HOLD s so the install command can be read.
+const RATE = 2.6, HOLD = 0.7, END_HOLD = 2.6;
+const STEPS = { s1: 6, s2: 8, s3: 8, s4: 7, s5: 9, s6: 4 };
 const slow = s => Math.max(1.4, STEPS[s[0].name] / (RATE * s[1]));
-const len = s => s[1] * slow(s) + (s[2] ? HOLD : 0);
+const len = s => s[1] * slow(s) + (s[2] ? HOLD : END_HOLD);
 const TOTAL = SCENES.reduce((a, s) => a + len(s), 0);
+
+// Split a line in two for the square format: at ': ' or ', ' nearest the middle, else at the middle space.
+function split2(s) {
+  let best = -1;
+  for (const sep of [': ', ', ']) for (let i = s.indexOf(sep); i > 0; i = s.indexOf(sep, i + 1))
+    if (best < 0 || Math.abs(i - s.length / 2) < Math.abs(best - s.length / 2)) best = i + 1;
+  if (best < 0 || Math.abs(best - s.length / 2) > s.length / 4) best = s.lastIndexOf(' ', s.length / 2);
+  return [s.slice(0, best), s.slice(best + 1)];
+}
 
 function draw(t) {
   let at = 0, i = 0;
   while (i < SCENES.length - 1 && t >= at + len(SCENES[i])) { at += len(SCENES[i]); i++; }
-  const [fn, d0, cap] = SCENES[i];
+  const [fn, d0, cap, subs] = SCENES[i];
   const d = len(SCENES[i]);
   const lt = t - at;
   const st = Math.min((t - at) / slow(SCENES[i]), d0 - .15);  // scene time, frozen near its end during the hold
@@ -229,24 +245,31 @@ function draw(t) {
   const fade = P(lt, 0, .14) * (last ? 1 : 1 - P(lt, d - .14, d));
   const square = H >= W;
   const k = square ? .9 : 1;
-  let sx = (W - 1120 * k) / 2, sy, capSize, lines = cap ? [cap] : [];
-  if (square && cap.length > 24) {   // two lines: at the comma, else at the middle space
-    const at = cap.indexOf(', ') > 0 ? cap.indexOf(', ') + 1 : cap.lastIndexOf(' ', cap.length / 2);
-    lines = [cap.slice(0, at), cap.slice(at + 1)];
-  }
-  const longest = Math.max(0, ...lines.map(l => l.length));
+  // the sub-caption shown now, and how far it has faded in
+  let sub = '', ksub = 0;
+  for (const [a, s] of subs) if (st >= a) { sub = s; ksub = P(st, a, a + .2, out); }
+  let sx = (W - 1120 * k) / 2, sy, capSize, subSize, lines = cap ? [cap] : [], slines = [];
   if (!cap) sy = (H - 560 * k) / 2;
   else if (square) {
-    capSize = Math.min(64, 1000 / (longest * .56));
-    const top = (H - (lines.length * capSize * 1.2 + 56 + 560 * k)) / 2;
+    if (cap.length > 24) lines = split2(cap);
+    capSize = Math.min(60, 1000 / (Math.max(...lines.map(l => l.length)) * .56));
+    subSize = 32;
+    const subH = 2 * subSize * 1.25;   // room for two sub lines, so the stage does not jump
+    const top = (H - (lines.length * capSize * 1.2 + 14 + subH + 40 + 560 * k)) / 2;
     lines = lines.map((l, j) => [l, top + capSize * (1 + 1.2 * j)]);
-    sy = top + lines.length * capSize * 1.2 + 56;
+    const sTop = top + lines.length * capSize * 1.2 + 14;
+    if (sub) slines = (sub.length > 34 ? split2(sub) : [sub]).map((l, j) => [l, sTop + subSize * (1 + 1.25 * j)]);
+    sy = sTop + subH + 40;
   } else {
-    capSize = Math.min(48, 1180 / (longest * .56));
-    lines = lines.map(l => [l, 86]);
-    sy = 140;
+    capSize = Math.min(48, 1000 / (cap.length * .56));
+    subSize = 27;
+    lines = [[cap, 68]];
+    if (sub) slines = [[sub, 112]];
+    sy = 150;
   }
   const kcap = P(lt, 0, .3, out);
+  const counter = `<g filter="url(#sh)"><rect x="28" y="24" width="82" height="42" rx="12" fill="${C.ink}" stroke="${C.ink}" stroke-width="3"/></g>`
+    + text(69, 54, `${i + 1}/${SCENES.length}`, { size: 24, weight: 800, fill: C.yellow });
   document.getElementById('frame').innerHTML =
     `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
 <defs>
@@ -255,7 +278,9 @@ function draw(t) {
 <marker id="mr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="4" markerHeight="4" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="${C.red}"/></marker>
 </defs>
 <rect width="${W}" height="${H}" fill="#fff8ef"/>
+${counter}
 ${g(lines.map(([l, y]) => text(W / 2, y.toFixed(1), l, { size: capSize.toFixed(1), weight: 800 })).join(''), { op: fade * kcap, ty: L(14, 0, kcap) })}
+${g(slines.map(([l, y]) => text(W / 2, y.toFixed(1), l, { size: subSize, weight: 600, fill: C.muted })).join(''), { op: fade * ksub, ty: L(10, 0, ksub) })}
 <g transform="translate(${sx} ${sy}) scale(${k})" opacity="${fade.toFixed(3)}">${fn(st)}</g>
 </svg>`;
 }
@@ -263,3 +288,4 @@ draw(+(Q.get('t') || 0));
 </script>
 </body>
 </html>
+
