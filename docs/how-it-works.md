@@ -102,3 +102,4 @@ model: while it has requests in flight, and for that long after the last one, re
 less important classes for another model wait in the queue. They go through together once the
 class has been quiet, so the server swaps once each way.
 
+![Class 1 uses model A; a class 3 request for model B waits instead of forcing a swap; once class 1 is quiet the server switches to model B once](model-hold.svg)
