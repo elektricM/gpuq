@@ -9,16 +9,18 @@
 
 rustPlatform.buildRustPackage (finalAttrs: {
   pname = "gpuq";
-  version = "0.3.0";
+  version = "0.4.0";
 
   src = fetchFromGitHub {
     owner = "elektricM";
     repo = "gpuq";
     tag = "v${finalAttrs.version}";
-    hash = "sha256-CzE9iY1aNkHwjcHsNbEPbB6Rv6UMZFppK1cX+QtN6AU=";
+    # Fill in after the v0.4.0 tag exists (packaging/README.md, release checklist step 3).
+    hash = lib.fakeHash;
   };
 
-  cargoHash = "sha256-Y3E12YI87bhUI+N4NdsoJ6BCc0y6lC2+FLe0vLbsUkI=";
+  # Fill in after the v0.4.0 tag exists.
+  cargoHash = lib.fakeHash;
 
   nativeBuildInputs = [ installShellFiles ];
 
