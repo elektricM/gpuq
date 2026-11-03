@@ -13,9 +13,9 @@ backend = "http://127.0.0.1:19435"
 backend = "ollama"
 card = ["rtx3090-0", "rtx3090-1"]
 resident = "qwen2.5:32b"
-reload_delay_s = 2
+reload_delay_s = 1
 gap_s = 1
-idle_s = 3                  # batch jobs take the cards after 3 s without LLM requests
+idle_s = 2                  # batch jobs take the cards after 2 s without LLM requests
 
 [gpu]
 driver_settle_s = 0.5

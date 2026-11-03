@@ -16,6 +16,7 @@ DEMO = os.environ.get("GPUQ_DEMO", "/tmp/gpuq-demo")
 CARDS = os.environ.get("GPUQ_DEMO_CARDS", "gpu0,gpu1").split(",")
 MODEL_MIB = 20480  # a 32B model at 4 bits, split over the cards
 LOAD_S = 1.5
+UNLOAD_S = 1.0
 loaded = set()
 
 
@@ -61,6 +62,7 @@ class H(BaseHTTPRequestHandler):
         req = json.loads(self.rfile.read(n) or b"{}")
         model = tag(req.get("model", ""))
         if self.path == "/api/generate" and req.get("keep_alive") in (0, "0", "0s"):
+            time.sleep(UNLOAD_S)
             loaded.discard(model)
             hold(model, False)
             self.reply({"model": model, "done": True, "done_reason": "unload"})

@@ -10,13 +10,18 @@ involved and no GPU is used:
   model holds 10 GiB on each card.
 - `bin/render` and `bin/train` are sleep scripts that hold 8 GiB and 22 GiB on the card gpuq
   granted them (`GPUQ_CARD`).
+- `view.py` types the commands, writes the captions and draws gpuq's `GET /status` five times
+  a second: each card's VRAM bar split into the leases gpuq granted and the model, the queue
+  with gpuq's own reason, and the last lines of gpuq's log.
 
 The scheduling in the recording is gpuq's own: it decides when to unload the model, which card
-each job gets, which job waits, and when the model comes back.
+each job gets, which job waits, that the chat request goes before the last batch job, and when
+the model comes back.
 
 ```sh
 cargo build --release
 PATH=/path/to/agg:$PATH docs/demo/record.sh
 ```
 
-Needs python3, curl, asciinema 2 and [agg](https://github.com/asciinema/agg).
+Needs python3, curl, asciinema 2, [agg](https://github.com/asciinema/agg) and the JetBrains
+Mono font.

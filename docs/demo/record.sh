@@ -3,8 +3,8 @@
 # $GPUQ_DEMO, two pretend cards (fake-vram.sh) and an Ollama stand-in (mock-ollama.py).
 # No real GPU is used and a gpuq already running on the machine is left alone.
 #
-# Needs: a built gpuq (GPUQ_BIN, default target/release/gpuq), python3, curl, asciinema 2
-# and agg (https://github.com/asciinema/agg).
+# Needs: a built gpuq (GPUQ_BIN, default target/release/gpuq), python3, curl, asciinema 2,
+# agg (https://github.com/asciinema/agg) and the JetBrains Mono font.
 set -eu
 here=$(cd "$(dirname "$0")" && pwd)
 root=$(cd "$here/../.." && pwd)
@@ -31,6 +31,8 @@ sleep 2
 curl -s localhost:19434/api/generate -d '{"model":"qwen2.5:32b","prompt":"hi"}' >/dev/null
 sleep 4
 
-asciinema rec --overwrite --cols 92 --rows 28 -c "bash $here/scene.sh" "$GPUQ_DEMO/demo.cast"
-agg --font-size 15 --theme monokai --last-frame-duration 4 "$GPUQ_DEMO/demo.cast" "$root/docs/demo.gif"
+asciinema rec --overwrite --cols 64 --rows 19 -c "python3 $here/view.py" "$GPUQ_DEMO/demo.cast"
+agg --font-family "JetBrains Mono" --font-size 30 --line-height 1.3 --fps-cap 20 \
+    --theme 161b22,e6e9ef,161b22,e06c75,98c379,e5c07b,61afef,c678dd,56b6c2,abb2bf \
+    --last-frame-duration 5 "$GPUQ_DEMO/demo.cast" "$root/docs/demo.gif"
 ls -l "$root/docs/demo.gif"
