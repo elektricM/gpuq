@@ -1,0 +1,257 @@
+<!doctype html>
+<!-- The overview video, scene by scene, in the overview diagram's bold flat style.
+     draw(t) paints the frame at t seconds; render.py captures it frame by frame.
+     Open with ?w=1280&h=720 or ?w=1080&h=1080, then call draw(t) in the console. -->
+<html>
+<head>
+<meta charset="utf-8">
+<style>html,body{margin:0;padding:0;background:#fff8ef;overflow:hidden}svg{display:block}</style>
+</head>
+<body>
+<div id="frame"></div>
+<script>
+const Q = new URLSearchParams(location.search);
+const W = +(Q.get('w') || 1280), H = +(Q.get('h') || 720);
+const C = { llm: '#a66cff', comfy: '#3d8bff', whisper: '#00b37e', api: '#ffb400', grey: '#4a4a4a',
+            ink: '#1f1f1f', muted: '#4a4a4a', track: '#f0e6d8', red: '#ff4d4d', yellow: '#ffd400', dark: '#1f2328' };
+const FONT = 'Inter, Helvetica, Arial, sans-serif';
+const MONO = 'JetBrains Mono, DejaVu Sans Mono, monospace';
+
+// easing and timing
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const io = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+const out = x => 1 - Math.pow(1 - x, 3);
+const back = x => { const c1 = 1.4, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
+const P = (t, a, b, f = io) => f(clamp((t - a) / (b - a)));
+const L = (a, b, k) => a + (b - a) * k;
+const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+
+// drawing, same strokes, radii and shadows as docs/overview.svg, scaled up
+function text(x, y, s, o = {}) {
+  const { size = 28, weight = 600, fill = C.ink, anchor = 'middle', op = 1, font = FONT } = o;
+  return `<text x="${x}" y="${y}" font-family="${font}" font-size="${size}" font-weight="${weight}" fill="${fill}" text-anchor="${anchor}" opacity="${op}">${esc(s)}</text>`;
+}
+function g(inner, { op = 1, tx = 0, ty = 0, s = 1, cx = 0, cy = 0 } = {}) {
+  if (op <= 0.002 || !inner) return '';
+  const sc = s !== 1 ? ` translate(${cx} ${cy}) scale(${s}) translate(${-cx} ${-cy})` : '';
+  return `<g opacity="${clamp(op).toFixed(3)}" transform="translate(${tx} ${ty})${sc}">${inner}</g>`;
+}
+function pill(x, y, w, h, fill, label, o = {}) {
+  const { tc = '#ffffff', sub = null, size = 32 } = o;
+  let s = `<g filter="url(#sh)"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${h * .4}" fill="${fill}" stroke="${C.ink}" stroke-width="4"/></g>`;
+  if (sub) s += text(x + 28, y + h / 2 + size * .36, label, { size, weight: 700, fill: tc, anchor: 'start' })
+             + text(x + w - 24, y + h / 2 + 9, sub, { size: 24, weight: 500, fill: tc, anchor: 'end', op: .85 });
+  else s += text(x + w / 2, y + h / 2 + size * .36, label, { size, weight: 700, fill: tc });
+  return s;
+}
+function card(x, y, w, h, title, o = {}) {
+  const { stroke = C.ink, sw = 4.5 } = o;
+  return `<g filter="url(#sh)"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="24" fill="#ffffff" stroke="${stroke}" stroke-width="${sw}"/></g>`
+    + (title ? text(x + w / 2, y + 54, title, { size: 32, weight: 800 }) : '');
+}
+function box(x, y, w, h, o = {}) {
+  const { title = 'gpuq', size = 46, ty = 64 } = o;
+  return `<g filter="url(#sh)"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="26" fill="${C.ink}" stroke="${C.ink}" stroke-width="4"/></g>`
+    + text(x + w / 2, y + ty, title, { size, weight: 800, fill: C.yellow });
+}
+const track = (x, y, w, h) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="8" fill="${C.track}"/>`;
+function seg(x, y, w, h, fill, label, o = {}) {
+  if (w < 1) return '';
+  const { tc = '#ffffff', size = 28 } = o;
+  let s = `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="8" fill="${fill}"/>`;
+  if (label && w > label.length * size * .52 + 20) s += text(x + w / 2, y + h / 2 + size * .36, label, { size, weight: 700, fill: tc });
+  return s;
+}
+function chip(x, y, w, h, col, label, solid, o = {}) {
+  const { size = 26, tc = '#ffffff' } = o;
+  if (solid) return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="12" fill="${col}"/>` + text(x + w / 2, y + h / 2 + size * .36, label, { size, weight: 700, fill: tc });
+  return `<rect x="${x + 1.5}" y="${y + 1.5}" width="${w - 3}" height="${h - 3}" rx="12" fill="none" stroke="${col}" stroke-width="3" stroke-dasharray="9 6"/>`
+    + text(x + w / 2, y + h / 2 + size * .36, label, { size, weight: 700, fill: col });
+}
+function arrow(x1, y1, x2, y2, k, col = C.muted, w = 4) {
+  if (k <= .01) return '';
+  return `<path d="M${x1},${y1} L${L(x1, x2, k)},${L(y1, y2, k)}" stroke="${col}" stroke-width="${w}" fill="none" marker-end="url(#${col === C.red ? 'mr' : 'mg'})"/>`;
+}
+const blink = (t, a, n = 3, p = .12) => (t < a ? 0 : t > a + n * 2 * p ? 1 : (Math.floor((t - a) / p) % 2 ? .25 : 1));
+const pulse = (t, a, b) => (t < a || t > b ? 1 : .6 + .4 * Math.cos((t - a) * 9));
+
+// ---- scenes, in a 1120 x 560 stage ----
+function s1(t) {   // the problem
+  let s = '';
+  const oom = t > 1.4;
+  const shake = t > 1.4 && t < 1.7 ? 9 * Math.sin((t - 1.4) * 70) * (1 - (t - 1.4) / .3) : 0;
+  s += arrow(345, 190, 606, 262, P(t, .3, .5), C.red, 5) + arrow(345, 370, 606, 318, P(t, .8, 1.0), C.red, 5);
+  const k1 = P(t, 0, .4, back), k2 = P(t, .12, .52, back);
+  s += g(pill(40, 150, 300, 80, C.llm, 'LLM server'), { tx: L(-420, 0, k1), op: k1 * 3 });
+  s += g(pill(40, 330, 300, 80, C.comfy, 'ComfyUI'), { tx: L(-420, 0, k2), op: k2 * 3 });
+  const kc = P(t, .05, .4, back);
+  let c = card(620, 110, 440, 340, 'GPU · 24 GB', { stroke: oom ? C.red : C.ink, sw: oom ? 6 : 4.5 });
+  c += track(660, 220, 360, 70);
+  const wp = 255 * P(t, .45, .85), wb = 180 * P(t, .95, 1.35);
+  c += seg(660, 220, wp, 70, C.llm, 'LLM 17G') + seg(915, 220, wb, 70, C.comfy, '12G');
+  if (wb > 105) c += `<rect x="1020" y="212" width="${wb - 105}" height="86" fill="none" stroke="${C.red}" stroke-width="3" stroke-dasharray="7 5"/>`;
+  c += text(840, 340, '29 GB asked', { size: 28, weight: 600, fill: C.red, op: P(t, 1.2, 1.4) });
+  c += text(840, 405, 'CUDA out of memory', { size: 38, weight: 800, fill: C.red, op: blink(t, 1.4) });
+  s += g(c, { op: kc * 2, s: L(.88, 1, kc), cx: 840, cy: 280, tx: shake });
+  return s;
+}
+function s2(t) {   // queued by priority, the card takes turns
+  let s = '';
+  const ka = P(t, 0, .35, back);
+  s += g(arrow(285, 178, 362, 230, 1) + arrow(285, 368, 362, 320, 1) + arrow(718, 280, 792, 280, 1), { op: P(t, .15, .35) });
+  s += g(pill(0, 140, 280, 76, C.llm, 'LLM', { sub: 'class 1' }), { tx: L(-400, 0, ka), op: ka * 3 });
+  s += g(pill(0, 330, 280, 76, C.comfy, 'ComfyUI', { sub: 'class 2' }), { tx: L(-400, 0, P(t, .08, .43, back)), op: 3 * P(t, .08, .43) });
+  const kb = P(t, .05, .35, back);
+  let b = box(370, 110, 340, 340) + text(540, 214, 'queue, by priority', { size: 22, weight: 500, fill: '#ffffff' });
+  const llmRuns = t > .65 && t < 1.6, comfyRuns = t > 1.75;
+  if (t > .65) b += chip(395, 240, 190, 50, C.llm, '1 LLM', llmRuns) + text(600, 274, llmRuns ? '▶ runs' : '· waits', { size: 24, weight: 600, fill: '#ffffff', anchor: 'start' });
+  if (t > .85) b += g(chip(395, 310, 190, 50, C.comfy, '2 ComfyUI', comfyRuns) + text(600, 344, comfyRuns ? '▶ runs' : '· waits', { size: 24, weight: 600, fill: '#ffffff', anchor: 'start' }), { op: comfyRuns ? 1 : pulse(t, .9, 1.75) });
+  s += g(b, { op: kb * 2, s: L(.9, 1, kb), cx: 540, cy: 280 });
+  let c = card(800, 140, 300, 280, 'GPU · 24 GB') + track(830, 240, 240, 64);
+  const wl = 170 * (P(t, .95, 1.3) - P(t, 1.5, 1.75)), wc = 200 * P(t, 1.95, 2.3);
+  c += seg(830, 240, wl, 64, C.llm, 'LLM 17G') + seg(830, 240, wc, 64, C.comfy, 'ComfyUI 20G');
+  c += text(950, 360, t > 1.5 && t < 1.95 ? 'LLM unloads' : '', { size: 24, weight: 600, fill: C.muted });
+  s += g(c, { op: 2 * P(t, .1, .4, back), s: L(.9, 1, P(t, .1, .4, back)), cx: 950, cy: 280 });
+  // chips on their way: pill -> queue -> card
+  const fly = (a, b, x1, y1, x2, y2, col, label) => { const k = P(t, a, b); return k > 0 && k < 1 ? chip(L(x1, x2, k), L(y1, y2, k), 190, 50, col, label, true) : ''; };
+  s += fly(.3, .65, 90, 153, 395, 240, C.llm, '1 LLM') + fly(.5, .85, 90, 343, 395, 310, C.comfy, '2 ComfyUI');
+  s += fly(.72, .98, 395, 240, 840, 247, C.llm, '1 LLM') + fly(1.72, 1.98, 395, 310, 840, 247, C.comfy, '2 ComfyUI');
+  return s;
+}
+function s3(t) {   // a big LLM split over two GPUs
+  let s = '';
+  const kb = P(t, 0, .3, back);
+  const llmUp = t < 1.3 || t > 2.25;
+  let b = box(0, 130, 300, 300) + text(150, 236, 'queue', { size: 22, weight: 500, fill: '#ffffff' });
+  b += chip(22, 262, 170, 50, C.llm, '1 LLM', llmUp) + text(206, 296, llmUp ? '▶ runs' : '· waits', { size: 22, weight: 600, fill: '#ffffff', anchor: 'start' });
+  const jobIn = P(t, .85, 1.15, out), jobRuns = t > 1.6;
+  if (jobIn > 0 && t < 2.2) b += g(chip(22, 342, 170, 50, C.api, '3 job', jobRuns, { tc: C.dark }) + text(206, 376, jobRuns ? '▶ runs' : '· waits', { size: 22, weight: 600, fill: '#ffffff', anchor: 'start' }),
+                                  { op: jobIn * (1 - P(t, 2.05, 2.2)), tx: L(-60, 0, jobIn) });
+  s += g(b, { op: kb * 2, s: L(.9, 1, kb), cx: 150, cy: 280 });
+  s += g(arrow(306, 280, 410, 150, 1) + arrow(306, 280, 410, 410, 1), { op: P(t, .15, .35) });
+  let c = card(420, 30, 700, 230, 'GPU 0 · 24 GB') + card(420, 300, 700, 230, 'GPU 1 · 16 GB');
+  c += track(460, 120, 620, 76) + track(460, 390, 620, 76);
+  const k = P(t, .3, .75) - P(t, 1.3, 1.6) + P(t, 2.25, 2.6);
+  const ws = 465 * k;
+  c += seg(460, 120, ws, 76, C.llm, 'LLM 30G, split') + seg(460, 390, ws, 76, C.llm, 'LLM 30G, split');
+  const kbr = P(t, .6, .8) - P(t, 1.25, 1.4) + P(t, 2.5, 2.65);
+  if (kbr > 0) c += `<rect x="${460 + 465 - 30}" y="190" width="30" height="206" fill="${C.llm}" opacity="${kbr.toFixed(3)}"/>`;
+  const wj = 620 * (P(t, 1.72, 1.98) - P(t, 2.05, 2.25));
+  c += seg(460, 390, wj, 76, C.api, 'job, whole card', { tc: C.dark });
+  c += text(770, 290, t > 1.3 && t < 1.75 ? 'unloaded from both cards' : '', { size: 26, weight: 700, fill: C.muted });
+  s += g(c, { op: 2 * P(t, .05, .35, back), s: L(.92, 1, P(t, .05, .35, back)), cx: 770, cy: 280 });
+  const kf = P(t, 1.58, 1.8);
+  if (kf > 0 && kf < 1) s += chip(L(22, 470, kf), L(342, 403, kf), 170, 50, C.api, '3 job', true, { tc: C.dark });
+  return s;
+}
+function s4(t) {   // the desktop steps aside
+  let s = '';
+  const ks = P(t, .35, .6, back);
+  let seat = pill(0, 110, 420, 80, '#ffffff', '', {}) + `<circle cx="48" cy="150" r="20" fill="${C.whisper}"/><path d="M38,151 L46,159 L59,142" stroke="#ffffff" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`
+    + text(84, 161, 'nobody at the seat', { size: 30, weight: 700, anchor: 'start' });
+  s += g(seat, { op: ks * 2, s: L(.85, 1, ks), cx: 210, cy: 150 });
+  const kj = P(t, .12, .45, back), kfly = P(t, .95, 1.2);
+  if (kfly < 1) s += g(chip(0, 330, 340, 70, C.comfy, kfly > 0 ? 'ComfyUI 15G' : 'ComfyUI 15G · waits', kfly > 0, { size: 28 }),
+                        { tx: L(-420, 0, kj) + L(0, 530, kfly), ty: L(0, -95, kfly), op: kj * 3 });
+  const kc = P(t, 0, .3, back);
+  let c = card(480, 110, 640, 330, 'GPU 1 · 16 GB') + track(520, 230, 560, 80);
+  const kd = 1 - P(t, .7, .95) + P(t, 1.8, 2.1, back);
+  c += seg(520, 230, 70 * kd, 80, C.grey, '');
+  const dl = t < .7 ? 'desktop' : t < 1.1 ? 'desktop stopped' : t > 1.85 ? 'desktop back' : '';
+  const dop = t < .7 ? 1 : t < 1.1 ? 1 - P(t, .9, 1.1) : P(t, 1.85, 2.05);
+  c += text(520 + 70 * clamp(kd) + 18, 280, dl, { size: 28, weight: 700, anchor: 'start', fill: t > .7 && t < 1.1 ? C.muted : C.ink, op: dop });
+  c += seg(520, 230, 525 * (P(t, 1.08, 1.4) - P(t, 1.55, 1.75)), 80, C.comfy, 'ComfyUI 15G', { size: 28 });
+  c += text(800, 390, t > 1.55 && t < 1.9 ? 'job done' : '', { size: 26, weight: 600, fill: C.muted });
+  s += g(c, { op: kc * 2, s: L(.9, 1, kc), cx: 800, cy: 275 });
+  return s;
+}
+function s5(t) {   // the gate holds a chat request, the model hold keeps the model
+  let s = '';
+  const kb = P(t, 0, .3, back);
+  let b = box(330, 100, 360, 360) + text(510, 200, 'gate and queue', { size: 22, weight: 500, fill: '#ffffff' });
+  s += g(b, { op: kb * 2, s: L(.9, 1, kb), cx: 510, cy: 280 });
+  s += g(arrow(698, 280, 792, 280, 1), { op: P(t, .15, .35) });
+  let c = card(800, 130, 320, 300, 'GPU 0 · 24 GB') + track(830, 240, 260, 72);
+  c += seg(830, 240, 217 * (1 - P(t, .8, 1.0)), 72, C.comfy, 'ComfyUI');
+  c += seg(830, 240, 184 * (P(t, 1.0, 1.3) - P(t, 2.15, 2.35)), 72, C.llm, 'model A');
+  c += seg(830, 240, 130 * P(t, 2.35, 2.65), 72, C.llm, 'model B', { size: 26 });
+  const note = t < .8 ? 'a job has the card' : t < 2.15 ? 'class 1 chatting' : 'class 1 quiet';
+  c += text(960, 380, note, { size: 24, weight: 600, fill: C.muted });
+  s += g(c, { op: 2 * P(t, .05, .35, back), s: L(.92, 1, P(t, .05, .35, back)), cx: 960, cy: 280 });
+  // chat request: held at the gate while the job runs, sent on once the model is back
+  const kin = P(t, .25, .55, out), kgo = P(t, 1.3, 1.6);
+  if (kin > 0 && kgo < 1) s += g(chip(355, 220, 310, 56, C.llm, kgo > 0 ? 'chat' : 'chat · held', kgo > 0),
+                                  { tx: L(-560, 0, kin) + L(0, 480, kgo), ty: L(0, 28, kgo), op: kgo > 0 ? 1 - P(t, 1.5, 1.6) : pulse(t, .6, 1.3) });
+  // class 3 asks for model B: it waits while class 1 holds model A
+  const kin2 = P(t, 1.55, 1.85, out), kgo2 = P(t, 2.35, 2.65);
+  if (kin2 > 0 && kgo2 < 1) s += g(chip(355, 310, 310, 56, C.api, kgo2 > 0 ? 'model B' : 'model B · waits', kgo2 > 0, { tc: C.dark }),
+                                    { tx: L(-560, 0, kin2) + L(0, 480, kgo2), ty: L(0, -62, kgo2), op: kgo2 > 0 ? 1 - P(t, 2.55, 2.65) : pulse(t, 1.9, 2.35) });
+  return s;
+}
+function s6(t) {   // end card
+  let s = '';
+  const k = P(t, 0, .35, back);
+  s += g(box(300, 20, 520, 200, { size: 150, ty: 152 }), { op: k * 2, s: L(.8, 1, k), cx: 560, cy: 120 });
+  const kp = P(t, .2, .5, out);
+  s += g(text(560, 300, 'Stop CUDA out of memory when Ollama,', { size: 36, weight: 700 }) + text(560, 346, 'ComfyUI and your jobs share a GPU.', { size: 36, weight: 700 }), { op: kp, ty: L(18, 0, kp) });
+  const kc = P(t, .4, .7, back);
+  s += g(`<g filter="url(#sh)"><rect x="350" y="390" width="420" height="72" rx="18" fill="#ffffff" stroke="${C.ink}" stroke-width="4"/></g>` + text(560, 437, 'cargo install gpuq', { size: 32, weight: 700, font: MONO }),
+         { op: kc * 2, s: L(.85, 1, kc), cx: 560, cy: 426 });
+  const ku = P(t, .55, .85, out);
+  s += g(text(560, 530, 'github.com/elektricM/gpuq', { size: 30, weight: 700, fill: C.muted }), { op: ku, ty: L(14, 0, ku) });
+  return s;
+}
+
+const SCENES = [
+  [s1, 2.2, 'Two programs, one card.'],
+  [s2, 2.6, 'Queued by priority, the card takes turns.'],
+  [s3, 2.8, 'A big LLM, split over two GPUs.'],
+  [s4, 2.3, 'The desktop steps aside, then comes back.'],
+  [s5, 3.0, 'Requests wait at gpuq, then go through.'],
+  [s6, 1.9, ''],
+];
+const TOTAL = SCENES.reduce((a, s) => a + s[1], 0);
+
+function draw(t) {
+  let at = 0, i = 0;
+  while (i < SCENES.length - 1 && t >= at + SCENES[i][1]) { at += SCENES[i][1]; i++; }
+  const [fn, d, cap] = SCENES[i];
+  const lt = t - at;
+  const last = i === SCENES.length - 1;
+  const fade = P(lt, 0, .14) * (last ? 1 : 1 - P(lt, d - .14, d));
+  const square = H >= W;
+  const k = square ? .9 : 1;
+  let sx = (W - 1120 * k) / 2, sy, capSize, lines = cap ? [cap] : [];
+  if (square && cap.length > 24) {   // two lines: at the comma, else at the middle space
+    const at = cap.indexOf(', ') > 0 ? cap.indexOf(', ') + 1 : cap.lastIndexOf(' ', cap.length / 2);
+    lines = [cap.slice(0, at), cap.slice(at + 1)];
+  }
+  const longest = Math.max(0, ...lines.map(l => l.length));
+  if (!cap) sy = (H - 560 * k) / 2;
+  else if (square) {
+    capSize = Math.min(64, 1000 / (longest * .56));
+    const top = (H - (lines.length * capSize * 1.2 + 56 + 560 * k)) / 2;
+    lines = lines.map((l, j) => [l, top + capSize * (1 + 1.2 * j)]);
+    sy = top + lines.length * capSize * 1.2 + 56;
+  } else {
+    capSize = Math.min(48, 1180 / (longest * .56));
+    lines = lines.map(l => [l, 86]);
+    sy = 140;
+  }
+  const kcap = P(lt, 0, .3, out);
+  document.getElementById('frame').innerHTML =
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+<defs>
+<filter id="sh" x="-10%" y="-10%" width="130%" height="140%"><feOffset dx="6" dy="6" in="SourceAlpha"/><feComponentTransfer><feFuncA type="linear" slope="1"/></feComponentTransfer><feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+<marker id="mg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="4" markerHeight="4" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="${C.muted}"/></marker>
+<marker id="mr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="4" markerHeight="4" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="${C.red}"/></marker>
+</defs>
+<rect width="${W}" height="${H}" fill="#fff8ef"/>
+${g(lines.map(([l, y]) => text(W / 2, y.toFixed(1), l, { size: capSize.toFixed(1), weight: 800 })).join(''), { op: fade * kcap, ty: L(14, 0, kcap) })}
+<g transform="translate(${sx} ${sy}) scale(${k})" opacity="${fade.toFixed(3)}">${fn(lt)}</g>
+</svg>`;
+}
+draw(+(Q.get('t') || 0));
+</script>
+</body>
+</html>
