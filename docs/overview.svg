@@ -1,5 +1,53 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1000" height="470" viewBox="0 0 1000 470" font-family="Inter, Helvetica, Arial, sans-serif">
 <defs>
+<style>
+.a{animation-duration:16s;animation-iteration-count:infinite;animation-timing-function:cubic-bezier(.45,0,.25,1);animation-fill-mode:both}
+.sx{transform-box:fill-box;transform-origin:0 50%}
+.lbp{animation-name:lbp}.lbb{animation-name:lbb}.lov{animation-name:lov}.lask{animation-name:lask}.loom{animation-name:loom}.lgpu{animation-name:lgpu}
+.la1{animation-name:la1}.la2{animation-name:la2}.la3{animation-name:la3}.la4{animation-name:la4}
+.lp1{animation-name:lp1}.lp2{animation-name:lp2}.lp3{animation-name:lp3}.lp4{animation-name:lp4}
+.rw0{animation-name:rw0}.rw1{animation-name:rw1}.rw2{animation-name:rw2}.rw3{animation-name:rw3}
+.gw{animation-name:gw}.gwt{animation-name:gwt}.gl{animation-name:gl}.glt{animation-name:glt}.gc{animation-name:gc}.gct{animation-name:gct}
+.r1o{animation-name:r1o}.r1a{animation-name:r1a}.r2o{animation-name:r2o}.r2a{animation-name:r2a}
+.f1{animation-name:f1}.f2{animation-name:f2}.f3{animation-name:f3}.f4{animation-name:f4}.cw{animation-name:cw}.cl{animation-name:cl}.cc{animation-name:cc}
+.fl{stroke-dasharray:18 200;stroke-linecap:round}
+@keyframes lbp{0%,9.4%{transform:scaleX(1)}14.4%,18.8%{transform:scaleX(0)}25%,100%{transform:scaleX(1)}}
+@keyframes lbb{0%,9.4%{transform:scaleX(1)}14.4%,28.5%{transform:scaleX(0)}33.5%,100%{transform:scaleX(1)}}
+@keyframes lov{0%,9.4%{opacity:1;transform:scaleX(1)}12.5%{opacity:0;transform:scaleX(1)}12.6%,37.4%{opacity:0;transform:scaleX(0)}37.5%{opacity:1;transform:scaleX(0)}40.5%,43.8%{opacity:1;transform:scaleX(.45)}46.8%,100%{opacity:1;transform:scaleX(1)}}
+@keyframes lask{0%,9.4%{opacity:1}12.5%,44%{opacity:0}47%,100%{opacity:1}}
+@keyframes loom{0%,9.4%{opacity:1}12.5%,46%{opacity:0}48%{opacity:1}50.5%{opacity:.15}53%{opacity:1}55.5%{opacity:.15}58%,100%{opacity:1}}
+@keyframes lgpu{0%,9.4%{stroke:#ff4d4d}13%,44%{stroke:#1f1f1f}47%,100%{stroke:#ff4d4d}}
+@keyframes la1{0%,9.4%{opacity:1}12.5%,16.3%{opacity:0}18.8%,100%{opacity:1}}
+@keyframes la2{0%,9.4%{opacity:1}12.5%,26%{opacity:0}28.5%,100%{opacity:1}}
+@keyframes la3{0%,9.4%{opacity:1}12.5%,35%{opacity:0}37.5%,100%{opacity:1}}
+@keyframes la4{0%,9.4%{opacity:1}12.5%,41.3%{opacity:0}43.8%,100%{opacity:1}}
+@keyframes lp1{0%,16.3%,19.5%,100%{transform:translateX(0)}17.8%{transform:translateX(5px)}}
+@keyframes lp2{0%,26%,29.2%,100%{transform:translateX(0)}27.5%{transform:translateX(5px)}}
+@keyframes lp3{0%,35%,38.2%,100%{transform:translateX(0)}36.5%{transform:translateX(5px)}}
+@keyframes lp4{0%,41.3%,44.5%,100%{transform:translateX(0)}42.8%{transform:translateX(5px)}}
+@keyframes rw0{0%,9.4%{opacity:1}14.4%,31.3%{opacity:.25}33.8%,100%{opacity:1}}
+@keyframes rw1{0%,9.4%{opacity:1}14.4%,40%{opacity:.25}42.5%,100%{opacity:1}}
+@keyframes rw2{0%,9.4%{opacity:1}14.4%,48.8%{opacity:.25}51.3%,100%{opacity:1}}
+@keyframes rw3{0%,9.4%{opacity:1}14.4%,52.5%{opacity:.25}55%,100%{opacity:1}}
+@keyframes gw{0%,9.4%{transform:scaleX(1)}14.4%,33.8%{transform:scaleX(0)}38.8%,100%{transform:scaleX(1)}}
+@keyframes gwt{0%,9.4%{opacity:1}12.5%,38%{opacity:0}40%,100%{opacity:1}}
+@keyframes gl{0%,9.4%{transform:scaleX(1)}14.4%,42.5%{transform:scaleX(0)}47.5%,60%{transform:scaleX(1)}65%,82.5%{transform:scaleX(0)}87.5%,100%{transform:scaleX(1)}}
+@keyframes glt{0%,9.4%{opacity:1}12.5%,47%{opacity:0}49%,60%{opacity:1}62%,87%{opacity:0}89%,100%{opacity:1}}
+@keyframes gc{0%,65%{opacity:1;transform:scaleX(0)}70%,78.8%{opacity:1;transform:scaleX(1)}82.5%,100%{opacity:1;transform:scaleX(0)}}
+@keyframes gct{0%,69.5%{opacity:0}71.5%,78%{opacity:1}80%,100%{opacity:0}}
+@keyframes r1o{0%,60%{opacity:1}61.5%,85.5%{opacity:0}87%,100%{opacity:1}}
+@keyframes r1a{0%,61.5%{opacity:0}63%,84%{opacity:1}85.5%,100%{opacity:0}}
+@keyframes r2o{0%,65%{opacity:1}66.5%,80.5%{opacity:0}82%,100%{opacity:1}}
+@keyframes r2a{0%,66.5%{opacity:0}68%,79%{opacity:1}80.5%,100%{opacity:0}}
+@keyframes f1{0%{opacity:0;stroke-dashoffset:18}15.5%{opacity:0;stroke-dashoffset:18}15.6%{opacity:1;stroke-dashoffset:18}20.6%{opacity:1;stroke-dashoffset:-100}20.7%{opacity:0;stroke-dashoffset:-100}100%{opacity:0;stroke-dashoffset:-100}}
+@keyframes f2{0%{opacity:0;stroke-dashoffset:18}18.7%{opacity:0;stroke-dashoffset:18}18.8%{opacity:1;stroke-dashoffset:18}23.8%{opacity:1;stroke-dashoffset:-100}23.9%{opacity:0;stroke-dashoffset:-100}100%{opacity:0;stroke-dashoffset:-100}}
+@keyframes f3{0%{opacity:0;stroke-dashoffset:18}21.8%{opacity:0;stroke-dashoffset:18}21.9%{opacity:1;stroke-dashoffset:18}26.9%{opacity:1;stroke-dashoffset:-100}27.0%{opacity:0;stroke-dashoffset:-100}100%{opacity:0;stroke-dashoffset:-100}}
+@keyframes f4{0%{opacity:0;stroke-dashoffset:18}24.9%{opacity:0;stroke-dashoffset:18}25.0%{opacity:1;stroke-dashoffset:18}30.0%{opacity:1;stroke-dashoffset:-100}30.1%{opacity:0;stroke-dashoffset:-100}100%{opacity:0;stroke-dashoffset:-100}}
+@keyframes cw{0%{opacity:0;stroke-dashoffset:18}33.7%{opacity:0;stroke-dashoffset:18}33.8%{opacity:1;stroke-dashoffset:18}37.5%{opacity:1;stroke-dashoffset:-100}37.6%{opacity:0;stroke-dashoffset:-100}100%{opacity:0;stroke-dashoffset:-100}}
+@keyframes cl{0%{opacity:0;stroke-dashoffset:18}42.4%{opacity:0;stroke-dashoffset:18}42.5%{opacity:1;stroke-dashoffset:18}46.3%{opacity:1;stroke-dashoffset:-100}46.4%{opacity:0;stroke-dashoffset:-100}82.4%{opacity:0;stroke-dashoffset:18}82.5%{opacity:1;stroke-dashoffset:18}86.3%{opacity:1;stroke-dashoffset:-100}86.4%{opacity:0;stroke-dashoffset:-100}100%{opacity:0;stroke-dashoffset:-100}}
+@keyframes cc{0%{opacity:0;stroke-dashoffset:18}64.9%{opacity:0;stroke-dashoffset:18}65.0%{opacity:1;stroke-dashoffset:18}68.8%{opacity:1;stroke-dashoffset:-100}68.9%{opacity:0;stroke-dashoffset:-100}100%{opacity:0;stroke-dashoffset:-100}}
+@media (prefers-reduced-motion:reduce){.a{animation:none!important}}
+</style>
 <marker id="m" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#4a4a4a"/></marker>
 <marker id="b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#ff4d4d"/></marker>
 <filter id="sh" x="-10%" y="-10%" width="130%" height="140%"><feOffset dx="4" dy="4" in="SourceAlpha"/><feComponentTransfer><feFuncA type="linear" slope="1"/></feComponentTransfer><feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter>
@@ -11,26 +59,34 @@
 </g>
 <text x="177" y="44" text-anchor="middle" font-size="17" font-weight="700" fill="#1f1f1f">Without gpuq</text>
 <text x="672.0" y="44" text-anchor="middle" font-size="17" font-weight="700" fill="#1f1f1f">With gpuq</text>
+<g class="a lp1">
 <g filter="url(#sh)"><rect x="30" y="70" width="120" height="36" rx="14" fill="#a66cff" stroke="#1f1f1f" stroke-width="3"/></g>
 <text x="90.0" y="93.0" text-anchor="middle" font-size="14" font-weight="600" fill="#ffffff">LLM server</text>
+</g>
+<g class="a lp2">
 <g filter="url(#sh)"><rect x="30" y="120" width="120" height="36" rx="14" fill="#3d8bff" stroke="#1f1f1f" stroke-width="3"/></g>
 <text x="90.0" y="143.0" text-anchor="middle" font-size="14" font-weight="600" fill="#ffffff">ComfyUI</text>
+</g>
+<g class="a lp3">
 <g filter="url(#sh)"><rect x="30" y="170" width="120" height="36" rx="14" fill="#00b37e" stroke="#1f1f1f" stroke-width="3"/></g>
 <text x="90.0" y="193.0" text-anchor="middle" font-size="14" font-weight="600" fill="#ffffff">Whisper</text>
+</g>
+<g class="a lp4">
 <g filter="url(#sh)"><rect x="30" y="220" width="120" height="36" rx="14" fill="#ffb400" stroke="#1f1f1f" stroke-width="3"/></g>
 <text x="90.0" y="243.0" text-anchor="middle" font-size="14" font-weight="600" fill="#1f2328">API request</text>
-<path d="M152,88 L192,138.75" stroke="#ff4d4d" stroke-width="1.8" marker-end="url(#b)" filter="none"/>
-<path d="M152,138 L192,156.25" stroke="#ff4d4d" stroke-width="1.8" marker-end="url(#b)" filter="none"/>
-<path d="M152,188 L192,173.75" stroke="#ff4d4d" stroke-width="1.8" marker-end="url(#b)" filter="none"/>
-<path d="M152,238 L192,191.25" stroke="#ff4d4d" stroke-width="1.8" marker-end="url(#b)" filter="none"/>
-<g filter="url(#sh)"><rect x="196" y="100" width="130" height="130" rx="16" fill="#ffffff" stroke="#ff4d4d" stroke-width="3.8"/></g>
+</g>
+<path class="a la1" d="M152,88 L192,138.75" stroke="#ff4d4d" stroke-width="1.8" marker-end="url(#b)" filter="none"/>
+<path class="a la2" d="M152,138 L192,156.25" stroke="#ff4d4d" stroke-width="1.8" marker-end="url(#b)" filter="none"/>
+<path class="a la3" d="M152,188 L192,173.75" stroke="#ff4d4d" stroke-width="1.8" marker-end="url(#b)" filter="none"/>
+<path class="a la4" d="M152,238 L192,191.25" stroke="#ff4d4d" stroke-width="1.8" marker-end="url(#b)" filter="none"/>
+<g filter="url(#sh)"><rect class="a lgpu" x="196" y="100" width="130" height="130" rx="16" fill="#ffffff" stroke="#ff4d4d" stroke-width="3.8"/></g>
 <text x="261.0" y="128" text-anchor="middle" font-size="16" font-weight="700" fill="#1f1f1f">GPU</text>
-<text x="261.0" y="216" text-anchor="middle" font-size="12" font-weight="600" fill="#ff4d4d">out of memory</text>
+<text class="a loom" x="261.0" y="216" text-anchor="middle" font-size="12" font-weight="600" fill="#ff4d4d">out of memory</text>
 <rect x="208" y="146" width="106" height="22" rx="3" fill="#f0e6d8"/>
-<rect x="208" y="146" width="75.08333333333333" height="22" fill="#a66cff"/>
-<rect x="283.0833333333333" y="146" width="30.916666666666686" height="22" fill="#3d8bff"/>
-<rect x="314" y="143" width="22.083333333333314" height="28" fill="none" stroke="#ff4d4d" stroke-width="1.6" stroke-dasharray="3 2"/>
-<text x="261.0" y="190" text-anchor="middle" font-size="12" fill="#ff4d4d">29 GB asked</text>
+<rect class="a sx lbp" x="208" y="146" width="75.08333333333333" height="22" fill="#a66cff"/>
+<rect class="a sx lbb" x="283.0833333333333" y="146" width="30.916666666666686" height="22" fill="#3d8bff"/>
+<rect class="a sx lov" x="314" y="143" width="22.083333333333314" height="28" fill="none" stroke="#ff4d4d" stroke-width="1.6" stroke-dasharray="3 2"/>
+<text class="a lask" x="261.0" y="190" text-anchor="middle" font-size="12" fill="#ff4d4d">29 GB asked</text>
 <text x="177" y="296" text-anchor="middle" font-size="12.5" fill="#4a4a4a">Every program grabs the card.</text>
 <text x="177" y="314" text-anchor="middle" font-size="12.5" fill="#4a4a4a">One crashes, or everything crawls.</text>
 <g filter="url(#sh)"><rect x="372" y="70" width="160" height="36" rx="14" fill="#a66cff" stroke="#1f1f1f" stroke-width="3"/></g>
@@ -49,33 +105,64 @@
 <path d="M534,138 C550,138 545,165.0 561,165.0" fill="none" stroke="#4a4a4a" stroke-width="1.5" marker-end="url(#m)" filter="none"/>
 <path d="M534,188 C550,188 545,165.0 561,165.0" fill="none" stroke="#4a4a4a" stroke-width="1.5" marker-end="url(#m)" filter="none"/>
 <path d="M534,238 C550,238 545,165.0 561,165.0" fill="none" stroke="#4a4a4a" stroke-width="1.5" marker-end="url(#m)" filter="none"/>
+<path class="a fl f1" d="M534,88 C550,88 545,165.0 561,165.0" pathLength="100" fill="none" stroke="#a66cff" stroke-width="3.5" opacity="0"/>
+<path class="a fl f2" d="M534,138 C550,138 545,165.0 561,165.0" pathLength="100" fill="none" stroke="#3d8bff" stroke-width="3.5" opacity="0"/>
+<path class="a fl f3" d="M534,188 C550,188 545,165.0 561,165.0" pathLength="100" fill="none" stroke="#00b37e" stroke-width="3.5" opacity="0"/>
+<path class="a fl f4" d="M534,238 C550,238 545,165.0 561,165.0" pathLength="100" fill="none" stroke="#ffb400" stroke-width="3.5" opacity="0"/>
 <g filter="url(#sh)"><rect x="565" y="80" width="180" height="170" rx="18" fill="#1f1f1f" stroke="#1f1f1f" stroke-width="3"/></g>
 <text x="655.0" y="112" text-anchor="middle" font-size="22" font-weight="800" fill="#ffd400">gpuq</text>
 <text x="581" y="138" font-size="11" fill="#ffffff">queue, by priority</text>
+<g class="a rw0">
 <rect x="579" y="148" width="96" height="19" rx="5" fill="#00b37e"/>
 <text x="627" y="162" text-anchor="middle" font-size="11" font-weight="600" fill="#ffffff">0 Whisper</text>
 <text x="683" y="162" font-size="11" fill="#ffffff">▶ runs</text>
+</g>
+<g class="a rw1">
+<g class="a r1o">
 <rect x="579" y="172" width="96" height="19" rx="5" fill="#a66cff"/>
 <text x="627" y="186" text-anchor="middle" font-size="11" font-weight="600" fill="#ffffff">1 LLM</text>
 <text x="683" y="186" font-size="11" fill="#ffffff">▶ runs</text>
+</g>
+<g class="a r1a" opacity="0">
+<rect x="579.5" y="172.5" width="95" height="18" rx="5" fill="none" stroke="#a66cff" stroke-width="1.3" stroke-dasharray="4 2"/>
+<text x="627" y="186" text-anchor="middle" font-size="11" font-weight="600" fill="#a66cff">1 LLM</text>
+<text x="683" y="186" font-size="11" fill="#ffffff">· waits</text>
+</g>
+</g>
+<g class="a rw2">
+<g class="a r2o">
 <rect x="579.5" y="196.5" width="95" height="18" rx="5" fill="none" stroke="#3d8bff" stroke-width="1.3" stroke-dasharray="4 2"/>
 <text x="627" y="210" text-anchor="middle" font-size="11" font-weight="600" fill="#3d8bff">2 ComfyUI</text>
 <text x="683" y="210" font-size="11" fill="#ffffff">· waits</text>
+</g>
+<g class="a r2a" opacity="0">
+<rect x="579" y="196" width="96" height="19" rx="5" fill="#3d8bff"/>
+<text x="627" y="210" text-anchor="middle" font-size="11" font-weight="600" fill="#ffffff">2 ComfyUI</text>
+<text x="683" y="210" font-size="11" fill="#ffffff">▶ runs</text>
+</g>
+</g>
+<g class="a rw3">
 <rect x="579.5" y="220.5" width="95" height="18" rx="5" fill="none" stroke="#ffb400" stroke-width="1.3" stroke-dasharray="4 2"/>
 <text x="627" y="234" text-anchor="middle" font-size="11" font-weight="600" fill="#ffb400">3 API req.</text>
 <text x="683" y="234" font-size="11" fill="#ffffff">· waits</text>
+</g>
 <path d="M747,165.0 L775,165.0" stroke="#4a4a4a" stroke-width="1.8" marker-end="url(#m)"/>
+<path class="a fl cw" d="M747,165.0 L775,165.0" pathLength="100" stroke="#00b37e" stroke-width="3.5" opacity="0"/>
+<path class="a fl cl" d="M747,165.0 L775,165.0" pathLength="100" stroke="#a66cff" stroke-width="3.5" opacity="0"/>
+<path class="a fl cc" d="M747,165.0 L775,165.0" pathLength="100" stroke="#3d8bff" stroke-width="3.5" opacity="0"/>
 <g filter="url(#sh)"><rect x="779" y="80" width="191" height="170" rx="16" fill="#ffffff" stroke="#00b37e" stroke-width="3.8"/></g>
 <text x="874.5" y="106" text-anchor="middle" font-size="16" font-weight="700" fill="#1f1f1f">2 GPUs</text>
 <text x="793" y="127" font-size="10" font-weight="600" fill="#4a4a4a">GPU 0 · 24 GB</text>
 <rect x="793" y="132" width="163" height="24" rx="4" fill="#f0e6d8"/>
-<rect x="793" y="132" width="115.5" height="24" rx="4" fill="#a66cff"/>
-<text x="850.75" y="148.5" text-anchor="middle" font-size="12" font-weight="600" fill="#ffffff">LLM 17G</text>
+<rect class="a sx gl" x="793" y="132" width="115.5" height="24" rx="4" fill="#a66cff"/>
+<text class="a glt" x="850.75" y="148.5" text-anchor="middle" font-size="12" font-weight="600" fill="#ffffff">LLM 17G</text>
+<rect class="a sx gc" x="793" y="132" width="135.8" height="24" rx="4" fill="#3d8bff" opacity="0"/>
+<text class="a gct" x="860.9" y="148.5" text-anchor="middle" font-size="12" font-weight="600" fill="#ffffff" opacity="0">ComfyUI 20G</text>
 <text x="793" y="172" font-size="10" font-weight="600" fill="#4a4a4a">GPU 1 · 16 GB</text>
 <rect x="793" y="177" width="163" height="24" rx="4" fill="#f0e6d8"/>
-<rect x="793" y="177" width="30.6" height="24" rx="4" fill="#00b37e"/>
-<text x="808.3" y="193.5" text-anchor="middle" font-size="10" font-weight="600" fill="#ffffff">3G</text>
-<text x="830" y="193.5" font-size="11" font-weight="600" fill="#1f1f1f">Whisper</text>
+<rect class="a sx gw" x="793" y="177" width="30.6" height="24" rx="4" fill="#00b37e"/>
+<text class="a gwt" x="808.3" y="193.5" text-anchor="middle" font-size="10" font-weight="600" fill="#ffffff">3G</text>
+<text class="a gwt" x="830" y="193.5" font-size="11" font-weight="600" fill="#1f1f1f">Whisper</text>
 <text x="874.5" y="222" text-anchor="middle" font-size="11" fill="#4a4a4a">Whisper takes the free card.</text>
 <text x="874.5" y="238" text-anchor="middle" font-size="11" fill="#4a4a4a">ComfyUI next: the LLM unloads.</text>
 <text x="672.0" y="305" text-anchor="middle" font-size="12.5" fill="#4a4a4a">gpuq hands out the GPUs by priority and free VRAM.</text>
