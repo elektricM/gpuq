@@ -22,8 +22,9 @@ do:
 
 - Several LLM servers, one per card, each behind its own gate. Today there is one LLM backend;
   it can span several cards (`llm.card` as a list) but not run twice.
-- Vulkan device numbers. Detected cards get `CUDA_VISIBLE_DEVICES` or `ROCR_VISIBLE_DEVICES`;
-  Vulkan programs (`GGML_VK_VISIBLE_DEVICES`) are still pinned by hand.
+- Vulkan on several cards and on NVIDIA. A lease on one AMD or Intel card gets `DRI_PRIME`;
+  a lease on several cards, NVIDIA Vulkan and services gpuq starts are still pinned by hand
+  (`GGML_VK_VISIBLE_DEVICES`).
 - Reading llama-swap's device options. gpuq takes a model's cards from `[llm.models]` or from
   its estimated size; it could read `-dev`, `--tensor-split` and the `*_VISIBLE_DEVICES` of each
   model's command instead.

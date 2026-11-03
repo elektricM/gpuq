@@ -86,8 +86,11 @@ card:
 
 Only `ROCR_VISIBLE_DEVICES` is set for detected AMD cards. HIP numbers the cards it is given
 from 0 again, so setting `HIP_VISIBLE_DEVICES` to the same value as well would point at the
-wrong device. Vulkan programs (for example llama.cpp built with Vulkan) ignore both variables;
-pin them by hand.
+wrong device. Vulkan and OpenGL programs (for example llama.cpp built with Vulkan) ignore both
+variables, so a lease on a single AMD or Intel card also gets `DRI_PRIME=pci-<address>!`
+(`pci-0000_03_00_0!`), which makes Mesa show that card and no other. A lease on several cards
+gets no `DRI_PRIME`, since Mesa takes one device; services that gpuq starts do not get it
+either. NVIDIA's Vulkan driver does not read `DRI_PRIME`.
 
 An AMD GPU counts as integrated when sysfs has no `mem_info_vram_vendor` for it: amdgpu creates
 that file only for cards with their own memory chips, which an APU's GPU does not have.
