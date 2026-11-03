@@ -39,15 +39,13 @@
     <text x="1200" y="398" text-anchor="end">24 GB</text>
     <text x="1200" y="514" text-anchor="end">24 GB</text>
   </g>
-  <!-- GPU 0: an LLM and a ComfyUI job -->
+  <!-- GPU 0: the LLM alone; jobs never share a card with the loaded model -->
   <rect x="612" y="412" width="588" height="52" rx="8" fill="#303642"/>
-  <rect x="612" y="412" width="250" height="52" rx="8" fill="#c792ea"/>
-  <rect x="854" y="412" width="8" height="52" fill="#c792ea"/>
-  <rect x="866" y="412" width="196" height="52" fill="#61afef"/>
-  <!-- GPU 1: a training run -->
+  <rect x="612" y="412" width="340" height="52" rx="8" fill="#c792ea"/>
+  <!-- GPU 1: ComfyUI and a training run side by side -->
   <rect x="612" y="528" width="588" height="52" rx="8" fill="#303642"/>
-  <rect x="612" y="528" width="480" height="52" rx="8" fill="#f08c5a"/>
-  <rect x="1084" y="528" width="8" height="52" fill="#f08c5a"/>
+  <rect x="612" y="528" width="250" height="52" rx="8" fill="#61afef"/>
+  <rect x="866" y="528" width="226" height="52" rx="8" fill="#f08c5a"/>
 
   <!-- Footer -->
   <text x="1200" y="150" text-anchor="end" font-family="Inter" font-weight="500" font-size="26" fill="#7d8594">github.com/elektricM/gpuq</text>
