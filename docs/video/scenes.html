@@ -210,13 +210,18 @@ const SCENES = [
   [s5, 3.0, 'Requests wait at gpuq, then go through.'],
   [s6, 1.9, ''],
 ];
-const TOTAL = SCENES.reduce((a, s) => a + s[1], 0);
+// Pace: every scene plays SLOW times slower than its timings above, then holds HOLD s on its last frame so the caption can be read
+const SLOW = 1.4, HOLD = 0.8;
+const len = s => s[1] * SLOW + (s[2] ? HOLD : 0);
+const TOTAL = SCENES.reduce((a, s) => a + len(s), 0);
 
 function draw(t) {
   let at = 0, i = 0;
-  while (i < SCENES.length - 1 && t >= at + SCENES[i][1]) { at += SCENES[i][1]; i++; }
-  const [fn, d, cap] = SCENES[i];
+  while (i < SCENES.length - 1 && t >= at + len(SCENES[i])) { at += len(SCENES[i]); i++; }
+  const [fn, d0, cap] = SCENES[i];
+  const d = len(SCENES[i]);
   const lt = t - at;
+  const st = Math.min((t - at) / SLOW, d0 - .15);  // scene time, frozen near its end during the hold
   const last = i === SCENES.length - 1;
   const fade = P(lt, 0, .14) * (last ? 1 : 1 - P(lt, d - .14, d));
   const square = H >= W;
@@ -248,7 +253,7 @@ function draw(t) {
 </defs>
 <rect width="${W}" height="${H}" fill="#fff8ef"/>
 ${g(lines.map(([l, y]) => text(W / 2, y.toFixed(1), l, { size: capSize.toFixed(1), weight: 800 })).join(''), { op: fade * kcap, ty: L(14, 0, kcap) })}
-<g transform="translate(${sx} ${sy}) scale(${k})" opacity="${fade.toFixed(3)}">${fn(lt)}</g>
+<g transform="translate(${sx} ${sy}) scale(${k})" opacity="${fade.toFixed(3)}">${fn(st)}</g>
 </svg>`;
 }
 draw(+(Q.get('t') || 0));
