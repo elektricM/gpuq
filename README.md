@@ -1,7 +1,3 @@
-
-
-https://github.com/user-attachments/assets/c62e5e80-7f69-45e5-9a54-a391b5e98c51
-
 # gpuq
 
 [![CI status](https://github.com/elektricM/gpuq/actions/workflows/ci.yml/badge.svg)](https://github.com/elektricM/gpuq/actions/workflows/ci.yml)
@@ -11,6 +7,8 @@ gpuq lets several programs share your GPUs without running out of VRAM: it queue
 unloads LLM models and stops services until there is room.
 
 ![Without gpuq, every program grabs the GPU and one runs out of memory. With gpuq, programs queue by priority class and each gets a card when there is room.](docs/overview.svg)
+
+https://github.com/user-attachments/assets/c62e5e80-7f69-45e5-9a54-a391b5e98c51
 
 ```
 torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 2.00 GiB. GPU 0 has a total
