@@ -7,15 +7,7 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-### Changed
-
-- README and docs: diagrams in `docs/diagrams/`, each in a light and a dark variant, show the
-  problem, what happens to a request, two GPUs and the HTTP gate. They replace
-  `docs/demo.gif`, `docs/overview.svg` and `docs/architecture.svg`; the demo recording
-  scripts in `docs/demo/` are removed.
-- Examples use current model names (`qwen3.8`).
-
-## [0.4.1] - 2026-11-03
+## [0.4.1] - 2026-11-10
 
 ### Added
 
@@ -30,8 +22,15 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   host gating Ollama and starting and stopping the ComfyUI container.
 - `install.sh`: downloads the release binary for x86_64 or aarch64, checks it against
   `SHA256SUMS` and installs it to `~/.local/bin` or, with `--system`, `/usr/local/bin`.
-- README: the out-of-memory errors gpuq prevents, who it is for, and a demo of two cards
-  (`docs/demo.gif`, recorded by `docs/demo/record.sh` with pretend cards).
+- README: the out-of-memory errors gpuq prevents and who it is for.
+
+### Changed
+
+- README and docs: diagrams in `docs/diagrams/`, each in a light and a dark variant, show the
+  problem, what happens to a request, two GPUs and the HTTP gate. They replace
+  `docs/demo.gif`, `docs/overview.svg` and `docs/architecture.svg`; the demo recording
+  scripts in `docs/demo/` are removed.
+- Examples use current model names (`qwen3.8`).
 
 ## [0.4.0] - 2026-11-03
 

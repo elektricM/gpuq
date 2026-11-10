@@ -117,7 +117,7 @@ cargo test --offline --locked %{?_smp_mflags}
 %{_datadir}/fish/vendor_completions.d/%{name}.fish
 
 %changelog
-* Tue Nov 03 2026 Martin Dolez <martin@dolez.fr> - 0.4.1-1
+* Tue Nov 10 2026 Martin Dolez <martin@dolez.fr> - 0.4.1-1
 - Unload models through the server's own API (Stable Diffusion web UIs, LM Studio,
   text-generation-webui)
 - install.sh and a Docker Compose example
