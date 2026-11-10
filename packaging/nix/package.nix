@@ -15,12 +15,10 @@ rustPlatform.buildRustPackage (finalAttrs: {
     owner = "elektricM";
     repo = "gpuq";
     tag = "v${finalAttrs.version}";
-    # Fill in after the v0.4.1 tag exists (packaging/README.md, release checklist step 3).
-    hash = lib.fakeHash;
+    hash = "sha256-VbiAO1BDgvwS+bjxCrWxPjRXNwWL2YLtUgtuDagybWM=";
   };
 
-  # Fill in after the v0.4.1 tag exists.
-  cargoHash = lib.fakeHash;
+  cargoHash = "sha256-4uTztYRFR1bD4fNCMgJXo32U1oLGAlsOw9A1mkvD3OQ=";
 
   nativeBuildInputs = [ installShellFiles ];
 
@@ -35,7 +33,8 @@ rustPlatform.buildRustPackage (finalAttrs: {
     install -Dm644 packaging/systemd/gpuq.user.service $out/lib/systemd/user/gpuq.service
     substituteInPlace $out/lib/systemd/system/gpuq.service $out/lib/systemd/user/gpuq.service \
       --replace-fail /usr/bin/gpuq $out/bin/gpuq
-    install -Dm644 examples/* -t $out/share/doc/gpuq/examples
+    mkdir -p $out/share/doc/gpuq
+    cp -r --no-preserve=mode examples $out/share/doc/gpuq/
   '';
 
   meta = {

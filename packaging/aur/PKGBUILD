@@ -11,8 +11,7 @@ makedepends=(cargo)
 backup=('etc/gpuq/config.toml')
 options=('!lto')  # makepkg's LTO flags break ring's assembly at link time
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
-# Fill in after the v0.4.1 tag exists (packaging/README.md, release checklist step 3).
-sha256sums=('TODO-fill-after-the-v0.4.1-tag')
+sha256sums=('8517e2277a8a8465c86d6af27716a8b978cee895c012081eb6e1b48028bf2247')
 
 prepare() {
   cd "$pkgname-$pkgver"
@@ -47,6 +46,8 @@ package() {
   install -Dm644 completions/gpuq.fish -t "$pkgdir/usr/share/fish/vendor_completions.d"
   install -Dm644 README.md CHANGELOG.md -t "$pkgdir/usr/share/doc/$pkgname"
   install -Dm644 docs/*.md -t "$pkgdir/usr/share/doc/$pkgname/docs"
-  install -Dm644 examples/* -t "$pkgdir/usr/share/doc/$pkgname/examples"
+  install -dm755 "$pkgdir/usr/share/doc/$pkgname"
+  cp -r --no-preserve=ownership examples "$pkgdir/usr/share/doc/$pkgname/"
+  find "$pkgdir/usr/share/doc/$pkgname/examples" -type d -exec chmod 755 {} + -o -type f -exec chmod 644 {} +
   install -Dm644 LICENSE -t "$pkgdir/usr/share/licenses/$pkgname"
 }

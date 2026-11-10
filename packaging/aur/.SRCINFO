@@ -12,6 +12,6 @@ pkgbase = gpuq
 	options = !lto
 	backup = etc/gpuq/config.toml
 	source = gpuq-0.4.1.tar.gz::https://github.com/elektricM/gpuq/archive/refs/tags/v0.4.1.tar.gz
-	sha256sums = TODO-fill-after-the-v0.4.1-tag
+	sha256sums = 8517e2277a8a8465c86d6af27716a8b978cee895c012081eb6e1b48028bf2247
 
 pkgname = gpuq
