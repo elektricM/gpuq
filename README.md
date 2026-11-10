@@ -1,3 +1,7 @@
+
+
+https://github.com/user-attachments/assets/c62e5e80-7f69-45e5-9a54-a391b5e98c51
+
 # gpuq
 
 [![CI status](https://github.com/elektricM/gpuq/actions/workflows/ci.yml/badge.svg)](https://github.com/elektricM/gpuq/actions/workflows/ci.yml)
